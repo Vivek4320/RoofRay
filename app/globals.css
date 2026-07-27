@@ -1,26 +1,484 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0B0F1A;
+  --foreground: #E2E8F0;
+  --primary: #3B82F6;
+  --primary-light: #60A5FA;
+  --primary-dark: #2563EB;
+  --surface-soft: #111827;
+  --surface-blue: #0D1424;
+  --muted: #94A3B8;
+  --line: #1E293B;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --color-primary: #3B82F6;
+  --color-primary-light: #60A5FA;
+  --color-primary-lighter: #93C5FD;
+  --color-primary-dark: #2563EB;
+  --color-primary-50: #1E3A5F;
+  --color-primary-100: #1E3A5F;
+  --color-primary-200: #1E4D8C;
+
+  --color-ink: #F1F5F9;
+  --color-ink-light: #CBD5E1;
+  --color-ink-lighter: #94A3B8;
+
+  --color-surface: #111827;
+  --color-surface-soft: #151C2C;
+  --color-surface-blue: #0D1424;
+  --color-surface-warm: #0F1623;
+
+  --color-muted: #64748B;
+  --color-line: #1E293B;
+  --color-success: #10B981;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Selection */
+::selection {
+  background-color: #3B82F6;
+  color: #FFFFFF;
+}
+
+/* Focus */
+:focus-visible {
+  outline: 2px solid #3B82F6;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Overline label */
+.section-label {
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: #60A5FA;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-label::before {
+  content: '';
+  display: inline-block;
+  width: 1.5rem;
+  height: 2px;
+  background: #3B82F6;
+  border-radius: 1px;
+}
+
+/* Blue gradient text */
+.blue-text {
+  background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 50%, #2563EB 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Diagonal section divider */
+.diagonal-top {
+  clip-path: polygon(0 4%, 100% 0, 100% 100%, 0 100%);
+}
+
+.diagonal-bottom {
+  clip-path: polygon(0 0, 100% 0, 100% 96%, 0 100%);
+}
+
+.diagonal-both {
+  clip-path: polygon(0 4%, 100% 0, 100% 96%, 0 100%);
+}
+
+/* Soft card — dark */
+.soft-card {
+  background: #111827;
+  border: 1px solid #1E293B;
+  border-radius: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.15);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.soft-card:hover {
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.12), 0 16px 48px rgba(0, 0, 0, 0.2);
+  border-color: #1E3A5F;
+  transform: translateY(-4px);
+}
+
+/* Blue card (for emphasis) */
+.blue-card {
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: #FFFFFF;
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.25), 0 12px 40px rgba(37, 99, 235, 0.15);
+}
+
+/* Glass effect for dark theme */
+.glass-light {
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(30, 41, 59, 0.6);
+}
+
+/* Blob shape */
+.blob {
+  animation: blob 8s ease-in-out infinite;
+}
+
+/* Skewed section background */
+.skew-bg {
+  position: relative;
+}
+
+.skew-bg::before {
+  content: '';
+  position: absolute;
+  top: -2rem;
+  left: -5%;
+  right: -5%;
+  bottom: -2rem;
+  background: #0D1424;
+  transform: skewY(-2deg);
+  z-index: -1;
+}
+
+/* Pill badge */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Hairline divider */
+.hairline {
+  background: linear-gradient(
+    90deg,
+    rgba(59, 130, 246, 0) 0%,
+    rgba(59, 130, 246, 0.3) 50%,
+    rgba(59, 130, 246, 0) 100%
+  );
+  height: 1px;
+}
+
+/* Number circle */
+.num-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #3B82F6, #2563EB);
+  color: white;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Diagonal stripe background — dark */
+.stripe-bg {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 10px,
+    rgba(59, 130, 246, 0.02) 10px,
+    rgba(59, 130, 246, 0.02) 20px
+  );
+}
+
+/* Button styles */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 2rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 2rem;
+  border-radius: 9999px;
+  background: #111827;
+  color: #E2E8F0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1.5px solid #1E293B;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: #1E3A5F;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Input styles ��� dark */
+.input-field {
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  border-radius: 9999px;
+  border: 1.5px solid #1E293B;
+  background: #111827;
+  color: #E2E8F0;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.input-field::placeholder {
+  color: #475569;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Section spacing */
+.section-pad {
+  padding-top: 6rem;
+  padding-bottom: 6rem;
+}
+
+@media (min-width: 768px) {
+  .section-pad {
+    padding-top: 8rem;
+    padding-bottom: 8rem;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Scroll-triggered animations */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-on-scroll {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ===== SOLAR HOVER EFFECTS ===== */
+
+/* Sun ray burst — rays radiate from top-right corner on hover */
+.solar-rays {
+  position: relative;
+  overflow: hidden;
+}
+
+.solar-rays::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(59, 130, 246, 0.08) 10deg,
+    transparent 20deg,
+    transparent 30deg,
+    rgba(59, 130, 246, 0.05) 40deg,
+    transparent 50deg,
+    transparent 60deg,
+    rgba(59, 130, 246, 0.08) 70deg,
+    transparent 80deg,
+    transparent 90deg,
+    rgba(59, 130, 246, 0.05) 100deg,
+    transparent 110deg,
+    transparent 120deg,
+    rgba(59, 130, 246, 0.08) 130deg,
+    transparent 140deg,
+    transparent 150deg,
+    rgba(59, 130, 246, 0.05) 160deg,
+    transparent 170deg,
+    transparent 180deg,
+    rgba(59, 130, 246, 0.08) 190deg,
+    transparent 200deg,
+    transparent 210deg,
+    rgba(59, 130, 246, 0.05) 220deg,
+    transparent 230deg,
+    transparent 240deg,
+    rgba(59, 130, 246, 0.08) 250deg,
+    transparent 260deg,
+    transparent 270deg,
+    rgba(59, 130, 246, 0.05) 280deg,
+    transparent 290deg,
+    transparent 300deg,
+    rgba(59, 130, 246, 0.08) 310deg,
+    transparent 320deg,
+    transparent 330deg,
+    rgba(59, 130, 246, 0.05) 340deg,
+    transparent 350deg,
+    transparent 360deg
+  );
+  opacity: 0;
+  transform: rotate(0deg);
+  transition: opacity 0.6s ease, transform 8s linear;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.solar-rays:hover::after {
+  opacity: 1;
+  transform: rotate(30deg);
+}
+
+/* Solar shimmer — light sweep across element on hover */
+.solar-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.solar-shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgba(59, 130, 246, 0.04) 40%,
+    rgba(59, 130, 246, 0.1) 50%,
+    rgba(59, 130, 246, 0.04) 60%,
+    transparent 100%
+  );
+  transition: none;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.solar-shimmer:hover::before {
+  animation: shimmer-sweep 0.8s ease forwards;
+}
+
+@keyframes shimmer-sweep {
+  0% { left: -100%; }
+  100% { left: 150%; }
+}
+
+/* Solar glow — expanding ring of light from center */
+.solar-glow {
+  position: relative;
+}
+
+.solar-glow::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1), height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.solar-glow:hover::after {
+  width: 300%;
+  height: 300%;
+}
+
+/* Sun icon pulse — the icon itself pulses with energy on hover */
+.solar-icon-pulse {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.solar-icon-pulse:hover {
+  filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
+  transform: scale(1.1) rotate(15deg);
+}
+
+/* Energy border — glowing border that pulses on hover */
+.solar-border {
+  position: relative;
+}
+
+.solar-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, transparent, transparent);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  transition: background 0.4s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.solar-border:hover::before {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.5));
 }
