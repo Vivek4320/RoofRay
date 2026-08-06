@@ -40,9 +40,9 @@ export default function HowItWorks() {
 
       <div className="relative mx-auto max-w-7xl px-6 py-24 lg:px-10 lg:py-32">
         {/* Section header — asymmetric: left-aligned with max constraint */}
-        <div className="mb-20 max-w-2xl">
+        <div className="mb-12 md:mb-20 max-w-2xl">
           <p className="section-label mb-5">How it works</p>
-          <h2 className="font-display text-4xl font-extrabold tracking-tight text-white md:text-5xl">
+          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white">
             Three steps.
             <br />
             <span className="relative inline-block">
@@ -61,7 +61,7 @@ export default function HowItWorks() {
         {/* Steps — asymmetric layout: first step big, next two stacked right */}
         <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
           {/* Step 1 — spans more width, taller */}
-          <div className="soft-card solar-rays solar-shimmer group relative overflow-hidden p-8 lg:col-span-5 lg:row-span-2 lg:p-10">
+          <div className="soft-card solar-rays solar-shimmer group relative overflow-hidden p-6 sm:p-8 lg:col-span-5 lg:row-span-2 lg:p-10">
             {/* Blue accent corner */}
             <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-[4rem]" />
 
@@ -107,11 +107,11 @@ export default function HowItWorks() {
           </div>
 
           {/* Step 2 — spans remaining width */}
-          <div className="soft-card solar-shimmer solar-glow group relative overflow-hidden p-8 lg:col-span-7 lg:p-10">
+          <div className="soft-card solar-shimmer solar-glow group relative overflow-hidden p-6 sm:p-8 lg:col-span-7 lg:p-10">
             {/* Accent gradient top edge */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-primary-light to-primary-200" />
 
-            <div className="relative flex gap-6 lg:gap-10">
+            <div className="relative flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-10">
               <div className="shrink-0">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="num-circle h-10 w-10">02</div>
@@ -148,8 +148,8 @@ export default function HowItWorks() {
           </div>
 
           {/* Step 3 */}
-          <div className="soft-card solar-shimmer solar-glow group relative overflow-hidden p-8 lg:col-span-7 lg:p-10">
-            <div className="relative flex gap-6 lg:gap-10">
+          <div className="soft-card solar-shimmer solar-glow group relative overflow-hidden p-6 sm:p-8 lg:col-span-7 lg:p-10">
+            <div className="relative flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-10">
               <div className="shrink-0">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="num-circle h-10 w-10">03</div>

@@ -13,10 +13,10 @@ export default function ReportPreview() {
 
       <div className="relative mx-auto max-w-7xl px-6 lg:px-10">
         {/* Header — asymmetric: wide headline + narrow description */}
-        <div className="mb-16 grid gap-8 lg:grid-cols-[1.3fr_1fr] lg:items-end">
+        <div className="mb-10 md:mb-16 grid gap-6 md:gap-8 lg:grid-cols-[1.3fr_1fr] lg:items-end">
           <div>
             <p className="section-label mb-5">The output</p>
-            <h2 className="font-display text-4xl font-extrabold tracking-tight text-white md:text-5xl">
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white">
               A verdict,
               <br />
               <span className="relative inline-block">
@@ -40,7 +40,7 @@ export default function ReportPreview() {
 
           <div className="solar-rays relative overflow-hidden rounded-3xl border border-primary/20 shadow-xl">
             {/* Header bar */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-primary/20 px-6 py-4 lg:px-8">
+            <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-b border-primary/20 px-4 sm:px-6 py-3 sm:py-4 lg:px-8">
               <div className="flex items-center gap-3">
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
@@ -60,11 +60,11 @@ export default function ReportPreview() {
               {METRICS.map((m, i) => (
                 <div
                   key={m.label}
-                  className="group p-6 lg:p-8 transition-all duration-300 hover:bg-primary/5"
+                  className="group p-4 sm:p-6 lg:p-8 transition-all duration-300 hover:bg-primary/5"
                 >
                   <span className="text-xl mb-3 block">{m.icon}</span>
                   <p className="section-label !text-[0.65rem] !gap-1.5 mb-2 !before:w-3">{m.label}</p>
-                  <p className={`font-display text-2xl font-bold lg:text-3xl transition-colors duration-300 ${
+                  <p className={`font-display text-xl sm:text-2xl lg:text-3xl font-bold transition-colors duration-300 ${
                     i === 4 ? 'blue-text' : 'text-muted group-hover:text-primary'
                   }`}>
                     {m.value}
@@ -75,7 +75,7 @@ export default function ReportPreview() {
             </div>
 
             {/* Footer */}
-            <div className="border-t border-primary/20 px-6 py-4 lg:px-8">
+            <div className="border-t border-primary/20 px-4 sm:px-6 py-3 sm:py-4 lg:px-8">
               <p className="font-mono text-xs leading-relaxed text-muted">
                 Forecast window: next 14 days, Open-Meteo · Irradiance baseline:
                 NASA POWER · Subsidy slab not yet applied — ask for PM Surya Ghar

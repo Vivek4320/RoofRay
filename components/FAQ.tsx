@@ -40,17 +40,17 @@ export default function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id='faq' className="relative py-28">
+    <section id='faq' className="relative py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-4xl px-6">
         {/* Badge */}
-        <div className="mb-5 inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-2">
+        <div className="mb-4 sm:mb-5 inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-3 sm:px-4 py-1.5 sm:py-2">
           <span className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-400">
             Frequently Asked Questions
           </span>
         </div>
 
         {/* Heading */}
-        <h2 className="text-5xl font-extrabold leading-tight text-white">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight text-white">
           Everything you
           <br />
           <span className="relative inline-block">
@@ -62,13 +62,13 @@ export default function FAQ() {
         </h2>
 
         {/* Subtitle */}
-        <p className="mt-6 max-w-2xl text-lg text-slate-400">
+        <p className="mt-4 sm:mt-6 max-w-2xl text-base sm:text-lg text-slate-400">
           Everything about RoofRay, our AI-powered rooftop analysis, and solar
           feasibility reports.
         </p>
 
         {/* FAQ */}
-        <div className="mt-14 space-y-4">
+        <div className="mt-8 sm:mt-14 space-y-4">
           {faqs.map((faq, index) => {
             const isOpen = openIndex === index;
 
@@ -81,9 +81,9 @@ export default function FAQ() {
                   onClick={() =>
                     setOpenIndex(isOpen ? null : index)
                   }
-                  className="flex w-full items-center justify-between px-6 py-5 text-left"
+                  className="flex w-full items-center justify-between px-5 sm:px-6 py-4 sm:py-5 text-left"
                 >
-                  <span className="text-lg font-semibold text-white">
+                  <span className="text-base sm:text-lg font-semibold text-white">
                     {faq.question}
                   </span>
 
@@ -102,7 +102,7 @@ export default function FAQ() {
                   }`}
                 >
                   <div className="overflow-hidden">
-                    <p className="px-6 pb-6 text-slate-400 leading-7">
+                    <p className="px-5 sm:px-6 pb-5 sm:pb-6 text-sm sm:text-base text-slate-400 leading-6 sm:leading-7">
                       {faq.answer}
                     </p>
                   </div>

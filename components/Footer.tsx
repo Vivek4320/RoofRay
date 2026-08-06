@@ -56,11 +56,11 @@ const footerLinks = {
 export default function Footer() {
   return (
     <footer className="border-t border-white/10 bg-[#070B17]">
-      <div className="mx-auto max-w-7xl px-6 py-20">
+      <div className="mx-auto max-w-7xl px-6 py-12 sm:py-16 md:py-20">
 
         {/* Top */}
 
-        <div className="grid gap-14 lg:grid-cols-5">
+        <div className="grid gap-10 sm:gap-14 lg:grid-cols-5">
 
           {/* Brand */}
 
@@ -70,23 +70,23 @@ export default function Footer() {
               <img
                 src="/Logo-removebg-preview.png"
                 alt="RoofRay Logo"
-                className="h-36 w-auto object-contain"
+                className="h-20 sm:h-28 md:h-36 w-auto object-contain"
               />
             </div>
 
-            <p className="max-w-sm leading-8 text-slate-400">
+            <p className="max-w-sm leading-7 sm:leading-8 text-sm sm:text-base text-slate-400">
               AI-powered rooftop analysis that helps homeowners discover
               their solar potential, savings, and payback period using
               trusted location-based data.
             </p>
 
-            <div className="mt-8 flex gap-4">
+            <div className="mt-6 sm:mt-8 flex flex-wrap gap-3 sm:gap-4">
 
               {[FaFacebook, FaInstagram, FaLinkedin, FaGithub, FaEnvelope].map(
                 (Icon, index) => (
                   <div
                     key={index}
-                    className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/5 transition hover:border-blue-500 hover:bg-blue-500/10"
+                    className="flex h-9 w-9 sm:h-11 sm:w-11 cursor-pointer items-center justify-center rounded-lg sm:rounded-xl border border-white/10 bg-white/5 transition hover:border-blue-500 hover:bg-blue-500/10"
                   >
                     <Icon className="h-5 w-5 text-slate-300" />
                   </div>
@@ -107,7 +107,7 @@ export default function Footer() {
                 {title}
               </h3>
 
-              <ul className="space-y-4">
+              <ul className="space-y-3 sm:space-y-4">
 
                 {links.map((link) => (
 
@@ -115,7 +115,7 @@ export default function Footer() {
 
                     <Link
                       href="#"
-                      className="text-slate-400 transition hover:text-blue-400"
+                      className="text-sm sm:text-base text-slate-400 transition hover:text-blue-400"
                     >
                       {link}
                     </Link>
@@ -136,7 +136,7 @@ export default function Footer() {
 
         <div className="my-10 h-px bg-white/10" />
 
-        <div className="text-center text-sm text-slate-500">
+        <div className="mt-6 sm:mt-10 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-500">
           <Link href="#top" className="hover:text-blue-400">
             Privacy Policy
           </Link>
@@ -156,7 +156,7 @@ export default function Footer() {
 
         {/* Bottom */}
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-sm text-slate-500 md:flex-row">
+        <div className="mt-6 sm:mt-10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 border-t border-white/10 pt-6 sm:pt-8 text-xs sm:text-sm text-slate-500">
 
           <p>
             © 2026 RoofRay. All rights reserved.

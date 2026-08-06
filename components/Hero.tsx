@@ -6,7 +6,7 @@ const House3D = dynamic(() => import('./House3D'), { ssr: false });
 
 export default function Hero() {
   return (
-    <section id="top" className="relative min-h-screen overflow-hidden bg-background pt-36">
+    <section id="top" className="relative min-h-screen overflow-hidden bg-background pt-28 md:pt-36">
       {/* Background �� layered solar effects */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Large radial blue glow */}
@@ -58,7 +58,7 @@ export default function Hero() {
             </div>
 
             {/* Headline */}
-            <h1 className="font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-white md:text-6xl lg:text-[4.2rem]">
+            <h1 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-[4.2rem] font-extrabold leading-[1.05] tracking-tight text-white">
               Location Based
               <br />
               Solar Feasibility {' '}
@@ -71,7 +71,7 @@ export default function Hero() {
             </h1>
 
             {/* Subheadline */}
-            <p className="mt-7 max-w-lg text-lg leading-relaxed text-muted lg:text-xl">
+            <p className="mt-5 sm:mt-7 max-w-lg text-base sm:text-lg leading-relaxed text-muted lg:text-xl">
               AI-powered rooftop analysis that uses your{" "}
               <span className="font-semibold text-primary">
                 exact location

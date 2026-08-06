@@ -41,9 +41,9 @@ export default function WhyRoofRay() {
 
       <div className="relative mx-auto max-w-7xl px-6 py-24 lg:px-10 lg:py-32">
         {/* Header */}
-        <div className="mb-16 max-w-2xl">
+        <div className="mb-10 md:mb-16 max-w-2xl">
           <p className="section-label mb-5">Why not a calculator?</p>
-          <h2 className="font-display text-4xl font-extrabold tracking-tight text-white md:text-5xl">
+          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white">
             Those tools ask you
             <br />
             to <span className="relative inline-block">
@@ -65,7 +65,7 @@ export default function WhyRoofRay() {
           {REASONS.map((r, i) => (
             <div
               key={r.title}
-              className={`soft-card solar-shimmer solar-glow group relative overflow-hidden p-8 transition-all duration-300 ${i === 1 ? 'lg:-mt-8' : ''
+              className={`soft-card solar-shimmer solar-glow group relative overflow-hidden p-6 sm:p-8 transition-all duration-300 ${i === 1 ? 'lg:-mt-8' : ''
                 }`}
             >
               {/* Top accent gradient */}
