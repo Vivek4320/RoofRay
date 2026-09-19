@@ -3,6 +3,7 @@ import { Outfit, Plus_Jakarta_Sans, DM_Mono } from 'next/font/google';
 // TypeScript: allow side-effect global CSS import without explicit type declarations
 // @ts-ignore
 import './globals.css';
+import BotpressProvider from '@/components/BotpressProvider';
 
 const outfit = Outfit({
   variable: '--font-display',
@@ -25,7 +26,7 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: 'RoofRay — Is Your Roof Worth Going Solar?',
   description:
-    'Tell RoofRay about your rooftop and get a real solar feasibility verdict — point-specific sun data, payback period, and a clear yes or no. No sliders, no forms.',
+    'AI-powered rooftop analysis using your location and sunlight data to calculate real solar savings.',
 };
 
 export default function RootLayout({
@@ -42,6 +43,7 @@ export default function RootLayout({
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-white focus:shadow-lg">
           Skip to content
         </a>
+        <BotpressProvider />
         {children}
       </body>
     </html>
