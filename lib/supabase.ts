@@ -68,7 +68,7 @@ export async function requestPasswordReset(email: string, redirectTo: string) {
   });
 }
 
-export async function updatePassword(accessToken: string, password: string) {
+export async function verifyRecoveryToken(tokenHash: string) {  return supabaseRequest(supabaseUrl + "/auth/v1/verify", {    method: "POST",    body: JSON.stringify({ token_hash: tokenHash, type: "recovery" }),  });}export async function updatePassword(accessToken: string, password: string) {
   return supabaseRequest(supabaseUrl + "/auth/v1/user", {
     method: "PUT",
     headers: {
