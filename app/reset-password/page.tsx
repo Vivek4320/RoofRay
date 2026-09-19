@@ -24,10 +24,15 @@ export default function ResetPasswordPage() {
     const token = hashParams.get("access_token");
     const errorDescription = hashParams.get("error_description");
 
+    const savedToken = localStorage.getItem("roofray_access_token");
+
     if (token) {
       setAccessToken(token);
     } else if (errorDescription) {
       setError(decodeURIComponent(errorDescription.replace(/\+/g, " ")));
+    } else if (savedToken) {
+      // Allow logged-in users to change their password from Profile.
+      setAccessToken(savedToken);
     } else {
       setError("This password reset link is invalid or has expired. Please request a new link.");
     }
