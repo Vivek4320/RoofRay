@@ -77,12 +77,12 @@ export default function ResetPasswordPage() {
         <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-400/20"><LockKeyhole className="h-7 w-7 text-blue-400" /></div>
         <p className="section-label mb-3">Account security</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl font-bold text-white">{success ? "Password updated." : "Create a new password."}</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-400">{success ? "Your RoofRay password has been updated successfully. You can now log in with your new password." : "Choose a new password for your RoofRay account."}</p>
+        <p className="mt-3 text-sm leading-6 text-slate-400">{success ? "Your RoofRay password has been updated successfully. You can continue directly to your profile." : "Choose a new password for your RoofRay account."}</p>
 
         {success ? (
           <div className="mt-8 space-y-4">
             <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-300"><ShieldCheck className="h-4 w-4 shrink-0" />Your password was changed successfully.</div>
-            <Link href="/login" className="btn-primary w-full"><span>Back to login</span><ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/profile" className="btn-primary w-full"><span>Go to profile</span><ArrowRight className="h-4 w-4" /></Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
