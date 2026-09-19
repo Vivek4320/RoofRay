@@ -5,20 +5,43 @@ export function isSupabaseConfigured() {
   return Boolean(supabaseUrl && supabaseAnonKey);
 }
 
+function requireSupabaseConfig() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+  }
+}
+
+async function supabaseRequest(endpoint: string, options: RequestInit = {}) {
+  requireSupabaseConfig();
+
+  const response = await fetch(endpoint, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseAnonKey!,
+      ...(options.headers || {}),
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data?.msg || data?.message || data?.error_description || "Authentication request failed.");
+  }
+
+  return data;
+}
+
 export async function supabaseAuth(
   action: "login" | "signup",
   email: string,
   password: string,
   fullName?: string
 ) {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
-  }
-
   const endpoint =
     action === "login"
-      ? `${supabaseUrl}/auth/v1/token?grant_type=password`
-      : `${supabaseUrl}/auth/v1/signup`;
+      ? supabaseUrl + "/auth/v1/token?grant_type=password"
+      : supabaseUrl + "/auth/v1/signup";
 
   const body =
     action === "signup"
@@ -29,22 +52,30 @@ export async function supabaseAuth(
         }
       : { email, password };
 
-  const response = await fetch(endpoint, {
+  return supabaseRequest(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: supabaseAnonKey,
-    },
     body: JSON.stringify(body),
   });
+}
 
-  const data = await response.json();
+export async function requestPasswordReset(email: string, redirectTo: string) {
+  return supabaseRequest(supabaseUrl + "/auth/v1/recover", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      redirect_to: redirectTo,
+    }),
+  });
+}
 
-  if (!response.ok) {
-    throw new Error(data?.msg || data?.message || data?.error_description || "Authentication failed.");
-  }
-
-  return data;
+export async function updatePassword(accessToken: string, password: string) {
+  return supabaseRequest(supabaseUrl + "/auth/v1/user", {
+    method: "PUT",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+    },
+    body: JSON.stringify({ password }),
+  });
 }
 
 export function saveSession(data: { access_token?: string; refresh_token?: string; user?: unknown }) {
