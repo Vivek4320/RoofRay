@@ -103,6 +103,7 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2">
           <a
+            id="bp-toggle-chat"
             href="#top"
             onClick={handleTalkToRoofRay}
             className="group/nav-btn relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-full px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all duration-500 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
