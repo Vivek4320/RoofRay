@@ -305,9 +305,7 @@ body {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
@@ -380,7 +378,7 @@ body {
     rgba(59, 130, 246, 0.05) 100deg,
     transparent 110deg,
     transparent 120deg,
-    rgba(59, 130, 246, 0.08) 130deg,
+    rgba(59, 130, 0.08) 130deg,
     transparent 140deg,
     transparent 150deg,
     rgba(59, 130, 246, 0.05) 160deg,
@@ -509,4 +507,21 @@ body {
 
 .solar-border:hover::before {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.5));
+}
+
+/* Botpress Webchat visibility
+ * The Webchat is mounted outside the React tree by Botpress.
+ * Keep it above RoofRay's navigation/hero layers.
+ */
+.bpFabWrapper,
+.bpWebchat,
+.bpModalOverlay,
+.bpContainer {
+  z-index: 2147483647 !important;
+}
+
+.bpWebchat {
+  position: fixed !important;
+  right: 20px !important;
+  bottom: 20px !important;
 }
