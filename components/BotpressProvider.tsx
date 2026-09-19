@@ -2,35 +2,41 @@
 
 import Script from "next/script";
 
-const BOTPRESS_WEBCHAT_ID = process.env.NEXT_PUBLIC_BOTPRESS_WEBCHAT_ID;
-
 declare global {
   interface Window {
+    botpress?: {
+      open?: () => void;
+      close?: () => void;
+      sendEvent?: (event: unknown) => void;
+      sendMessage?: (message: unknown) => void;
+    };
     botpressWebChat?: {
+      open?: () => void;
+      close?: () => void;
+      sendEvent?: (event: unknown) => void;
+      sendMessage?: (message: unknown) => void;
       init?: (config: Record<string, unknown>) => void;
     };
   }
 }
 
 export default function BotpressProvider() {
-  if (!BOTPRESS_WEBCHAT_ID) {
-    return null;
-  }
-
   return (
-    <Script
-      id="roofray-botpress-webchat"
-      src="https://cdn.botpress.cloud/webchat/v3.6/inject.js"
-      strategy="afterInteractive"
-      onLoad={() => {
-        if (window.botpressWebChat?.init) {
-          window.botpressWebChat.init({
-            botId: BOTPRESS_WEBCHAT_ID,
-          });
-        }
+    <>
+      <Script
+        id="roofray-botpress-v37"
+        src="https://cdn.botpress.cloud/webchat/v3.7/inject.js"
+        strategy="afterInteractive"
+      />
 
-        window.dispatchEvent(new CustomEvent("roofray_botpress_ready"));
-      }}
-    />
+      <Script
+        id="roofray-botpress-config"
+        src="https://files.bpcontent.cloud/2026/07/12/16/20260712163416-V9EJYWEN.js"
+        strategy="afterInteractive"
+        onLoad={() => {
+          window.dispatchEvent(new CustomEvent("roofray_botpress_ready"));
+        }}
+      />
+    </>
   );
 }
