@@ -1,12 +1,3 @@
-/**
- * Browser location -> Botpress bridge for RoofRay.
- *
- * Set NEXT_PUBLIC_BOTPRESS_WEBCHAT_ID to the Webchat bot ID from Botpress.
- * The bridge intentionally keeps the browser geolocation API separate from
- * the chatbot implementation so the location capture can also be reused by
- * the solar-data/report flow.
- */
-
 import type { RoofRayLocation } from "@/lib/location";
 
 export type RoofRayBotpressLocation = RoofRayLocation & {
@@ -16,8 +7,9 @@ export type RoofRayBotpressLocation = RoofRayLocation & {
 type BotpressClient = {
   open?: () => void;
   close?: () => void;
-  sendEvent?: (event: unknown) => void;
-  sendMessage?: (message: unknown) => void;
+  sendEvent?: (event: unknown) => void | Promise<void>;
+  sendMessage?: (message: string) => void | Promise<void>;
+  on?: (event: string, handler: (...args: unknown[]) => void) => (() => void) | void;
 };
 
 declare global {
@@ -32,21 +24,30 @@ export const ROOFRAY_BOTPRESS_EVENT = "roofray_location";
 
 export function getBotpressClient(): BotpressClient | null {
   if (typeof window === "undefined") return null;
-  return window.bp ?? window.botpress ?? null;
+  return window.botpress ?? window.bp ?? null;
 }
 
 export function openRoofRayBotpress(): boolean {
+  if (typeof window === "undefined") return false;
+
   const client = getBotpressClient();
 
-  if (!client?.open) {
-    console.warn(
-      "[RoofRay] Botpress Webchat is not loaded. Add the Botpress Webchat embed before opening the chat.",
-    );
-    return false;
+  if (client?.open) {
+    client.open();
+    return true;
   }
 
-  client.open();
-  return true;
+  // The Botpress config script may still be initializing. Wait for the
+  // official initialization event instead of trying to open too early.
+  if (window.botpress?.on) {
+    window.botpress.on("webchat:initialized", () => {
+      window.botpress?.open?.();
+    });
+    return true;
+  }
+
+  console.warn("[RoofRay] Botpress Webchat is still loading.");
+  return false;
 }
 
 export function sendRoofRayLocationToBotpress(
@@ -65,10 +66,8 @@ export function sendRoofRayLocationToBotpress(
     source: "browser-geolocation",
   };
 
-  // Botpress Webchat integrations differ slightly by generated client version.
-  // Prefer the Webchat event API, then fall back to its message API.
   if (client.sendEvent) {
-    client.sendEvent({
+    void client.sendEvent({
       type: ROOFRAY_BOTPRESS_EVENT,
       payload,
     });
@@ -76,18 +75,12 @@ export function sendRoofRayLocationToBotpress(
   }
 
   if (client.sendMessage) {
-    client.sendMessage({
-      type: "text",
-      text: `📍 My location: Latitude ${location.latitude}, Longitude ${location.longitude}`,
-      metadata: {
-        roofrayLocation: payload,
-      },
-    });
+    void client.sendMessage(
+      `📍 My location: Latitude ${location.latitude}, Longitude ${location.longitude}`,
+    );
     return true;
   }
 
-  console.warn(
-    "[RoofRay] Botpress client loaded, but no supported send API was found.",
-  );
+  console.warn("[RoofRay] Botpress client has no sendEvent/sendMessage API.");
   return false;
 }
