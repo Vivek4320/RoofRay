@@ -32,7 +32,13 @@ const FaEnvelope = (props: any) => (
   </svg>
 );
 
-const footerLinks = {
+type FooterLink = {
+  label: string;
+  href: string;
+  external?: boolean;
+};
+
+const footerLinks: Record<string, FooterLink[]> = {
   Product: [
     { label: "How it Works", href: "/#how" },
     { label: "Sample Report", href: "/#report" },

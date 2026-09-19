@@ -70,7 +70,9 @@ export default function LoginPage() {
     try {
       const data = await supabaseAuth("login", email.trim(), password);
       saveSession(data);
-      window.location.href = "/";
+      const params = new URLSearchParams(window.location.search);
+      const redirectUrl = params.get("redirect") || "/";
+      window.location.href = redirectUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to log in.");
     } finally {

@@ -58,7 +58,9 @@ export default function SignupPage() {
       const data = await supabaseAuth("signup", email.trim(), password, name.trim());
       if (data?.access_token) {
         saveSession(data);
-        window.location.href = "/";
+        const params = new URLSearchParams(window.location.search);
+        const redirectUrl = params.get("redirect") || "/";
+        window.location.href = redirectUrl;
       } else {
         setMessage("Account created successfully. You can now log in.");
       }
