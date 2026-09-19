@@ -2,12 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getCurrentRoofRayLocation } from "@/lib/location";
-import {
-  openRoofRayBotpress,
-  sendRoofRayLocationToBotpress,
-} from "@/lib/botpress";
+import { useState } from "react";
 
 const NAV_LINKS = [
   { href: '#how', label: 'How it works' },
@@ -22,7 +17,23 @@ export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profileName, setProfileName] = useState("Profile");
 
+  const handleTalkToRoofRay = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    event.preventDefault();
 
+    if (window.botpress?.open) {
+      window.botpress.open();
+      return;
+    }
+
+    const openWhenReady = () => {
+      window.botpress?.open?.();
+    };
+
+    window.botpress?.on?.("webchat:initialized", openWhenReady);
+    window.setTimeout(openWhenReady, 1500);
+  };
 
   return (
     <header className="absolute top-0 left-0 right-0 z-50">
@@ -61,7 +72,7 @@ export default function Navbar() {
             >
               <span className="relative z-10">Talk to RoofRay</span>
               <svg viewBox="0 0 20 20" fill="currentColor" className="relative z-10 h-4 w-4 transition-all duration-500 group-hover/nav-btn:translate-x-1 group-hover/nav-btn:rotate-[-8deg] group-hover/nav-btn:scale-110">
-                <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 010 1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 01-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
               </svg>
             </a>
           )}
