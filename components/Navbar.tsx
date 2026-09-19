@@ -7,6 +7,7 @@ const NAV_LINKS = [
   { href: '#report', label: 'Sample report' },
   { href: '#why', label: 'Why RoofRay' },
   { href: '#faq', label: 'FAQ' },
+  { href: '/about', label: 'About' },
   { href: '/contact', label: 'Contact' }
 ];
 

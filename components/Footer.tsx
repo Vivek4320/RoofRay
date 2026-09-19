@@ -109,20 +109,24 @@ export default function Footer() {
 
               <ul className="space-y-3 sm:space-y-4">
 
-                {links.map((link) => (
+                {links.map((link) => {
+                  const hrefMap: Record<string, string> = {
+                    'About': '/about',
+                    'Contact': '/contact',
+                  };
+                  const href = hrefMap[link] ?? '#';
 
-                  <li key={link}>
-
-                    <Link
-                      href="#"
-                      className="text-sm sm:text-base text-slate-400 transition hover:text-blue-400"
-                    >
-                      {link}
-                    </Link>
-
-                  </li>
-
-                ))}
+                  return (
+                    <li key={link}>
+                      <Link
+                        href={href}
+                        className="text-sm sm:text-base text-slate-400 transition hover:text-blue-400"
+                      >
+                        {link}
+                      </Link>
+                    </li>
+                  );
+                })}
 
               </ul>
 
