@@ -54,8 +54,6 @@ const footerLinks: Record<string, FooterLink[]> = {
   Company: [
     { label: "About", href: "/about" },
     { label: "Contact", href: "/contact" },
-    { label: "GitHub", href: "https://github.com/Vivek4320/RoofRay", external: true },
-    { label: "LinkedIn", href: "https://www.linkedin.com/in/vivek-pankhaniya/", external: true },
   ]
 };
 
@@ -125,23 +123,12 @@ export default function Footer() {
 
                 {links.map((link) => (
                   <li key={link.label}>
-                    {link.external ? (
-                      <a
-                        href={link.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm sm:text-base text-slate-400 transition hover:text-blue-400"
-                      >
-                        {link.label}
-                      </a>
-                    ) : (
-                      <Link
-                        href={link.href}
-                        className="text-sm sm:text-base text-slate-400 transition hover:text-blue-400"
-                      >
-                        {link.label}
-                      </Link>
-                    )}
+                    <Link
+                      href={link.href}
+                      className="text-sm sm:text-base text-slate-400 transition hover:text-blue-400"
+                    >
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
 
