@@ -43,11 +43,29 @@ export default function RootLayout({
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-white focus:shadow-lg">
           Skip to content
         </a>
+        {/* Botpress must register the initialized listener BEFORE the config script calls window.botpress.init. */}
         <script src="https://cdn.botpress.cloud/webchat/v3.7/inject.js"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (window.botpress) {
+                window.botpress.on('webchat:initialized', function () {
+                  console.log('[RoofRay] Botpress initialized');
+                });
+                window.botpress.on('webchat:opened', function () {
+                  console.log('[RoofRay] Botpress opened');
+                });
+                window.botpress.on('error', function (error) {
+                  console.error('[RoofRay] Botpress error', error);
+                });
+              }
+            `,
+          }}
+        />
         <script
           src="https://files.bpcontent.cloud/2026/07/12/16/20260712163416-V9EJYWEN.js"
           defer
-        ></script>
+        />
         {children}
       </body>
     </html>
