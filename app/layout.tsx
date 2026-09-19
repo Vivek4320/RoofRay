@@ -53,7 +53,23 @@ export default function RootLayout({
                   console.log('[RoofRay] Botpress initialized');
                 });
                 window.botpress.on('webchat:opened', function () {
-                  console.log('[RoofRay] Botpress opened');
+                  const accessToken = window.localStorage.getItem('roofray_access_token');
+                  const isLoggedIn = Boolean(accessToken);
+
+                  if (!isLoggedIn) {
+                    // Close the Botpress widget immediately and send the user
+                    // through RoofRay login before allowing chat access.
+                    window.botpress.close?.();
+                    window.sessionStorage.setItem('roofray_pending_chat', 'true');
+
+                    // Avoid redirecting repeatedly if the user is already on login.
+                    if (window.location.pathname !== '/login') {
+                      window.location.href = '/login?redirect=/';
+                    }
+                    return;
+                  }
+
+                  console.log('[RoofRay] Botpress opened for authenticated user');
                 });
                 window.botpress.on('error', function (error) {
                   console.error('[RoofRay] Botpress error', error);
