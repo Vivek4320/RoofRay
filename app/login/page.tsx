@@ -6,16 +6,38 @@ import { FormEvent, useState } from "react";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sun } from "lucide-react";
 import { saveSession, supabaseAuth } from "@/lib/supabase";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
+  function validateForm() {
+    const normalizedEmail = email.trim();
+
+    if (!normalizedEmail) return "Please enter your email address.";
+    if (normalizedEmail.length > 254) return "Email address is too long.";
+    if (!EMAIL_REGEX.test(normalizedEmail)) return "Please enter a valid email address.";
+    if (!password) return "Please enter your password.";
+    if (password.length < 6) return "Password must be at least 6 characters.";
+    if (password.length > 72) return "Password must be 72 characters or fewer.";
+
+    return "";
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await supabaseAuth("login", email.trim(), password);
@@ -69,12 +91,12 @@ export default function LoginPage() {
             <h2 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl font-bold text-white">Welcome back.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-400">Enter your details to continue to your RoofRay solar assistant.</p>
 
-            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Email address</span>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="auth-input pl-12" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                  <input className="auth-input pl-12" type="email" required autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@example.com" />
                 </div>
               </label>
 
@@ -85,14 +107,14 @@ export default function LoginPage() {
                 </div>
                 <div className="relative">
                   <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="auth-input pl-12 pr-12" type={showPassword ? "text" : "password"} required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
+                  <input className="auth-input pl-12 pr-12" type={showPassword ? "text" : "password"} required autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} placeholder="Enter your password" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:text-blue-400" aria-label={showPassword ? "Hide password" : "Show password"}>
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </label>
 
-              {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
+              {error && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
 
               <button disabled={loading} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" type="submit">
                 {loading ? "Signing in..." : "Log in"}
