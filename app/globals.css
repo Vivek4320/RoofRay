@@ -378,7 +378,7 @@ body {
     rgba(59, 130, 246, 0.05) 100deg,
     transparent 110deg,
     transparent 120deg,
-    rgba(59, 130, 0.08) 130deg,
+    rgba(59, 130, 246, 0.08) 130deg,
     transparent 140deg,
     transparent 150deg,
     rgba(59, 130, 246, 0.05) 160deg,
@@ -509,11 +509,9 @@ body {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.5));
 }
 
-/* Botpress Webchat visibility
- * The Webchat is mounted outside the React tree by Botpress.
- * Keep it above RoofRay's navigation/hero layers.
- */
+/* Botpress Webchat visibility */
 .bpFabWrapper,
+.bpFab,
 .bpWebchat,
 .bpModalOverlay,
 .bpContainer {
@@ -524,4 +522,17 @@ body {
   position: fixed !important;
   right: 20px !important;
   bottom: 20px !important;
+  width: min(420px, calc(100vw - 32px)) !important;
+  height: min(700px, calc(100vh - 110px)) !important;
+  max-height: calc(100vh - 110px) !important;
+}
+
+@media (max-width: 640px) {
+  .bpWebchat {
+    right: 16px !important;
+    bottom: 16px !important;
+    width: calc(100vw - 32px) !important;
+    height: calc(100vh - 96px) !important;
+    max-height: calc(100vh - 96px) !important;
+  }
 }
