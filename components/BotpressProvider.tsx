@@ -8,14 +8,8 @@ declare global {
       open?: () => void;
       close?: () => void;
       sendEvent?: (event: unknown) => void;
-      sendMessage?: (message: unknown) => void;
-    };
-    botpressWebChat?: {
-      open?: () => void;
-      close?: () => void;
-      sendEvent?: (event: unknown) => void;
-      sendMessage?: (message: unknown) => void;
-      init?: (config: Record<string, unknown>) => void;
+      sendMessage?: (message: string) => void;
+      on?: (event: string, handler: (...args: unknown[]) => void) => (() => void) | void;
     };
   }
 }
@@ -34,6 +28,9 @@ export default function BotpressProvider() {
         src="https://files.bpcontent.cloud/2026/07/12/16/20260712163416-V9EJYWEN.js"
         strategy="afterInteractive"
         onLoad={() => {
+          // The config script initializes window.botpress. Keep this event
+          // available to the rest of RoofRay so buttons can open the chat
+          // after Webchat has finished initializing.
           window.dispatchEvent(new CustomEvent("roofray_botpress_ready"));
         }}
       />
