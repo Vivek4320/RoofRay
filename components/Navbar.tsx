@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getCurrentRoofRayLocation } from "@/lib/location";
 
 const NAV_LINKS = [
   { href: '#how', label: 'How it works' },
@@ -33,6 +34,27 @@ export default function Navbar() {
     }
   }, []);
 
+  const handleTalkToRoofRay = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+
+    // Get the user's browser location before opening the chatbot.
+    // The result is exposed through window.RoofRayLocation and the
+    // "roofray_location" event so the Botpress bridge can consume it.
+    const result = await getCurrentRoofRayLocation();
+
+    if (!result.ok) {
+      console.warn("[RoofRay] Location unavailable:", result.error);
+    }
+
+    // Keep the existing navigation/login behavior intact.
+    if (isLoggedIn) {
+      window.dispatchEvent(new CustomEvent("roofray_open_chat"));
+      return;
+    }
+
+    window.location.href = '/login?redirect=/';
+  };
+
   return (
     <header className="absolute top-0 left-0 right-0 z-50">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4 lg:px-10">
@@ -52,7 +74,7 @@ export default function Navbar() {
         <div className="flex items-center gap-2">
           {isLoggedIn ? (
             <>
-              <a href="#top" className="group/nav-btn relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-full px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all duration-500 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]" style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 4px 20px rgba(37, 99, 235, 0.3)' }}>
+              <a href="#top" onClick={handleTalkToRoofRay} className="group/nav-btn relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-full px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all duration-500 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]" style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 4px 20px rgba(37, 99, 235, 0.3)' }}>
                 <span className="relative z-10">Talk to RoofRay</span>
                 <svg viewBox="0 0 20 20" fill="currentColor" className="relative z-10 h-4 w-4 transition-all duration-500 group-hover/nav-btn:translate-x-1"><path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" /></svg>
               </a>
@@ -64,16 +86,13 @@ export default function Navbar() {
           ) : (
             <a
               href="#top"
-              onClick={(event) => {
-                event.preventDefault();
-                window.location.href = '/login?redirect=/';
-              }}
+              onClick={handleTalkToRoofRay}
               className="group/nav-btn relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-full px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all duration-500 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
               style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 4px 20px rgba(37, 99, 235, 0.3)' }}
             >
               <span className="relative z-10">Talk to RoofRay</span>
               <svg viewBox="0 0 20 20" fill="currentColor" className="relative z-10 h-4 w-4 transition-all duration-500 group-hover/nav-btn:translate-x-1 group-hover/nav-btn:rotate-[-8deg] group-hover/nav-btn:scale-110">
-                <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M3 10a.75.75 0 01-.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 011.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
               </svg>
             </a>
           )}
