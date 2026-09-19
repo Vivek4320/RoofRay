@@ -34,22 +34,22 @@ const FaEnvelope = (props: any) => (
 
 const footerLinks = {
   Product: [
-    "How it Works",
-    "Sample Report",
-    "Why RoofRay",
-    "AI Chatbot",
+    { label: "How it Works", href: "/#how" },
+    { label: "Sample Report", href: "/#report" },
+    { label: "Why RoofRay", href: "/#why" },
+    { label: "AI Chatbot", href: "/#top" },
   ],
   Resources: [
-    "FAQ",
-    "Data Sources",
-    "API",
-    "Documentation",
+    { label: "FAQ", href: "/#faq" },
+    { label: "Data Sources", href: "/#report" },
+    { label: "API", href: "/#report" },
+    { label: "Documentation", href: "/#faq" },
   ],
   Company: [
-    "About",
-    "Contact",
-    "Blog",
-    "Careers",
+    { label: "About", href: "/about" },
+    { label: "Contact", href: "/contact" },
+    { label: "GitHub", href: "https://github.com/Vivek4320/RoofRay", external: true },
+    { label: "LinkedIn", href: "https://www.linkedin.com/in/vivek-pankhaniya/", external: true },
   ]
 };
 
@@ -82,16 +82,24 @@ export default function Footer() {
 
             <div className="mt-6 sm:mt-8 flex flex-wrap gap-3 sm:gap-4">
 
-              {[FaFacebook, FaInstagram, FaLinkedin, FaGithub, FaEnvelope].map(
-                (Icon, index) => (
-                  <div
-                    key={index}
-                    className="flex h-9 w-9 sm:h-11 sm:w-11 cursor-pointer items-center justify-center rounded-lg sm:rounded-xl border border-white/10 bg-white/5 transition hover:border-blue-500 hover:bg-blue-500/10"
-                  >
-                    <Icon className="h-5 w-5 text-slate-300" />
-                  </div>
-                )
-              )}
+              {[
+                { Icon: FaFacebook, href: "https://www.facebook.com/", label: "Facebook" },
+                { Icon: FaInstagram, href: "https://www.instagram.com/", label: "Instagram" },
+                { Icon: FaLinkedin, href: "https://www.linkedin.com/in/vivek-pankhaniya/", label: "LinkedIn" },
+                { Icon: FaGithub, href: "https://github.com/Vivek4320/RoofRay", label: "GitHub" },
+                { Icon: FaEnvelope, href: "mailto:hello@roofray.in", label: "Email RoofRay" },
+              ].map(({ Icon, href, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  aria-label={label}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-lg sm:rounded-xl border border-white/10 bg-white/5 transition hover:border-blue-500 hover:bg-blue-500/10"
+                >
+                  <Icon className="h-5 w-5 text-slate-300" />
+                </a>
+              ))}
 
             </div>
 
@@ -109,24 +117,27 @@ export default function Footer() {
 
               <ul className="space-y-3 sm:space-y-4">
 
-                {links.map((link) => {
-                  const hrefMap: Record<string, string> = {
-                    'About': '/about',
-                    'Contact': '/contact',
-                  };
-                  const href = hrefMap[link] ?? '#';
-
-                  return (
-                    <li key={link}>
-                      <Link
-                        href={href}
+                {links.map((link) => (
+                  <li key={link.label}>
+                    {link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="text-sm sm:text-base text-slate-400 transition hover:text-blue-400"
                       >
-                        {link}
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        href={link.href}
+                        className="text-sm sm:text-base text-slate-400 transition hover:text-blue-400"
+                      >
+                        {link.label}
                       </Link>
-                    </li>
-                  );
-                })}
+                    )}
+                  </li>
+                ))}
 
               </ul>
 
@@ -141,19 +152,19 @@ export default function Footer() {
         <div className="my-10 h-px bg-white/10" />
 
         <div className="mt-6 sm:mt-10 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-500">
-          <Link href="#top" className="hover:text-blue-400">
+          <Link href="/privacy" className="hover:text-blue-400">
             Privacy Policy
           </Link>
           <span className="mx-2">|</span>
-          <Link href="#top" className="hover:text-blue-400">
+          <Link href="/terms" className="hover:text-blue-400">
             Terms of Service
           </Link>
           <span className="mx-2">|</span>
-          <Link href="#top" className="hover:text-blue-400">
+          <Link href="/cookies" className="hover:text-blue-400">
             Cookies
           </Link>
           <span className="mx-2">|</span>
-          <Link href="#top" className="hover:text-blue-400">
+          <Link href="/disclaimer" className="hover:text-blue-400">
             Disclaimer
           </Link>
         </div>
