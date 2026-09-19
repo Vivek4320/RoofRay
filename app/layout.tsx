@@ -43,7 +43,11 @@ export default function RootLayout({
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-white focus:shadow-lg">
           Skip to content
         </a>
-        <BotpressProvider />
+        <script src="https://cdn.botpress.cloud/webchat/v3.7/inject.js"></script>
+        <script
+          src="https://files.bpcontent.cloud/2026/07/12/16/20260712163416-V9EJYWEN.js"
+          defer
+        ></script>
         {children}
       </body>
     </html>
