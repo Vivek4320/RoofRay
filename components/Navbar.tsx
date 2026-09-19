@@ -4,6 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getCurrentRoofRayLocation } from "@/lib/location";
+import {
+  openRoofRayBotpress,
+  sendRoofRayLocationToBotpress,
+} from "@/lib/botpress";
 
 const NAV_LINKS = [
   { href: '#how', label: 'How it works' },
@@ -34,26 +38,69 @@ export default function Navbar() {
     }
   }, []);
 
-  const handleTalkToRoofRay = async (event: React.MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-
-    // Get the user's browser location before opening the chatbot.
-    // The result is exposed through window.RoofRayLocation and the
-    // "roofray_location" event so the Botpress bridge can consume it.
+  const startRoofRayChat = async () => {
     const result = await getCurrentRoofRayLocation();
 
     if (!result.ok) {
       console.warn("[RoofRay] Location unavailable:", result.error);
-    }
-
-    // Keep the existing navigation/login behavior intact.
-    if (isLoggedIn) {
-      window.dispatchEvent(new CustomEvent("roofray_open_chat"));
+      openRoofRayBotpress();
       return;
     }
 
-    window.location.href = '/login?redirect=/';
+    // Make the captured coordinates available to any component and
+    // immediately pass them to the Botpress Webchat client.
+    sendRoofRayLocationToBotpress(result.location);
+    window.dispatchEvent(
+      new CustomEvent("roofray_location", { detail: result.location }),
+    );
+
+    openRoofRayBotpress();
+    window.dispatchEvent(new CustomEvent("roofray_open_chat"));
   };
+
+  const handleTalkToRoofRay = async (
+    event: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    event.preventDefault();
+
+    // Logged-in users can open the chatbot immediately after location capture.
+    if (isLoggedIn) {
+      await startRoofRayChat();
+      return;
+    }
+
+    // Preserve the location permission/capture across the auth redirect.
+    const result = await getCurrentRoofRayLocation();
+    if (result.ok) {
+      sessionStorage.setItem(
+        "roofray_pending_location",
+        JSON.stringify(result.location),
+      );
+    } else {
+      console.warn("[RoofRay] Location unavailable:", result.error);
+    }
+
+    window.location.href = "/login?redirect=/";
+  };
+
+  useEffect(() => {
+    const handleOpenAfterLogin = async () => {
+      const pending = sessionStorage.getItem("roofray_pending_location");
+      if (!pending) return;
+
+      try {
+        const location = JSON.parse(pending);
+        sessionStorage.removeItem("roofray_pending_location");
+        sendRoofRayLocationToBotpress(location);
+        openRoofRayBotpress();
+        window.dispatchEvent(new CustomEvent("roofray_open_chat"));
+      } catch {
+        sessionStorage.removeItem("roofray_pending_location");
+      }
+    };
+
+    handleOpenAfterLogin();
+  }, []);
 
   return (
     <header className="absolute top-0 left-0 right-0 z-50">
@@ -92,7 +139,7 @@ export default function Navbar() {
             >
               <span className="relative z-10">Talk to RoofRay</span>
               <svg viewBox="0 0 20 20" fill="currentColor" className="relative z-10 h-4 w-4 transition-all duration-500 group-hover/nav-btn:translate-x-1 group-hover/nav-btn:rotate-[-8deg] group-hover/nav-btn:scale-110">
-                <path fillRule="evenodd" d="M3 10a.75.75 0 01-.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 011.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 010 1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
               </svg>
             </a>
           )}
