@@ -6,6 +6,8 @@ import { FormEvent, useState } from "react";
 import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, UserRound, Sun } from "lucide-react";
 import { saveSession, supabaseAuth } from "@/lib/supabase";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -16,18 +18,41 @@ export default function SignupPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  function validateForm() {
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim();
+
+    if (!normalizedName) return "Please enter your full name.";
+    if (normalizedName.length < 2) return "Full name must be at least 2 characters.";
+    if (normalizedName.length > 80) return "Full name must be 80 characters or fewer.";
+    if (!/^[\p{L}\p{M}][\p{L}\p{M}' .-]*$/u.test(normalizedName)) {
+      return "Full name contains invalid characters.";
+    }
+
+    if (!normalizedEmail) return "Please enter your email address.";
+    if (normalizedEmail.length > 254) return "Email address is too long.";
+    if (!EMAIL_REGEX.test(normalizedEmail)) return "Please enter a valid email address.";
+
+    if (!password) return "Please create a password.";
+    if (password.length < 6) return "Password must be at least 6 characters.";
+    if (password.length > 72) return "Password must be 72 characters or fewer.";
+    if (!confirm) return "Please confirm your password.";
+    if (password !== confirm) return "Passwords do not match.";
+
+    return "";
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
-    if (password !== confirm) {
-      setError("Passwords do not match.");
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
+
     setLoading(true);
     try {
       const data = await supabaseAuth("signup", email.trim(), password, name.trim());
@@ -35,7 +60,7 @@ export default function SignupPage() {
         saveSession(data);
         window.location.href = "/";
       } else {
-        setMessage("Account created. Check your email to confirm your account, then log in.");
+        setMessage("Account created successfully. You can now log in.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create your account.");
@@ -86,12 +111,12 @@ export default function SignupPage() {
             <h2 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl font-bold text-white">Join RoofRay.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-400">Create your account to start using your RoofRay solar assistant.</p>
 
-            <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-8 space-y-4" noValidate>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Full name</span>
                 <div className="relative">
                   <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="auth-input pl-12" type="text" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+                  <input className="auth-input pl-12" type="text" required autoComplete="name" maxLength={80} value={name} onChange={(e) => { setName(e.target.value); setError(""); }} placeholder="Your name" />
                 </div>
               </label>
 
@@ -99,7 +124,7 @@ export default function SignupPage() {
                 <span className="mb-2 block text-sm font-medium text-slate-300">Email address</span>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="auth-input pl-12" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                  <input className="auth-input pl-12" type="email" required autoComplete="email" maxLength={254} value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@example.com" />
                 </div>
               </label>
 
@@ -107,7 +132,7 @@ export default function SignupPage() {
                 <span className="mb-2 block text-sm font-medium text-slate-300">Password</span>
                 <div className="relative">
                   <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="auth-input pl-12 pr-12" type={showPassword ? "text" : "password"} required autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create a password" />
+                  <input className="auth-input pl-12 pr-12" type={showPassword ? "text" : "password"} required autoComplete="new-password" maxLength={72} value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} placeholder="Create a password" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:text-blue-400" aria-label={showPassword ? "Hide password" : "Show password"}>
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -118,12 +143,12 @@ export default function SignupPage() {
                 <span className="mb-2 block text-sm font-medium text-slate-300">Confirm password</span>
                 <div className="relative">
                   <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="auth-input pl-12" type="password" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repeat your password" />
+                  <input className="auth-input pl-12" type="password" required autoComplete="new-password" maxLength={72} value={confirm} onChange={(e) => { setConfirm(e.target.value); setError(""); }} placeholder="Repeat your password" />
                 </div>
               </label>
 
-              {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
-              {message && <p className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">{message}</p>}
+              {error && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
+              {message && <p role="status" className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">{message}</p>}
 
               <button disabled={loading} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" type="submit">
                 {loading ? "Creating account..." : "Create account"}
