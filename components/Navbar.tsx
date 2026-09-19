@@ -41,8 +41,18 @@ export default function Navbar() {
           ))}
         </nav>
 
+        {/* Auth actions */}
+        <div className="hidden sm:flex items-center gap-2">
+          <a href="/login" className="rounded-full px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white">
+            Log in
+          </a>
+          <a href="/signup" className="rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 hover:bg-blue-500">
+            Sign up
+          </a>
+        </div>
+
         {/* CTA — visible on all screens */}
-        <a href="#top" className="group/nav-btn relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-full px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all duration-500 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]" style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 4px 20px rgba(37, 99, 235, 0.3)' }}>
+        <a href="/#top" className="group/nav-btn relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-full px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all duration-500 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]" style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 4px 20px rgba(37, 99, 235, 0.3)' }}>
           <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover/nav-btn:translate-x-full" />
           <span className="absolute -inset-1 rounded-full bg-primary/20 opacity-0 blur-sm transition-all duration-500 group-hover/nav-btn:opacity-100 group-hover/nav-btn:inset-[-4px] group-hover/nav-btn:blur-md" />
           <span className="relative z-10">Talk to RoofRay</span>
