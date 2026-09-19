@@ -19,6 +19,7 @@ declare global {
         handler: (...args: unknown[]) => void,
       ) => (() => void) | void;
     };
+    __roofrayBotpressReady?: boolean;
   }
 }
 
@@ -35,10 +36,13 @@ export default function BotpressProvider() {
             resolve();
             return;
           }
+
           existing.addEventListener("load", () => resolve(), { once: true });
-          existing.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), {
-            once: true,
-          });
+          existing.addEventListener(
+            "error",
+            () => reject(new Error(`Failed to load ${src}`)),
+            { once: true },
+          );
           return;
         }
 
@@ -46,28 +50,59 @@ export default function BotpressProvider() {
         script.id = id;
         script.src = src;
         script.async = true;
+
         script.onload = () => {
           script.dataset.loaded = "true";
           resolve();
         };
-        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+
+        script.onerror = () => {
+          reject(new Error(`Failed to load ${src}`));
+        };
+
         document.head.appendChild(script);
       });
 
+    const waitForBotpress = async () => {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (cancelled) return false;
+        if (window.botpress?.on) return true;
+        await new Promise((resolve) => window.setTimeout(resolve, 50));
+      }
+
+      return false;
+    };
+
     const initialize = async () => {
       try {
-        // 1. Load the Botpress loader.
+        // Botpress requires inject.js to load before the dashboard config.
         await loadScript(BOTPRESS_INJECT_URL, "roofray-botpress-v37");
         if (cancelled) return;
 
-        // 2. IMPORTANT: register the initialization listener BEFORE the
-        // config script calls window.botpress.init().
-        const botpress = window.botpress;
-        botpress?.on?.("webchat:initialized", () => {
-          window.dispatchEvent(new CustomEvent("roofray_botpress_initialized"));
+        // Make absolutely sure the Botpress client exists before loading the
+        // config script. This listener must exist BEFORE window.botpress.init().
+        const botpressAvailable = await waitForBotpress();
+
+        if (!botpressAvailable) {
+          throw new Error("Botpress client was not created by inject.js");
+        }
+
+        window.botpress?.on?.("webchat:initialized", () => {
+          window.__roofrayBotpressReady = true;
+          console.log("[RoofRay] Botpress Webchat initialized");
+          window.dispatchEvent(
+            new CustomEvent("roofray_botpress_initialized"),
+          );
         });
 
-        // 3. Now load the dashboard-generated config/init script.
+        window.botpress?.on?.("webchat:opened", () => {
+          console.log("[RoofRay] Botpress Webchat opened");
+        });
+
+        window.botpress?.on?.("error", (error) => {
+          console.error("[RoofRay] Botpress Webchat error:", error);
+        });
+
         await loadScript(BOTPRESS_CONFIG_URL, "roofray-botpress-config");
         if (cancelled) return;
 
