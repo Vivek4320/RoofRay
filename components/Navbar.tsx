@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getCurrentRoofRayLocation } from "@/lib/location";
+import { openRoofRayBotpress, sendRoofRayLocationToBotpress } from "@/lib/botpress";
 
 const NAV_LINKS = [
   { href: '#how', label: 'How it works' },
@@ -41,23 +43,24 @@ export default function Navbar() {
     // open Botpress after the login flow returns to the home page.
     if (loggedIn && sessionStorage.getItem("roofray_pending_chat") === "true") {
       sessionStorage.removeItem("roofray_pending_chat");
-
-      const openChat = () => {
-        if (window.botpress?.open) {
-          window.botpress.open();
-        } else {
-          window.botpress?.on?.("webchat:initialized", () => {
-            window.botpress?.open?.();
-          });
-          window.setTimeout(() => {
-            window.botpress?.open?.();
-          }, 1500);
-        }
-      };
-
-      window.setTimeout(openChat, 300);
+      window.setTimeout(() => void startRoofRayChat(), 300);
     }
   }, []);
+
+  const startRoofRayChat = async () => {
+    // Ask for the browser's current location before opening the assistant.
+    // The coordinates are sent to Botpress as a RoofRay location event so the
+    // assistant can use local solar/sunlight context in the conversation.
+    const locationResult = await getCurrentRoofRayLocation();
+
+    if (locationResult.ok) {
+      sendRoofRayLocationToBotpress(locationResult.location);
+    } else {
+      console.warn("[RoofRay] Location unavailable:", locationResult.error);
+    }
+
+    openRoofRayBotpress();
+  };
 
   const handleTalkToRoofRay = (
     event: React.MouseEvent<HTMLAnchorElement>,
@@ -71,18 +74,8 @@ export default function Navbar() {
       return;
     }
 
-    // Logged-in user: open Botpress.
-    if (window.botpress?.open) {
-      window.botpress.open();
-      return;
-    }
-
-    const openWhenReady = () => {
-      window.botpress?.open?.();
-    };
-
-    window.botpress?.on?.("webchat:initialized", openWhenReady);
-    window.setTimeout(openWhenReady, 1500);
+    // Logged-in user: get current location first, then open Botpress.
+    void startRoofRayChat();
   };
 
   return (
