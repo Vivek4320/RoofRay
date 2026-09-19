@@ -84,14 +84,14 @@ export default function SignupPage() {
             <Link href="/" className="text-xs font-medium text-slate-500 hover:text-blue-400 transition-colors">← Back to RoofRay</Link>
             <p className="section-label mt-8 mb-3">Create account</p>
             <h2 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl font-bold text-white">Join RoofRay.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-400">Create your account and get started.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">Create your account to start using your RoofRay solar assistant.</p>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-4">
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Full name</span>
                 <div className="relative">
                   <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="input-field pl-11" type="text" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+                  <input className="auth-input pl-12" type="text" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
                 </div>
               </label>
 
@@ -99,7 +99,7 @@ export default function SignupPage() {
                 <span className="mb-2 block text-sm font-medium text-slate-300">Email address</span>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="input-field pl-11" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                  <input className="auth-input pl-12" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
                 </div>
               </label>
 
@@ -107,7 +107,7 @@ export default function SignupPage() {
                 <span className="mb-2 block text-sm font-medium text-slate-300">Password</span>
                 <div className="relative">
                   <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="input-field pl-11 pr-11" type={showPassword ? "text" : "password"} required autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create a password" />
+                  <input className="auth-input pl-12 pr-12" type={showPassword ? "text" : "password"} required autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create a password" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:text-blue-400" aria-label={showPassword ? "Hide password" : "Show password"}>
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -118,7 +118,7 @@ export default function SignupPage() {
                 <span className="mb-2 block text-sm font-medium text-slate-300">Confirm password</span>
                 <div className="relative">
                   <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input className="input-field pl-11" type="password" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repeat your password" />
+                  <input className="auth-input pl-12" type="password" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repeat your password" />
                 </div>
               </label>
 
