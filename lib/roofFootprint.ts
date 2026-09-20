@@ -7,6 +7,11 @@ export type RoofFootprint = {
   perimeterM: number;
   polygon: Array<{ latitude: number; longitude: number }>;
   dimensionsM: { width: number; length: number };
+  orientation: {
+    azimuthDeg: number;
+    direction: string;
+    source: "longest-footprint-edge";
+  };
   shape: "polygon";
   confidence: "high" | "medium" | "low";
   attribution: "© OpenStreetMap contributors";
@@ -66,6 +71,33 @@ function containsPoint(
     if (intersects) inside = !inside;
   }
   return inside;
+}
+
+function directionName(deg: number) {
+  const directions = ["North", "North-East", "East", "South-East", "South", "South-West", "West", "North-West"];
+  return directions[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+}
+
+function footprintOrientation(points: Array<{ x: number; y: number }>) {
+  let longest = { dx: 1, dy: 0, length: 0 };
+  for (let i = 0; i < points.length; i++) {
+    const next = points[(i + 1) % points.length];
+    const dx = next.x - points[i].x;
+    const dy = next.y - points[i].y;
+    const length = Math.hypot(dx, dy);
+    if (length > longest.length) longest = { dx, dy, length };
+  }
+
+  // x is east-west and y is north-south.
+  let azimuth = (Math.atan2(longest.dx, longest.dy) * 180) / Math.PI;
+  azimuth = (azimuth + 360) % 360;
+  if (azimuth >= 180) azimuth -= 180;
+
+  return {
+    azimuthDeg: Number(azimuth.toFixed(1)),
+    direction: directionName(azimuth),
+    source: "longest-footprint-edge" as const,
+  };
 }
 
 function dimensions(points: Array<{ x: number; y: number }>) {
@@ -154,6 +186,7 @@ out geom tags center qt;`;
   if (!selected) return null;
 
   const dimensionsM = dimensions(selected.projected);
+  const orientation = footprintOrientation(selected.projected);
   const confidence = selected.containsUser
     ? selected.element.tags?.building === "house" ||
       selected.element.tags?.building === "residential"
@@ -173,6 +206,7 @@ out geom tags center qt;`;
       longitude: Number(point.longitude.toFixed(6)),
     })),
     dimensionsM,
+    orientation,
     shape: "polygon",
     confidence,
     attribution: "© OpenStreetMap contributors",
