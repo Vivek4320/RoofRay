@@ -3,6 +3,7 @@ import { getNearbyObstacleAnalysis, buildCurrentSunCycle } from "@/lib/obstacles
 import { getRoofFootprint } from "@/lib/roofFootprint";
 import { estimatePanelPlacement } from "@/lib/panelPlacement";
 import { getPVGISAnalysis } from "@/lib/pvgis";
+import { analyzeShadowTimeline } from "@/lib/shadowEngine";
 
 type SolarAnalysisRequest = {
   latitude?: unknown;
@@ -43,6 +44,14 @@ export async function POST(request: Request) {
     ]);
 
     const sunCycle = buildCurrentSunCycle(latitude, longitude);
+    const shadow = analyzeShadowTimeline(
+      obstacles.obstacles,
+      sunCycle.next12Hours.map((sample) => ({
+        timestamp: sample.timestamp,
+        azimuthDeg: sample.azimuthDeg,
+        elevationDeg: sample.elevationDeg,
+      })),
+    );
     const panelPlacement = roof
       ? estimatePanelPlacement({
           roofAreaM2: roof.areaM2,
@@ -53,7 +62,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      analysis: { ...pvgis, sunCycle, obstacles, roof, panelPlacement },
+      analysis: { ...pvgis, sunCycle, obstacles, roof, shadow, panelPlacement },
     });
   } catch (error) {
     console.error("[RoofRay] Solar analysis failed:", error);
