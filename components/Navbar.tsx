@@ -1,10 +1,13 @@
-'use client';
-
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getCurrentRoofRayLocation } from "@/lib/location";
-import { openRoofRayBotpress, sendRoofRayLocationToBotpress } from "@/lib/botpress";
+import {
+  openRoofRayBotpress,
+  sendRoofRayLocationToBotpress,
+  sendRoofRaySolarAnalysisToBotpress,
+  type RoofRaySolarAnalysis,
+} from "@/lib/botpress";
 
 const NAV_LINKS = [
   { href: '#how', label: 'How it works' },
@@ -39,22 +42,61 @@ export default function Navbar() {
       }
     }
 
-    // If the user clicked Talk to RoofRay before logging in,
-    // open Botpress after the login flow returns to the home page.
     if (loggedIn && sessionStorage.getItem("roofray_pending_chat") === "true") {
       sessionStorage.removeItem("roofray_pending_chat");
       window.setTimeout(() => void startRoofRayChat(), 300);
     }
   }, []);
 
+  const loadSolarAnalysis = async (
+    latitude: number,
+    longitude: number,
+  ): Promise<void> => {
+    try {
+      const response = await fetch("/api/solar-analysis", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          latitude,
+          longitude,
+          // 1 kWp keeps the result normalized. RoofRay can scale this later
+          // after the user provides roof area or a chosen system size.
+          peakPowerKw: 1,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        ok?: boolean;
+        analysis?: RoofRaySolarAnalysis;
+        error?: string;
+      };
+
+      if (!response.ok || !data.ok || !data.analysis) {
+        console.warn("[RoofRay] PVGIS analysis unavailable:", data.error);
+        return;
+      }
+
+      sendRoofRaySolarAnalysisToBotpress(data.analysis);
+    } catch (error) {
+      console.warn("[RoofRay] Could not load PVGIS analysis:", error);
+    }
+  };
+
   const startRoofRayChat = async () => {
     // Ask for the browser's current location before opening the assistant.
-    // The coordinates are sent to Botpress as a RoofRay location event so the
-    // assistant can use local solar/sunlight context in the conversation.
     const locationResult = await getCurrentRoofRayLocation();
 
     if (locationResult.ok) {
+      const { latitude, longitude } = locationResult.location;
+
+      // Send the location event immediately so Botpress knows the context.
       sendRoofRayLocationToBotpress(locationResult.location);
+
+      // Run PVGIS server-side. The browser never calls PVGIS directly.
+      // This also keeps the third-party API integration out of the client.
+      void loadSolarAnalysis(latitude, longitude);
     } else {
       console.warn("[RoofRay] Location unavailable:", locationResult.error);
     }
@@ -67,14 +109,12 @@ export default function Navbar() {
   ) => {
     event.preventDefault();
 
-    // User must be logged in before using RoofRay.
     if (!isLoggedIn) {
       sessionStorage.setItem("roofray_pending_chat", "true");
       window.location.href = "/login?redirect=/";
       return;
     }
 
-    // Logged-in user: get current location first, then open Botpress.
     void startRoofRayChat();
   };
 
