@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getNearbyObstacleAnalysis, buildCurrentSunCycle } from "@/lib/obstacles";
 import { getPVGISAnalysis } from "@/lib/pvgis";
 
 type SolarAnalysisRequest = {
@@ -6,6 +7,7 @@ type SolarAnalysisRequest = {
   longitude?: unknown;
   peakPowerKw?: unknown;
   lossPercent?: unknown;
+  obstacleRadiusMeters?: unknown;
 };
 
 function finiteNumber(value: unknown): number | null {
@@ -21,6 +23,7 @@ export async function POST(request: Request) {
     const longitude = finiteNumber(body.longitude);
     const peakPowerKw = finiteNumber(body.peakPowerKw) ?? 1;
     const lossPercent = finiteNumber(body.lossPercent) ?? 14;
+    const obstacleRadiusMeters = finiteNumber(body.obstacleRadiusMeters) ?? 500;
 
     if (
       latitude === null ||
@@ -50,19 +53,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const analysis = await getPVGISAnalysis({
-      latitude,
-      longitude,
-      peakPowerKw,
-      lossPercent,
-    });
+    const [pvgis, obstacles] = await Promise.all([
+      getPVGISAnalysis({
+        latitude,
+        longitude,
+        peakPowerKw,
+        lossPercent,
+      }),
+      getNearbyObstacleAnalysis(latitude, longitude, obstacleRadiusMeters),
+    ]);
+
+    const sunCycle = buildCurrentSunCycle(latitude, longitude);
 
     return NextResponse.json({
       ok: true,
-      analysis,
+      analysis: {
+        ...pvgis,
+        sunCycle,
+        obstacles,
+      },
     });
   } catch (error) {
-    console.error("[RoofRay] PVGIS solar analysis failed:", error);
+    console.error("[RoofRay] Solar analysis failed:", error);
 
     return NextResponse.json(
       {
