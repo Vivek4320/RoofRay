@@ -64,6 +64,8 @@ export default function Navbar() {
           // 1 kWp keeps the result normalized. RoofRay can scale this later
           // after the user provides roof area or a chosen system size.
           peakPowerKw: 1,
+          // Search a local 500 m radius for mapped buildings, towers and masts.
+          obstacleRadiusMeters: 500,
         }),
       });
 
