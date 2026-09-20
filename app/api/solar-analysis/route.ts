@@ -57,6 +57,9 @@ export async function POST(request: Request) {
           roofAreaM2: roof.areaM2,
           annualSpecificYieldKwhPerKwp: pvgis.annual.specificYieldKwhPerKwp,
           recommendedDirection: pvgis.optimalOrientation.direction,
+          shadingFactor: shadow.timeSeries.length
+            ? shadow.timeSeries.filter((sample) => sample.risk === "high" || sample.risk === "medium").length / shadow.timeSeries.length * 0.15
+            : 0,
         })
       : null;
 
