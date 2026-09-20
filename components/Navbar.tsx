@@ -80,6 +80,10 @@ export default function Navbar() {
         return;
       }
 
+      try {
+        sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
+        window.dispatchEvent(new Event("roofray_solar_analysis_ready"));
+      } catch {}
       sendRoofRaySolarAnalysisToBotpress(data.analysis);
     } catch (error) {
       console.warn("[RoofRay] Could not load PVGIS analysis:", error);
