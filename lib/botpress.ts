@@ -56,6 +56,37 @@ export type RoofRaySolarAnalysis = {
       aboveHorizon: boolean;
     }>;
   };
+  roof?: {
+    buildingId: string;
+    areaM2: number;
+    perimeterM: number;
+    dimensionsM: { width: number; length: number };
+    orientation?: { azimuthDeg: number; direction: string; source: string };
+    confidence: "high" | "medium" | "low";
+  } | null;
+  shadow?: {
+    currentRisk: "high" | "medium" | "low" | "none";
+    estimatedAffectedDirections: string[];
+    timeSeries: Array<{
+      timestamp: string;
+      sunAzimuthDeg: number;
+      sunElevationDeg: number;
+      affectedObstacleCount: number;
+      highRiskObstacleCount: number;
+      risk: string;
+    }>;
+  };
+  panelPlacement?: {
+    estimate: {
+      panelCount: number;
+      systemSizeKw: number;
+      annualGenerationKwh: number | null;
+      effectiveGenerationKwh: number | null;
+    };
+    roof: { mappedAreaM2: number; usableAreaM2: number; usableAreaFactor: number };
+    recommendedDirection: string | null;
+    layout: { orientation: "portrait"; columns: number; rows: number; coveredAreaM2: number };
+  } | null;
   obstacles: {
     provider: "OpenStreetMap Overpass";
     radiusMeters: number;
