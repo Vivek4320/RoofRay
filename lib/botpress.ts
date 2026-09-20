@@ -40,6 +40,43 @@ export type RoofRaySolarAnalysis = {
     averageDailyIrradiationKwhM2: number;
   }>;
   notes: string[];
+  sunCycle: {
+    current: {
+      timestamp: string;
+      azimuthDeg: number;
+      elevationDeg: number;
+      direction: string;
+      aboveHorizon: boolean;
+    };
+    next12Hours: Array<{
+      timestamp: string;
+      azimuthDeg: number;
+      elevationDeg: number;
+      direction: string;
+      aboveHorizon: boolean;
+    }>;
+  };
+  obstacles: {
+    provider: "OpenStreetMap Overpass";
+    radiusMeters: number;
+    obstacles: Array<{
+      id: string;
+      type: "building" | "tower" | "mast" | "other";
+      name: string | null;
+      latitude: number;
+      longitude: number;
+      distanceMeters: number;
+      bearingDeg: number;
+      heightMeters: number;
+      heightSource: "osm-height" | "osm-levels" | "estimated";
+      tags: Record<string, string>;
+      shadowRisk: "high" | "medium" | "low" | "unknown";
+      estimatedShadowReachMeters: number | null;
+    }>;
+    likelyShadowDirections: string[];
+    caveats: string[];
+    attribution: "© OpenStreetMap contributors";
+  };
 };
 
 type BotpressClient = {
@@ -87,14 +124,10 @@ export function openRoofRayBotpress(): boolean {
   return false;
 }
 
-export function sendRoofRayLocationToBotpress(
-  location: RoofRayLocation,
-): boolean {
+export function sendRoofRayLocationToBotpress(location: RoofRayLocation): boolean {
   const client = getBotpressClient();
   if (!client) {
-    console.warn(
-      "[RoofRay] Botpress Webchat client is unavailable; location was captured but not delivered.",
-    );
+    console.warn("[RoofRay] Botpress Webchat client is unavailable; location was captured but not delivered.");
     return false;
   }
 
@@ -143,17 +176,18 @@ export function sendRoofRaySolarAnalysisToBotpress(
   }
 
   if (client.sendMessage) {
+    const highRisk = analysis.obstacles.obstacles.filter(
+      (obstacle) => obstacle.shadowRisk === "high",
+    );
     const direction = analysis.optimalOrientation.direction ?? "the optimal direction";
     const annual = analysis.annual.energyKwh;
 
     void client.sendMessage(
-      `☀️ PVGIS analysis ready: ${annual ?? "N/A"} kWh/year for ${analysis.system.peakPowerKw} kWp, with a solar-resource optimum toward ${direction}.`,
+      `☀️ RoofRay analysis ready: ${annual ?? "N/A"} kWh/year for ${analysis.system.peakPowerKw} kWp. Solar-resource optimum: ${direction}. Nearby mapped high-shadow-risk obstacles: ${highRisk.length}.`,
     );
     return true;
   }
 
-  console.warn(
-    "[RoofRay] Botpress client has no sendEvent/sendMessage API for solar analysis.",
-  );
+  console.warn("[RoofRay] Botpress client has no sendEvent/sendMessage API for solar analysis.");
   return false;
 }
