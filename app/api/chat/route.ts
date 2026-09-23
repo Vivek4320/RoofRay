@@ -5,15 +5,11 @@ type ChatMessage = {
   content: string;
 };
 
-function extractResponseText(data: any): string {
-  if (typeof data?.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
-  const chunks: string[] = [];
-  for (const item of Array.isArray(data?.output) ? data.output : []) {
-    for (const content of Array.isArray(item?.content) ? item.content : []) {
-      if (content?.type === "output_text" && typeof content?.text === "string") chunks.push(content.text);
-    }
-  }
-  return chunks.join("\n").trim();
+function extractGeminiText(data: any): string {
+  const parts = Array.isArray(data?.candidates?.[0]?.content?.parts)
+    ? data.candidates[0].content.parts
+    : [];
+  return parts.map((part: any) => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("\n").trim();
 }
 
 async function verifyAccessToken(token: string): Promise<boolean> {
@@ -35,9 +31,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Please log in before using the RoofRay assistant." }, { status: 401 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ ok: false, error: "RoofRay AI is not configured yet. Add OPENAI_API_KEY on the server." }, { status: 503 });
+      return NextResponse.json({ ok: false, error: "RoofRay AI is not configured yet. Add GEMINI_API_KEY on the server." }, { status: 503 });
     }
 
     const body = (await request.json()) as { messages?: ChatMessage[]; solarContext?: Record<string, unknown> | null };
@@ -69,41 +65,30 @@ export async function POST(request: Request) {
       solarContext,
     ].join("\n");
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const model = process.env.ROOFRAY_GEMINI_MODEL && process.env.ROOFRAY_GEMINI_MODEL !== "your_supported_model_id" ? process.env.ROOFRAY_GEMINI_MODEL : "gemini-3.5-flash-lite";
+    const contents = messages.map((message) => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: message.content }],
+    }));
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        model:
-          process.env.ROOFRAY_OPENAI_MODEL &&
-          process.env.ROOFRAY_OPENAI_MODEL !== "your_supported_model_id"
-            ? process.env.ROOFRAY_OPENAI_MODEL
-            : "gpt-5.6-luna",
-        instructions: systemPrompt,
-        input: messages,
-        max_output_tokens: 700,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: { maxOutputTokens: 700 },
       }),
       cache: "no-store",
     });
-
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      console.error("[RoofRay] OpenAI request failed:", response.status, data);
+      console.error("[RoofRay] Gemini request failed:", response.status, data);
       const providerMessage = typeof data?.error?.message === "string" ? data.error.message : "";
-      return NextResponse.json(
-        {
-          ok: false,
-          error: providerMessage
-            ? `RoofRay AI could not answer right now: ${providerMessage}`
-            : "RoofRay AI could not answer right now. Please try again.",
-        },
-        { status: 502 },
-      );
+      return NextResponse.json({ ok: false, error: providerMessage ? `RoofRay AI could not answer right now: ${providerMessage}` : "RoofRay AI could not answer right now. Please try again." }, { status: 502 });
     }
-
-    const answer = extractResponseText(data);
+    const answer = extractGeminiText(data);
     if (!answer) return NextResponse.json({ ok: false, error: "RoofRay AI returned an empty response. Please try again." }, { status: 502 });
-    return NextResponse.json({ ok: true, message: answer });
-  } catch (error) {
+    return NextResponse.json({ ok: true, message: answer });catch (error) {
     console.error("[RoofRay] Chat failed:", error);
     return NextResponse.json({ ok: false, error: "RoofRay AI is temporarily unavailable. Please try again." }, { status: 500 });
   }
