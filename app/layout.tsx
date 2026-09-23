@@ -3,7 +3,7 @@ import { Outfit, Plus_Jakarta_Sans, DM_Mono } from 'next/font/google';
 // TypeScript: allow side-effect global CSS import without explicit type declarations
 // @ts-ignore
 import './globals.css';
-import BotpressProvider from '@/components/BotpressProvider';
+import RoofRayChat from '@/components/RoofRayChat';
 
 const outfit = Outfit({
   variable: '--font-display',
@@ -83,6 +83,7 @@ export default function RootLayout({
           defer
         />
         {children}
+        <RoofRayChat />
       </body>
     </html>
   );

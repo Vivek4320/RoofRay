@@ -1,13 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getCurrentRoofRayLocation } from "@/lib/location";
-import {
-  openRoofRayBotpress,
-  sendRoofRayLocationToBotpress,
-  sendRoofRaySolarAnalysisToBotpress,
-  type RoofRaySolarAnalysis,
-} from "@/lib/botpress";
 
 const NAV_LINKS = [
   { href: '#how', label: 'How it works' },
@@ -48,66 +41,8 @@ export default function Navbar() {
     }
   }, []);
 
-  const loadSolarAnalysis = async (
-    latitude: number,
-    longitude: number,
-  ): Promise<void> => {
-    try {
-      const response = await fetch("/api/solar-analysis", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          latitude,
-          longitude,
-          // 1 kWp keeps the result normalized. RoofRay can scale this later
-          // after the user provides roof area or a chosen system size.
-          peakPowerKw: 1,
-          // Search a local 500 m radius for mapped buildings, towers and masts.
-          obstacleRadiusMeters: 500,
-        }),
-      });
-
-      const data = (await response.json()) as {
-        ok?: boolean;
-        analysis?: RoofRaySolarAnalysis;
-        error?: string;
-      };
-
-      if (!response.ok || !data.ok || !data.analysis) {
-        console.warn("[RoofRay] PVGIS analysis unavailable:", data.error);
-        return;
-      }
-
-      try {
-        sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
-        window.dispatchEvent(new Event("roofray_solar_analysis_ready"));
-      } catch {}
-      sendRoofRaySolarAnalysisToBotpress(data.analysis);
-    } catch (error) {
-      console.warn("[RoofRay] Could not load PVGIS analysis:", error);
-    }
-  };
-
   const startRoofRayChat = async () => {
-    // Ask for the browser's current location before opening the assistant.
-    const locationResult = await getCurrentRoofRayLocation();
-
-    if (locationResult.ok) {
-      const { latitude, longitude } = locationResult.location;
-
-      // Send the location event immediately so Botpress knows the context.
-      sendRoofRayLocationToBotpress(locationResult.location);
-
-      // Run PVGIS server-side. The browser never calls PVGIS directly.
-      // This also keeps the third-party API integration out of the client.
-      void loadSolarAnalysis(latitude, longitude);
-    } else {
-      console.warn("[RoofRay] Location unavailable:", locationResult.error);
-    }
-
-    openRoofRayBotpress();
+    window.dispatchEvent(new Event("roofray:open-chat"));
   };
 
   const handleTalkToRoofRay = (
