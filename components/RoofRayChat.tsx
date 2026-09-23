@@ -221,10 +221,6 @@ export default function RoofRayChat() {
     <>
       {open && (
         <section aria-label="RoofRay AI assistant" className="fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7">
-          <div className="border-b border-white/5 bg-[#0D1422] px-5 py-2.5">
-            <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-slate-500"><span>Solar check</span><span>Step {currentStep} of 4</span></div>
-            <div className="flex gap-1.5">{[1, 2, 3, 4].map((step) => <span key={step} className={`h-1 flex-1 rounded-full ${step <= currentStep ? "bg-blue-500" : "bg-white/10"}`} />)}</div>
-          </div>
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#0B1220] p-4">
             {!hasStarted && <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
               <Image src="/Logo-removebg-preview.png" alt="RoofRay Logo" width={260} height={100} priority className="h-auto w-48 object-contain" />
