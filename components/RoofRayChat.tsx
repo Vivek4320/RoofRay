@@ -44,6 +44,8 @@ export default function RoofRayChat() {
   const [shading, setShading] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
+  const currentStep = shading !== null ? 4 : monthlyBill !== null ? 3 : roofArea !== null ? 2 : 1;
+
   const quickOptions = useMemo(() => {
     if (roofArea === null || monthlyBill === null || shading !== null) return [];
     return ["No", "Partial", "Heavy"];
@@ -217,22 +219,29 @@ export default function RoofRayChat() {
   return (
     <>
       {!open && (
-        <button type="button" onClick={openChat} aria-label="Open RoofRay AI assistant" className="fixed bottom-24 right-5 z-[70] flex h-14 w-14 items-center justify-center rounded-full border border-blue-300/30 bg-blue-600 text-white shadow-2xl shadow-blue-900/30 transition hover:-translate-y-1 hover:bg-blue-500 lg:bottom-7">
-          <span className="text-2xl">☀</span>
+        <button type="button" onClick={openChat} aria-label="Open RoofRay AI assistant" className="group fixed bottom-24 right-5 z-[70] flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-300/30 bg-[#0B1220] text-white shadow-2xl shadow-blue-950/40 transition duration-300 hover:-translate-y-1 hover:border-blue-300/60 lg:bottom-7">
+          <span className="absolute inset-1 rounded-xl border border-blue-400/10" />
+          <span className="relative text-xl transition-transform duration-300 group-hover:rotate-12">☀</span>
+          <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#0B1220] bg-emerald-400" />
         </button>
       )}
 
       {open && (
-        <section aria-label="RoofRay AI assistant" className="fixed bottom-20 right-4 z-[80] flex h-[min(720px,calc(100vh-110px))] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/40 lg:bottom-7 lg:right-7">
+        <section aria-label="RoofRay AI assistant" className="fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7">
           <header className="border-b border-white/10 bg-[#101827] px-5 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold">RoofRay AI</p>
-                <p className="text-xs text-slate-400">Solar feasibility assistant</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-300/20 bg-blue-600/15 text-lg shadow-inner shadow-blue-500/10">☀</div>
+                  <div>
+                    <div className="flex items-center gap-2"><p className="text-sm font-bold tracking-tight">RoofRay AI</p><span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-300">Online</span></div>
+                    <p className="text-xs text-slate-400">Your rooftop solar assistant</p>
+                  </div>
+                </div>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="rounded-full px-3 py-1 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close chat">×</button>
             </div>
-            <div className="mt-3 rounded-xl border border-blue-400/20 bg-blue-500/5 px-3 py-2 text-xs">
+            <div className="mt-3 rounded-2xl border border-blue-400/15 bg-[#0D1728] px-3 py-2.5 text-xs">
               {locationStatus === "detecting" || locationLoading ? (
                 <p className="text-blue-200">📍 Detecting your rooftop location…</p>
               ) : locationStatus === "ready" ? (
@@ -250,37 +259,47 @@ export default function RoofRayChat() {
             </div>
           </header>
 
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          <div className="border-b border-white/5 bg-[#0D1422] px-5 py-2.5">
+            <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-slate-500">
+              <span>Solar check</span><span>Step {currentStep} of 4</span>
+            </div>
+            <div className="flex gap-1.5">
+              {[1, 2, 3, 4].map((step) => <span key={step} className={`h-1 flex-1 rounded-full ${step <= currentStep ? "bg-blue-500" : "bg-white/10"}`} />)}
+            </div>
+          </div>
+
+          <div className="flex-1 space-y-4 overflow-y-auto bg-[#0B1220] p-4">
             {messages.map((message) => (
-              <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                <div className={message.role === "user" ? "max-w-[85%] rounded-2xl rounded-br-md bg-blue-600 px-4 py-3 text-sm leading-6" : "max-w-[90%] rounded-2xl rounded-bl-md border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-slate-200"}>
+              <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex items-end gap-2 justify-start"}>
+                {message.role === "assistant" && <div className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-blue-300/15 bg-blue-500/10 text-xs">☀</div>}
+                <div className={message.role === "user" ? "max-w-[86%] rounded-2xl rounded-br-md border border-blue-400/20 bg-blue-600 px-4 py-3 text-sm leading-6 shadow-lg shadow-blue-950/20" : "max-w-[86%] rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-4 py-3 text-sm leading-6 text-slate-200 shadow-lg shadow-black/10"}>
                   {message.content}
                 </div>
               </div>
             ))}
             {quickOptions.length > 0 && (
-              <div className="flex flex-wrap gap-2">
+              <div className="ml-9 flex flex-wrap gap-2">
                 {quickOptions.map((option) => (
-                  <button key={option} type="button" onClick={() => void sendMessage(option)} className="rounded-full border border-blue-400/30 px-3 py-1.5 text-xs text-blue-200 hover:bg-blue-500/10">
-                    {option}
+                  <button key={option} type="button" onClick={() => void sendMessage(option)} className="rounded-xl border border-blue-400/20 bg-blue-500/5 px-3 py-2 text-xs font-medium text-blue-200 transition hover:border-blue-300/40 hover:bg-blue-500/10">
+                    {option === "No" ? "No shade" : option === "Partial" ? "Partial shade" : "Heavy shade"}
                   </button>
                 ))}
               </div>
             )}
-            {loading && <div className="text-xs text-slate-500">RoofRay is thinking…</div>}
+            {loading && <div className="ml-9 flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-3 py-2.5 text-xs text-slate-400"><span>RoofRay is thinking</span><span className="flex gap-1"><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400" /><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400 [animation-delay:150ms]" /><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400 [animation-delay:300ms]" /></span></div>}
             <div ref={endRef} />
           </div>
 
-          <form onSubmit={(event) => { event.preventDefault(); void sendMessage(); }} className="border-t border-white/10 bg-[#101827] p-3">
-            <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/5 p-2">
+          <form onSubmit={(event) => { event.preventDefault(); void sendMessage(); }} className="border-t border-white/10 bg-[#0D1422] p-3 sm:p-4">
+            <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-[#111B2B] p-2 shadow-inner shadow-black/10">
               <input
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 placeholder={roofArea === null ? "e.g. 1200 sq ft" : monthlyBill === null ? "e.g. ₹2500 per month" : shading === null ? "No, Partial, or Heavy" : "Ask RoofRay anything about your analysis…"}
-                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-600"
+                className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-sm outline-none placeholder:text-slate-500"
                 disabled={loading}
               />
-              <button type="submit" disabled={loading || !input.trim()} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Send</button>
+              <button type="submit" disabled={loading || !input.trim()} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">Send</button>
             </div>
           </form>
         </section>
