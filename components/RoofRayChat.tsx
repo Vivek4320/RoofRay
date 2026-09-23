@@ -1,15 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 type SolarAnalysis = Record<string, unknown>;
 
-const initialMessage: ChatMessage = {
-  id: "roofray-welcome",
-  role: "assistant",
-  content: "Hi! I’m RoofRay ☀️ I’ll help you check your rooftop solar feasibility step by step. I’ve started with your location; first, tell me your roof area in sq ft.",
-};
+const initialMessage: ChatMessage = { id: "roofray-welcome", role: "assistant", content: "" };
 
 function getToken() {
   if (typeof window === "undefined") return "";
@@ -42,6 +39,7 @@ export default function RoofRayChat() {
   const [roofArea, setRoofArea] = useState<number | null>(null);
   const [monthlyBill, setMonthlyBill] = useState<number | null>(null);
   const [shading, setShading] = useState<string | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   const currentStep = shading !== null ? 4 : monthlyBill !== null ? 3 : roofArea !== null ? 2 : 1;
@@ -164,6 +162,7 @@ export default function RoofRayChat() {
 
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", content };
     const nextMessages = [...messages, userMessage];
+    setHasStarted(true);
     setMessages(nextMessages);
     setInput("");
     setLoading(true);
@@ -254,16 +253,11 @@ export default function RoofRayChat() {
           </header>
 
           <div className="border-b border-white/5 bg-[#0D1422] px-5 py-2.5">
-            <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-slate-500">
-              <span>Solar check</span><span>Step {currentStep} of 4</span>
-            </div>
-            <div className="flex gap-1.5">
-              {[1, 2, 3, 4].map((step) => <span key={step} className={`h-1 flex-1 rounded-full ${step <= currentStep ? "bg-blue-500" : "bg-white/10"}`} />)}
-            </div>
+            <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-slate-500"><span>Solar check</span><span>Step {currentStep} of 4</span></div>
+            <div className="flex gap-1.5">{[1, 2, 3, 4].map((step) => <span key={step} className={`h-1 flex-1 rounded-full ${step <= currentStep ? "bg-blue-500" : "bg-white/10"}`} />)}</div>
           </div>
-
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#0B1220] p-4">
-            <div className="rounded-2xl border border-white/7 bg-[#0E1828] px-3.5 py-3"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Project inputs</p><span className="text-[10px] text-slate-600">Live</span></div><div className="mt-2.5 grid grid-cols-3 gap-2"><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Roof</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{roofArea !== null ? `${roofArea.toLocaleString()} ft²` : "Pending"}</p></div><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Bill</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{monthlyBill !== null ? `₹${monthlyBill.toLocaleString("en-IN")}` : "Pending"}</p></div><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Shade</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{shading ?? "Pending"}</p></div></div></div>
+            {hasStarted && <div className="rounded-2xl border border-white/7 bg-[#0E1828] px-3.5 py-3"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Project inputs</p><span className="text-[10px] text-slate-600">Live</span></div><div className="mt-2.5 grid grid-cols-3 gap-2"><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Roof</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{roofArea !== null ? `${roofArea.toLocaleString()} ft²` : "Pending"}</p></div><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Bill</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{monthlyBill !== null ? `₹${monthlyBill.toLocaleString("en-IN")}` : "Pending"}</p></div><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Shade</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{shading ?? "Pending"}</p></div></div></div>
             {messages.map((message) => (
               <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex items-end gap-2 justify-start"}>
                 {message.role === "assistant" && <div className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-blue-300/15 bg-blue-500/10 text-xs">☀</div>}
@@ -281,7 +275,7 @@ export default function RoofRayChat() {
                 ))}
               </div>
             )}
-            {starterOptions.length > 0 && (<div className="ml-9"><p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Suggested</p><div className="flex flex-wrap gap-2">{starterOptions.map((option) => <button key={option} type="button" onClick={() => void sendMessage(option)} className="rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2 text-left text-[11px] font-medium text-slate-300 transition hover:-translate-y-0.5 hover:border-blue-300/20 hover:bg-blue-500/5 hover:text-blue-200">{option}</button>)}</div></div>)}
+            {hasStarted && starterOptions.length > 0 && (<div className="ml-9"><p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Suggested</p><div className="flex flex-wrap gap-2">{starterOptions.map((option) => <button key={option} type="button" onClick={() => void sendMessage(option)} className="rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2 text-left text-[11px] font-medium text-slate-300 transition hover:-translate-y-0.5 hover:border-blue-300/20 hover:bg-blue-500/5 hover:text-blue-200">{option}</button>)}</div></div>)}
             {loading && <div className="ml-9 flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-3 py-2.5 text-xs text-slate-400"><span>RoofRay is thinking</span><span className="flex gap-1"><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400" /><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400 [animation-delay:150ms]" /><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400 [animation-delay:300ms]" /></span></div>}
             <div ref={endRef} />
           </div>
