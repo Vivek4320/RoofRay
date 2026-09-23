@@ -73,7 +73,11 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
       body: JSON.stringify({
-        model: process.env.ROOFRAY_OPENAI_MODEL || "gpt-5.6-luna",
+        model:
+          process.env.ROOFRAY_OPENAI_MODEL &&
+          process.env.ROOFRAY_OPENAI_MODEL !== "your_supported_model_id"
+            ? process.env.ROOFRAY_OPENAI_MODEL
+            : "gpt-5.6-luna",
         instructions: systemPrompt,
         input: messages,
         max_output_tokens: 700,
