@@ -20,7 +20,7 @@ function angularDifference(a: number, b: number) {
   return Math.abs(((a - b + 180) % 360) - 180);
 }
 function direction(deg: number) {
-  const names = ["North","North-East","East","South-East","South","South-West","West","North-West"];
+  const names = ["North", "North-East", "East", "South-East", "South", "South-West", "West", "North-West"];
   return names[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
 }
 
@@ -63,10 +63,12 @@ export function analyzeShadowTimeline(
       }
     }
 
-    const risk =
-      highRiskObstacleCount > 0 ? "high" :
-      affectedObstacleCount > 0 ? "medium" :
-      "low";
+    const risk: ShadowTimeSample["risk"] =
+      highRiskObstacleCount > 0
+        ? "high"
+        : affectedObstacleCount > 0
+          ? "medium"
+          : "low";
 
     return {
       timestamp: sun.timestamp,
@@ -78,7 +80,7 @@ export function analyzeShadowTimeline(
     };
   });
 
-  const currentRisk = timeSeries[0]?.risk ?? "none";
+  const currentRisk: ShadowAnalysis["currentRisk"] = timeSeries[0]?.risk ?? "none";
   const estimatedAffectedDirections = [...new Set(
     timeSeries
       .filter(sample => sample.risk === "high" || sample.risk === "medium")

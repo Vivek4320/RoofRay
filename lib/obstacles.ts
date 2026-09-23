@@ -1,7 +1,7 @@
 export type SolarObstacle = {
   id: string;
   type: "building" | "tower" | "mast" | "other";
-  name: string | null;
+  name: string;
   latitude: number;
   longitude: number;
   distanceMeters: number;
@@ -337,7 +337,7 @@ out center tags qt;`;
       return {
         id: `${element.type}/${element.id}`,
         type,
-        name: tags.name ?? null,
+        name: tags.name ?? "Unnamed obstacle",
         latitude: Number(obstacleLatitude.toFixed(6)),
         longitude: Number(obstacleLongitude.toFixed(6)),
         distanceMeters: Number(distance.toFixed(1)),
@@ -374,7 +374,7 @@ out center tags qt;`;
     provider: "OpenStreetMap Overpass",
     radiusMeters: safeRadius,
     obstacles,
-    likelyShadowDirections: [...new Set(likelyShadowDirections)],
+    likelyShadowDirections: Array.from(new Set(likelyShadowDirections)),
     caveats: [
       "OpenStreetMap coverage varies by area; an unmapped building or tower will not appear here.",
       "Obstacle heights use OSM height/building-level tags when available and conservative estimates otherwise.",
