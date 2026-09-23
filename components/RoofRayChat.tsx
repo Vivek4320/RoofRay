@@ -13,6 +13,62 @@ function getToken() {
   return localStorage.getItem("roofray_access_token") || "";
 }
 
+async function getValidToken() {
+  const token = getToken();
+  if (token) {
+    const refreshToken = localStorage.getItem("roofray_refresh_token") || "";
+    if (!refreshToken) return token;
+
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) return token;
+
+      const response = await fetch(
+        supabaseUrl + "/auth/v1/user",
+        {
+          headers: {
+            apikey: anonKey,
+            Authorization: "Bearer " + token,
+          },
+          cache: "no-store",
+        },
+      );
+
+      if (response.ok) return token;
+    } catch {}
+  }
+
+  const refreshToken = localStorage.getItem("roofray_refresh_token") || "";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!refreshToken || !supabaseUrl || !anonKey) return "";
+
+  try {
+    const response = await fetch(
+      supabaseUrl + "/auth/v1/token?grant_type=refresh_token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey,
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) return "";
+
+    const data = await response.json();
+    if (data.access_token) localStorage.setItem("roofray_access_token", data.access_token);
+    if (data.refresh_token) localStorage.setItem("roofray_refresh_token", data.refresh_token);
+    return data.access_token || "";
+  } catch {
+    return "";
+  }
+}
+
 function getStoredAnalysis(): SolarAnalysis | null {
   if (typeof window === "undefined") return null;
   try {
@@ -187,10 +243,17 @@ export default function RoofRayChat() {
       if (nextShading) setShading(nextShading);
     }
 
+    const validToken = await getValidToken();
+    if (!validToken) {
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: "Your login session is not available. Please log in again, then try your message." }]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + getToken() },
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + validToken },
         body: JSON.stringify({
           messages: nextMessages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
           solarContext: {
