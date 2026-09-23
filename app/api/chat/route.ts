@@ -84,7 +84,16 @@ export async function POST(request: Request) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       console.error("[RoofRay] OpenAI request failed:", response.status, data);
-      return NextResponse.json({ ok: false, error: "RoofRay AI could not answer right now. Please try again." }, { status: 502 });
+      const providerMessage = typeof data?.error?.message === "string" ? data.error.message : "";
+      return NextResponse.json(
+        {
+          ok: false,
+          error: providerMessage
+            ? `RoofRay AI could not answer right now: ${providerMessage}`
+            : "RoofRay AI could not answer right now. Please try again.",
+        },
+        { status: 502 },
+      );
     }
 
     const answer = extractResponseText(data);
