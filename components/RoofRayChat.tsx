@@ -271,7 +271,11 @@ export default function RoofRayChat() {
             </div>}
             {messages.filter((message) => message.content.trim()).map((message) => (
               <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex items-end gap-2 justify-start"}>
-                {message.role === "assistant" && <div className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-blue-300/15 bg-blue-500/10 text-xs">☀</div>}
+                {message.role === "assistant" && (
+                  <div className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-blue-300/15 bg-blue-500/10">
+                    <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={28} height={28} className="h-7 w-7 object-contain" />
+                  </div>
+                )}
                 <div className={message.role === "user" ? "max-w-[86%] rounded-2xl rounded-br-md border border-blue-400/20 bg-blue-600 px-4 py-3 text-sm leading-6 shadow-lg shadow-blue-950/20" : "max-w-[86%] rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-4 py-3 text-sm leading-6 text-slate-200 shadow-lg shadow-black/10"}>
                   {message.content}
                 </div>
@@ -279,8 +283,8 @@ export default function RoofRayChat() {
             ))}
             {loading && (
               <div className="ml-9 flex items-center gap-2.5 rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-3.5 py-3 text-xs text-slate-400 shadow-lg shadow-black/10">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-blue-400/15 bg-blue-500/10">
-                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-blue-400" />
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-blue-300/15 bg-blue-500/10">
+                  <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={28} height={28} className="h-7 w-7 animate-pulse object-contain" />
                 </div>
                 <span className="flex items-center gap-1" aria-hidden="true">
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400" />
