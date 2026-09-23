@@ -218,14 +218,6 @@ export default function RoofRayChat() {
 
   return (
     <>
-      {!open && (
-        <button type="button" onClick={openChat} aria-label="Open RoofRay AI assistant" className="group fixed bottom-24 right-5 z-[70] flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-300/30 bg-[#0B1220] text-white shadow-2xl shadow-blue-950/40 transition duration-300 hover:-translate-y-1 hover:border-blue-300/60 lg:bottom-7">
-          <span className="absolute inset-1 rounded-xl border border-blue-400/10" />
-          <span className="relative text-xl transition-transform duration-300 group-hover:rotate-12">☀</span>
-          <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#0B1220] bg-emerald-400" />
-        </button>
-      )}
-
       {open && (
         <section aria-label="RoofRay AI assistant" className="fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7">
           <header className="border-b border-white/10 bg-[#101827] px-5 py-4">
