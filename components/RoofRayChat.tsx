@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 type SolarAnalysis = Record<string, unknown>;
@@ -98,14 +98,6 @@ export default function RoofRayChat() {
   const [hasStarted, setHasStarted] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const currentStep = shading !== null ? 4 : monthlyBill !== null ? 3 : roofArea !== null ? 2 : 1;
-
-  const starterOptions = useMemo(() => roofArea === null ? ["How does RoofRay work?", "What data do you analyze?"] : monthlyBill === null ? ["Why do you need my bill?", "Can I use an estimated bill?"] : shading === null ? [] : ["Explain my solar potential", "What affects my savings?", "Explain the shadow analysis"], [roofArea, monthlyBill, shading]);
-
-  const quickOptions = useMemo(() => {
-    if (roofArea === null || monthlyBill === null || shading !== null) return [];
-    return ["No", "Partial", "Heavy"];
-  }, [roofArea, monthlyBill, shading]);
 
   function hydrateStoredLocation() {
     try {
@@ -303,17 +295,19 @@ export default function RoofRayChat() {
                 </div>
               </div>
             ))}
-            {quickOptions.length > 0 && (
-              <div className="ml-9 flex flex-wrap gap-2">
-                {quickOptions.map((option) => (
-                  <button key={option} type="button" onClick={() => void sendMessage(option)} className="rounded-xl border border-blue-400/20 bg-blue-500/5 px-3 py-2 text-xs font-medium text-blue-200 transition hover:border-blue-300/40 hover:bg-blue-500/10">
-                    {option === "No" ? "No shade" : option === "Partial" ? "Partial shade" : "Heavy shade"}
-                  </button>
-                ))}
+            {loading && (
+              <div className="ml-9 flex items-center gap-2.5 rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-3.5 py-3 text-xs text-slate-400 shadow-lg shadow-black/10">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-blue-400/15 bg-blue-500/10">
+                  <span className="h-2.5 w-2.5 animate-ping rounded-full bg-blue-400/70" />
+                </div>
+                <span className="min-w-[72px]">Thinking</span>
+                <span className="flex items-center gap-1" aria-hidden="true">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400 [animation-delay:120ms]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400 [animation-delay:240ms]" />
+                </span>
               </div>
             )}
-            {hasStarted && starterOptions.length > 0 && (<div className="ml-9"><p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Suggested</p><div className="flex flex-wrap gap-2">{starterOptions.map((option) => <button key={option} type="button" onClick={() => void sendMessage(option)} className="rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2 text-left text-[11px] font-medium text-slate-300 transition hover:-translate-y-0.5 hover:border-blue-300/20 hover:bg-blue-500/5 hover:text-blue-200">{option}</button>)}</div></div>)}
-            {loading && <div className="ml-9 flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-3 py-2.5 text-xs text-slate-400"><span>RoofRay is thinking</span><span className="flex gap-1"><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400" /><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400 [animation-delay:150ms]" /><i className="h-1 w-1 animate-pulse rounded-full bg-blue-400 [animation-delay:300ms]" /></span></div>}
             <div ref={endRef} />
           </div>
 
