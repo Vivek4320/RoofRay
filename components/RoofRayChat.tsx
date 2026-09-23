@@ -220,8 +220,8 @@ export default function RoofRayChat() {
   return (
     <>
       {open && (
-        <button type="button" onClick={() => setOpen(false)} aria-label="Close RoofRay chat" className="absolute right-5 top-5 z-10 flex h-9 w-9 items-center justify-center rounded-full text-xl text-slate-500 transition hover:bg-white/5 hover:text-white">×</button>
         <section aria-label="RoofRay AI assistant" className="fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7">
+          <button type="button" onClick={() => setOpen(false)} aria-label="Close RoofRay chat" className="absolute right-5 top-5 z-10 flex h-9 w-9 items-center justify-center rounded-full text-xl text-slate-500 transition hover:bg-white/5 hover:text-white">×</button>
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#0B1220] p-4">
             {!hasStarted && <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
               <Image src="/Logo-removebg-preview.png" alt="RoofRay Logo" width={260} height={100} priority className="h-auto w-48 object-contain" />
