@@ -257,6 +257,10 @@ export default function RoofRayChat() {
             <div className="flex gap-1.5">{[1, 2, 3, 4].map((step) => <span key={step} className={`h-1 flex-1 rounded-full ${step <= currentStep ? "bg-blue-500" : "bg-white/10"}`} />)}</div>
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#0B1220] p-4">
+            {!hasStarted && <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
+              <Image src="/Logo-removebg-preview.png" alt="RoofRay Logo" width={260} height={100} priority className="h-auto w-48 object-contain" />
+              <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">RoofRay</h2>
+            </div>}
             {hasStarted && <div className="rounded-2xl border border-white/7 bg-[#0E1828] px-3.5 py-3"><div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Project inputs</p><span className="text-[10px] text-slate-600">Live</span></div><div className="mt-2.5 grid grid-cols-3 gap-2"><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Roof</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{roofArea !== null ? `${roofArea.toLocaleString()} ft²` : "Pending"}</p></div><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Bill</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{monthlyBill !== null ? `₹${monthlyBill.toLocaleString("en-IN")}` : "Pending"}</p></div><div className="rounded-xl border border-white/5 bg-white/[0.025] px-2.5 py-2"><p className="text-[9px] uppercase tracking-wider text-slate-600">Shade</p><p className="mt-0.5 truncate text-xs font-semibold text-slate-200">{shading ?? "Pending"}</p></div></div></div>}
 
             {messages.map((message) => (
