@@ -15,29 +15,10 @@ function getToken() {
 
 async function getValidToken() {
   const token = getToken();
-  if (token) {
-    const refreshToken = localStorage.getItem("roofray_refresh_token") || "";
-    if (!refreshToken) return token;
 
-    try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !anonKey) return token;
-
-      const response = await fetch(
-        supabaseUrl + "/auth/v1/user",
-        {
-          headers: {
-            apikey: anonKey,
-            Authorization: "Bearer " + token,
-          },
-          cache: "no-store",
-        },
-      );
-
-      if (response.ok) return token;
-    } catch {}
-  }
+  // The chat API already verifies the access token server-side.
+  // Avoid an extra Supabase round-trip on every message.
+  if (token) return token;
 
   const refreshToken = localStorage.getItem("roofray_refresh_token") || "";
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,6 +39,7 @@ async function getValidToken() {
         cache: "no-store",
       },
     );
+
     if (!response.ok) return "";
 
     const data = await response.json();
@@ -298,9 +280,9 @@ export default function RoofRayChat() {
             {loading && (
               <div className="ml-9 flex items-center gap-2.5 rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-3.5 py-3 text-xs text-slate-400 shadow-lg shadow-black/10">
                 <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-blue-400/15 bg-blue-500/10">
-                  <span className="h-2.5 w-2.5 animate-ping rounded-full bg-blue-400/70" />
+                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-blue-400" />
                 </div>
-                <span className="min-w-[72px]">Thinking</span>
+                <span className="text-slate-300">RoofRay is thinking</span>
                 <span className="flex items-center gap-1" aria-hidden="true">
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400 [animation-delay:120ms]" />
