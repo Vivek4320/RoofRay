@@ -88,7 +88,8 @@ export async function POST(request: Request) {
     }
     const answer = extractGeminiText(data);
     if (!answer) return NextResponse.json({ ok: false, error: "RoofRay AI returned an empty response. Please try again." }, { status: 502 });
-    return NextResponse.json({ ok: true, message: answer });catch (error) {
+    return NextResponse.json({ ok: true, message: answer });
+  } catch (error) {
     console.error("[RoofRay] Chat failed:", error);
     return NextResponse.json({ ok: false, error: "RoofRay AI is temporarily unavailable. Please try again." }, { status: 500 });
   }
