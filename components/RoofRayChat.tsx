@@ -35,6 +35,9 @@ export default function RoofRayChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<"idle" | "detecting" | "ready" | "warning" | "denied" | "unavailable">("idle");
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
   const [monthlyBill, setMonthlyBill] = useState<number | null>(null);
@@ -46,8 +49,23 @@ export default function RoofRayChat() {
     return ["No", "Partial", "Heavy"];
   }, [roofArea, monthlyBill, shading]);
 
+  function hydrateStoredLocation() {
+    try {
+      const stored = sessionStorage.getItem("roofray_location");
+      if (!stored) return;
+      const value = JSON.parse(stored) as { latitude?: unknown; longitude?: unknown; accuracy?: unknown };
+      const latitude = readNumber(value.latitude);
+      const longitude = readNumber(value.longitude);
+      const accuracy = readNumber(value.accuracy);
+      if (latitude !== null && longitude !== null) setLocationCoords({ latitude, longitude });
+      if (accuracy !== null) setLocationAccuracy(accuracy);
+      if (latitude !== null && longitude !== null) setLocationStatus(accuracy !== null && accuracy > 100 ? "warning" : "ready");
+    } catch {}
+  }
+
   useEffect(() => {
     setSolarContext(getStoredAnalysis());
+    hydrateStoredLocation();
     const handleOpen = () => {
       setOpen(true);
       if (!getStoredAnalysis()) void loadLocationAnalysis();
@@ -66,18 +84,30 @@ export default function RoofRayChat() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
   async function loadLocationAnalysis() {
-    if (!navigator.geolocation) { setLocationLoading(false); return; }
+    if (!navigator.geolocation) {
+      setLocationStatus("unavailable");
+      setLocationLoading(false);
+      return;
+    }
     setLocationLoading(true);
+    setLocationStatus("detecting");
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        setLocationCoords({ latitude, longitude });
+        setLocationAccuracy(accuracy);
+        setLocationStatus(accuracy > 100 ? "warning" : "ready");
+        sessionStorage.setItem("roofray_location", JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }));
         try {
           const response = await fetch("/api/solar-analysis", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
+              latitude,
+              longitude,
               peakPowerKw: 1,
               obstacleRadiusMeters: 500,
             }),
@@ -89,8 +119,12 @@ export default function RoofRayChat() {
           }
         } catch {} finally { setLocationLoading(false); }
       },
-      () => setLocationLoading(false),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+      (error) => {
+        setLocationLoading(false);
+        if (error.code === 1) setLocationStatus("denied");
+        else setLocationStatus("unavailable");
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   }
 
@@ -190,12 +224,30 @@ export default function RoofRayChat() {
 
       {open && (
         <section aria-label="RoofRay AI assistant" className="fixed bottom-20 right-4 z-[80] flex h-[min(720px,calc(100vh-110px))] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/40 lg:bottom-7 lg:right-7">
-          <header className="flex items-center justify-between border-b border-white/10 bg-[#101827] px-5 py-4">
-            <div>
-              <p className="text-sm font-bold">RoofRay AI</p>
-              <p className="text-xs text-slate-400">{locationLoading ? "Analyzing your location…" : "Solar feasibility assistant"}</p>
+          <header className="border-b border-white/10 bg-[#101827] px-5 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold">RoofRay AI</p>
+                <p className="text-xs text-slate-400">Solar feasibility assistant</p>
+              </div>
+              <button type="button" onClick={() => setOpen(false)} className="rounded-full px-3 py-1 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close chat">×</button>
             </div>
-            <button type="button" onClick={() => setOpen(false)} className="rounded-full px-3 py-1 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close chat">×</button>
+            <div className="mt-3 rounded-xl border border-blue-400/20 bg-blue-500/5 px-3 py-2 text-xs">
+              {locationStatus === "detecting" || locationLoading ? (
+                <p className="text-blue-200">📍 Detecting your rooftop location…</p>
+              ) : locationStatus === "ready" ? (
+                <p className="text-emerald-300">📍 Rooftop location detected{locationAccuracy !== null ? ` • ±${Math.round(locationAccuracy)} m accuracy` : ""}</p>
+              ) : locationStatus === "warning" ? (
+                <div className="flex items-center justify-between gap-2 text-amber-200">
+                  <p>📍 Location detected, but GPS accuracy is low{locationAccuracy !== null ? ` (±${Math.round(locationAccuracy)} m)` : ""}.</p>
+                  <button type="button" onClick={() => void loadLocationAnalysis()} className="shrink-0 rounded-lg border border-amber-300/20 px-2 py-1 hover:bg-amber-400/10">Retry</button>
+                </div>
+              ) : locationStatus === "denied" ? (
+                <div className="flex items-center justify-between gap-2 text-amber-200"><p>📍 Location permission is required for rooftop solar analysis.</p><button type="button" onClick={() => void loadLocationAnalysis()} className="shrink-0 rounded-lg border border-amber-300/20 px-2 py-1 hover:bg-amber-400/10">Retry</button></div>
+              ) : (
+                <div className="flex items-center justify-between gap-2 text-slate-400"><p>📍 Rooftop location is not available.</p><button type="button" onClick={() => void loadLocationAnalysis()} className="shrink-0 rounded-lg border border-white/10 px-2 py-1 hover:bg-white/10">Retry</button></div>
+              )}
+            </div>
           </header>
 
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
