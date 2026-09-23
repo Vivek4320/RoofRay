@@ -221,37 +221,6 @@ export default function RoofRayChat() {
     <>
       {open && (
         <section aria-label="RoofRay AI assistant" className="fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7">
-          <header className="border-b border-white/10 bg-[#101827] px-5 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-300/20 bg-blue-600/15 text-lg shadow-inner shadow-blue-500/10">☀</div>
-                  <div>
-                    <div className="flex items-center gap-2"><p className="text-sm font-bold tracking-tight">RoofRay AI</p><span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-300">Online</span></div>
-                    <p className="text-xs text-slate-400">Your rooftop solar assistant</p>
-                  </div>
-                </div>
-              </div>
-              <button type="button" onClick={() => setOpen(false)} className="rounded-full px-3 py-1 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close chat">×</button>
-            </div>
-            <div className="mt-3 rounded-2xl border border-blue-400/15 bg-[#0D1728] px-3 py-2.5 text-xs">
-              {locationStatus === "detecting" || locationLoading ? (
-                <p className="text-blue-200">📍 Detecting your rooftop location…</p>
-              ) : locationStatus === "ready" ? (
-                <p className="text-emerald-300">📍 Rooftop location detected{locationAccuracy !== null ? ` • ±${Math.round(locationAccuracy)} m accuracy` : ""}</p>
-              ) : locationStatus === "warning" ? (
-                <div className="flex items-center justify-between gap-2 text-amber-200">
-                  <p>📍 Location detected, but GPS accuracy is low{locationAccuracy !== null ? ` (±${Math.round(locationAccuracy)} m)` : ""}.</p>
-                  <button type="button" onClick={() => void loadLocationAnalysis()} className="shrink-0 rounded-lg border border-amber-300/20 px-2 py-1 hover:bg-amber-400/10">Retry</button>
-                </div>
-              ) : locationStatus === "denied" ? (
-                <div className="flex items-center justify-between gap-2 text-amber-200"><p>📍 Location permission is required for rooftop solar analysis.</p><button type="button" onClick={() => void loadLocationAnalysis()} className="shrink-0 rounded-lg border border-amber-300/20 px-2 py-1 hover:bg-amber-400/10">Retry</button></div>
-              ) : (
-                <div className="flex items-center justify-between gap-2 text-slate-400"><p>📍 Rooftop location is not available.</p><button type="button" onClick={() => void loadLocationAnalysis()} className="shrink-0 rounded-lg border border-white/10 px-2 py-1 hover:bg-white/10">Retry</button></div>
-              )}
-            </div>
-          </header>
-
           <div className="border-b border-white/5 bg-[#0D1422] px-5 py-2.5">
             <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-slate-500"><span>Solar check</span><span>Step {currentStep} of 4</span></div>
             <div className="flex gap-1.5">{[1, 2, 3, 4].map((step) => <span key={step} className={`h-1 flex-1 rounded-full ${step <= currentStep ? "bg-blue-500" : "bg-white/10"}`} />)}</div>
