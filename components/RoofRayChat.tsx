@@ -80,7 +80,6 @@ export default function RoofRayChat() {
   const [hasStarted, setHasStarted] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-
   function hydrateStoredLocation() {
     try {
       const stored = sessionStorage.getItem("roofray_location");
@@ -258,12 +257,29 @@ export default function RoofRayChat() {
     <>
       {open && (
         <section aria-label="RoofRay AI assistant" className="fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7">
-          <div className="flex h-16 items-center justify-end border-b border-white/5 bg-[#0B1220] px-4">
-
-            <button type="button" onClick={() => { setMessages([]); setRoofArea(null); setMonthlyBill(null); setShading(null); setHasStarted(false); }} aria-label="Reset RoofRay chat" title="New chat" className="group relative right-auto top-auto z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-slate-500 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.06] hover:text-white hover:shadow-lg hover:shadow-black/20 active:scale-95"><span className="text-lg transition-transform duration-200 group-hover:rotate-180">↻</span></button>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close RoofRay chat" className="group relative right-auto top-auto z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-slate-500 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.06] hover:text-white hover:shadow-lg hover:shadow-black/20 active:scale-95"><span className="text-2xl font-light leading-none transition-transform duration-200 group-hover:rotate-90">×</span></button>
+          <div className="flex h-16 shrink-0 items-center justify-end border-b border-white/5 bg-[#0B1220] px-4">
+            <div className="flex h-10 items-center gap-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => { setMessages([]); setRoofArea(null); setMonthlyBill(null); setShading(null); setHasStarted(false); }}
+                aria-label="Reset RoofRay chat"
+                title="New chat"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-transparent text-slate-500 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.06] hover:text-white hover:shadow-lg hover:shadow-black/20 active:scale-95"
+              >
+                <span className="text-lg leading-none transition-transform duration-200 group-hover:rotate-180">↻</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close RoofRay chat"
+                title="Close"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-transparent text-slate-500 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.06] hover:text-white hover:shadow-lg hover:shadow-black/20 active:scale-95"
+              >
+                <span className="text-2xl font-light leading-none transition-transform duration-200 group-hover:rotate-90">×</span>
+              </button>
+            </div>
           </div>
-          
+
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#0B1220] p-4">
             {!hasStarted && <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
               <Image src="/Logo-removebg-preview.png" alt="RoofRay Logo" width={260} height={100} priority className="h-auto w-48 object-contain" />
@@ -282,7 +298,7 @@ export default function RoofRayChat() {
               </div>
             ))}
             {loading && (
-              <div className="flex w-full items-end gap-2 justify-start">
+              <div className="flex w-full items-end justify-start gap-2">
                 <div className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-blue-300/15 bg-blue-500/10">
                   <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={28} height={28} className="h-7 w-7 animate-pulse object-contain" />
                 </div>
