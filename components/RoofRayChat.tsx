@@ -282,15 +282,17 @@ export default function RoofRayChat() {
               </div>
             ))}
             {loading && (
-              <div className="ml-9 flex items-center gap-2.5 rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-3.5 py-3 text-xs text-slate-400 shadow-lg shadow-black/10">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-blue-300/15 bg-blue-500/10">
+              <div className="flex w-full items-end gap-2 justify-start">
+                <div className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-blue-300/15 bg-blue-500/10">
                   <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={28} height={28} className="h-7 w-7 animate-pulse object-contain" />
                 </div>
-                <span className="flex items-center gap-1" aria-hidden="true">
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400 [animation-delay:120ms]" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400 [animation-delay:240ms]" />
-                </span>
+                <div className="flex min-h-12 items-center gap-2 rounded-2xl rounded-bl-md border border-white/8 bg-[#111B2B] px-3.5 py-3 text-xs text-slate-400 shadow-lg shadow-black/10">
+                  <span className="flex items-center gap-1" aria-hidden="true">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400 [animation-delay:120ms]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-400 [animation-delay:240ms]" />
+                  </span>
+                </div>
               </div>
             )}
             <div ref={endRef} />
