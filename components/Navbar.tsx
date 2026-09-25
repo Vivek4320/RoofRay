@@ -43,8 +43,8 @@ export default function Navbar() {
     }
   }, []);
 
-  const startRoofRayChat = async () => {
-    window.dispatchEvent(new Event("roofray:open-chat"));
+  const startRoofRayChat = () => {
+    window.location.href = "/chat";
   };
 
   const handleTalkToRoofRay = (
