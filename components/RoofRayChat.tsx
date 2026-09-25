@@ -265,7 +265,31 @@ export default function RoofRayChat() {
           ? "fixed inset-0 z-[80] flex h-screen w-screen flex-col overflow-hidden bg-[#0B1220] text-white"
           : "fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7"}
           >
-          <div className="flex h-16 shrink-0 items-center justify-end border-b border-white/5 bg-[#0B1220] px-4">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 bg-[#0B1220] px-4">
+            {isFullScreenPage && (
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                aria-label="Back to Home"
+                title="Back to Home"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 px-3 text-xs font-medium text-slate-400 transition-all duration-200 hover:border-blue-400/30 hover:bg-white/[0.06] hover:text-white active:scale-95"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+                <span>Back to Home</span>
+              </button>
+            )}
+
             <div className="flex h-10 items-center gap-1">
               {/* Reset / New chat button */}
               <button
