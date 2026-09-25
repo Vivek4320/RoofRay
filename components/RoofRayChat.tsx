@@ -483,10 +483,42 @@ function EmptyState() {
 }
 
 function UserMessage({ message }: { message: ChatMessage }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   return (
-    <div className="rr-msg-in flex justify-end">
-      <div className="max-w-[75%] rounded-2xl rounded-br-[6px] bg-[#1A3A6B] px-4 py-3 text-[14px] leading-relaxed text-slate-100 ring-1 ring-white/[0.06]">
-        {message.content}
+    <div className="rr-msg-in group flex justify-end">
+      <div className="relative max-w-[75%]">
+        <div className="rounded-2xl rounded-br-[6px] bg-[#1A3A6B] px-4 py-3 text-[14px] leading-relaxed text-slate-100 ring-1 ring-white/[0.06]">
+          {message.content}
+        </div>
+        <button
+          type="button"
+          onClick={copyMessage}
+          aria-label={copied ? "Copied" : "Copy message"}
+          title={copied ? "Copied" : "Copy message"}
+          className="absolute -bottom-9 right-0 flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 opacity-0 transition-all duration-150 hover:bg-white/[0.06] hover:text-slate-200 group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          {copied ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+              <path d="m5 12 4 4L19 6" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+              <rect x="9" y="9" width="11" height="11" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          )}
+        </button>
       </div>
     </div>
   );
