@@ -636,6 +636,7 @@ function AttachmentMenu({ open, onPhoto, onFile, onClose }: { open: boolean; onP
       ref={menuRef}
       role="menu"
       aria-label="Attachment options"
+<<<<<<< Updated upstream
       className={`absolute bottom-full left-0 mb-2 w-[220px] origin-bottom-left rounded-2xl border border-white/[0.08] bg-[#101A2B]/98 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl transition-all duration-150 ${
         open ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none translate-y-1 scale-95 opacity-0"
       }`}
@@ -678,6 +679,17 @@ function AttachmentMenu({ open, onPhoto, onFile, onClose }: { open: boolean; onP
           <span className="block font-medium">Upload file</span>
           <span className="mt-0.5 block text-[11px] text-slate-500">PDF, TXT, or CSV</span>
         </span>
+=======
+      className={`absolute bottom-full left-0 mb-2 min-w-[180px] origin-bottom-left rounded-2xl bg-[#111B2E] transition-all duration-200 ${
+        open ? "pointer-events-auto scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"
+      }`}
+    >
+      <button type="button" role="menuitem" onClick={() => { onPhoto(); onClose(); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-[13px] text-slate-300 transition-colors hover:text-white">
+        <span aria-hidden="true" className="text-base"></span> Upload Photo
+      </button>
+        <button type="button" role="menuitem" onClick={() => { onFile(); onClose(); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-[13px] text-slate-300 transition-colors hover:text-white">
+          <span aria-hidden="true" className="text-base"></span> Upload File
+>>>>>>> Stashed changes
       </button>
     </div>
   );
