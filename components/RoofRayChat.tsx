@@ -722,7 +722,7 @@ function ChatComposer({
       )}
 
       <form onSubmit={(e) => { e.preventDefault(); if (canSend) onSend(); }} className="mx-auto max-w-[900px]">
-        <div className="rounded-2xl border border-white/[0.08] bg-[#0F1929] outline-none focus-within:outline-none">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0F1929] !outline-none focus-within:!outline-none focus-within:!ring-0 focus-within:!border-white/[0.08]">
           <AttachmentPreview attachments={attachments} onRemove={onRemoveAttachment} />
           <div className="flex items-end gap-1 px-2 pb-2 pt-2">
             {/* + button */}
@@ -752,7 +752,7 @@ function ChatComposer({
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={loading}
-              className="min-h-[36px] flex-1 resize-none bg-transparent px-2 py-2 text-[14px] leading-6 text-white outline-none focus:outline-none focus:ring-0 placeholder:text-slate-500 disabled:opacity-50"
+              className="min-h-[36px] flex-1 resize-none border-0 bg-transparent px-2 py-2 text-[14px] leading-6 text-white !outline-none focus:!outline-none focus-visible:!outline-none focus:!ring-0 focus-visible:!ring-0 focus:!border-0 focus-visible:!border-0 placeholder:text-slate-500 disabled:opacity-50"
               style={{ maxHeight: COMPOSER_MAX_HEIGHT }}
             />
 
