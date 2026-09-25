@@ -749,6 +749,7 @@ export default function RoofRayChat() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [activeChatId, setActiveChatId] = useState("");
+  const [pendingDeleteChat, setPendingDeleteChat] = useState<ChatRecord | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
@@ -1058,9 +1059,16 @@ export default function RoofRayChat() {
   function deleteChat(id: string) {
     const chat = chats.find((item) => item.id === id);
     if (!chat) return;
+    setPendingDeleteChat(chat);
+  }
+
+  function confirmDeleteChat() {
+    if (!pendingDeleteChat) return;
+    const id = pendingDeleteChat.id;
     const remaining = chats.filter((item) => item.id !== id);
     setChats(remaining);
     localStorage.setItem("roofray_chats", JSON.stringify(remaining));
+    setPendingDeleteChat(null);
     if (id === activeChatId) {
       const next = remaining[0];
       if (next) selectChat(next.id);
@@ -1152,6 +1160,30 @@ export default function RoofRayChat() {
               </button>
             </div>
           </header>
+
+        {pendingDeleteChat && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="delete-chat-title">
+            <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 shadow-2xl shadow-black/50">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-300">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+                  <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" />
+                </svg>
+              </div>
+              <h2 id="delete-chat-title" className="text-base font-semibold text-white">Delete chat?</h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
+                Are you sure you want to delete “{pendingDeleteChat.title}”? This action cannot be undone.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" onClick={() => setPendingDeleteChat(null)} className="h-10 rounded-lg border border-white/[0.08] px-4 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white">
+                  Cancel
+                </button>
+                <button type="button" onClick={confirmDeleteChat} className="h-10 rounded-lg bg-red-500/15 px-4 text-sm font-medium text-red-300 transition hover:bg-red-500/25">
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <DragOverlay visible={dragOver} />
 
