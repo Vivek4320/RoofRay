@@ -215,6 +215,137 @@ function renderAssistantContent(content: string): ReactNode {
   return <div className="space-y-3">{blocks}</div>;
 }
 
+
+type ChatRecord = {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: ChatMessage[];
+};
+
+function chatTitle(messages: ChatMessage[]) {
+  const firstUser = messages.find((message) => message.role === "user" && message.content.trim());
+  if (!firstUser) return "New chat";
+  const clean = firstUser.content.replace(/\s+/g, " ").trim();
+  return clean.length > 35 ? clean.slice(0, 35).trimEnd() + "…" : clean;
+}
+
+function ChatSidebar({
+  chats,
+  activeChatId,
+  collapsed,
+  mobileOpen,
+  onNewChat,
+  onSelect,
+  onRename,
+  onDelete,
+  onToggleCollapse,
+  onCloseMobile,
+}: {
+  chats: ChatRecord[];
+  activeChatId: string;
+  collapsed: boolean;
+  mobileOpen: boolean;
+  onNewChat: () => void;
+  onSelect: (id: string) => void;
+  onRename: (id: string) => void;
+  onDelete: (id: string) => void;
+  onToggleCollapse: () => void;
+  onCloseMobile: () => void;
+}) {
+  return (
+    <>
+      <div
+        className={`fixed inset-0 z-[90] bg-black/50 backdrop-blur-[2px] transition-opacity duration-200 md:hidden ${mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        onClick={onCloseMobile}
+        aria-hidden="true"
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-[100] flex flex-col border-r border-white/[0.06] bg-[#090F1C] text-white shadow-2xl shadow-black/40 transition-all duration-200 ease-out
+          ${collapsed ? "w-[72px]" : "w-[270px]"}
+          ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        aria-label="RoofRay chat history"
+      >
+        <div className={`flex h-[60px] shrink-0 items-center border-b border-white/[0.05] ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+          {!collapsed ? (
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Image src={LOGO_SRC} alt="RoofRay" width={42} height={42} className="h-9 w-9 object-contain" priority />
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-semibold text-white">RoofRay</p>
+                <p className="truncate text-[10px] text-slate-500">AI Solar Assistant</p>
+              </div>
+            </div>
+          ) : (
+            <Image src={LOGO_SRC} alt="RoofRay" width={36} height={36} className="h-9 w-9 object-contain" priority />
+          )}
+          <button type="button" onClick={onToggleCollapse} className="rr-icon-btn hidden md:flex" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-3">
+          <button
+            type="button"
+            onClick={onNewChat}
+            className={`flex h-10 w-full items-center rounded-xl border border-white/[0.07] bg-white/[0.03] text-[13px] font-medium text-slate-200 transition hover:border-blue-400/20 hover:bg-blue-500/[0.08] hover:text-white ${collapsed ? "justify-center px-0" : "gap-2.5 px-3"}`}
+            title="New chat"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            {!collapsed && "New chat"}
+          </button>
+        </div>
+
+        {!collapsed && (
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            <p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">Recent chats</p>
+            <div className="space-y-0.5">
+              {chats.length === 0 ? (
+                <p className="px-2 py-3 text-xs text-slate-600">No conversations yet</p>
+              ) : (
+                chats.map((chat) => (
+                  <div key={chat.id} className={`group flex items-center gap-1 rounded-xl px-2 py-1 transition ${chat.id === activeChatId ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"}`}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(chat.id)}
+                      className="min-w-0 flex-1 truncate px-1.5 py-2 text-left text-[12px] text-slate-300 hover:text-white"
+                      title={chat.title}
+                    >
+                      {chat.title}
+                    </button>
+                    <div className="relative flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                      <button type="button" className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[0.06] hover:text-slate-200" aria-label={`Options for ${chat.title}`} title="Chat options" onClick={() => {
+                        const action = window.prompt("Type rename or delete");
+                        if (action?.toLowerCase() === "rename") onRename(chat.id);
+                        if (action?.toLowerCase() === "delete") onDelete(chat.id);
+                      }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+                          <circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="border-t border-white/[0.05] p-3">
+          <button type="button" onClick={onCloseMobile} className={`flex h-9 w-full items-center rounded-lg text-xs text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300 md:hidden ${collapsed ? "justify-center" : "gap-2 px-2"}`} aria-label="Close sidebar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            {!collapsed && "Close"}
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 /* ----------------------------------------------------------------------- */
 /* ChatHeader                                                              */
 /* ----------------------------------------------------------------------- */
@@ -575,6 +706,10 @@ export default function RoofRayChat() {
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [chats, setChats] = useState<ChatRecord[]>([]);
+  const [activeChatId, setActiveChatId] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
@@ -640,6 +775,45 @@ export default function RoofRayChat() {
     return () => window.removeEventListener("roofray:open-chat", handleOpen);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFullScreenPage]);
+
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("roofray_chats");
+      if (stored) {
+        const parsed = JSON.parse(stored) as ChatRecord[];
+        if (Array.isArray(parsed)) {
+          setChats(parsed);
+          if (parsed.length > 0) {
+            const latest = [...parsed].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+            setActiveChatId(latest.id);
+            setMessages(latest.messages || []);
+            setHasStarted((latest.messages || []).length > 0);
+          }
+        }
+      }
+    } catch { /* ignore malformed local history */ }
+  }, []);
+
+  useEffect(() => {
+    if (!activeChatId) return;
+    setChats((current) => {
+      const now = Date.now();
+      const existing = current.find((chat) => chat.id === activeChatId);
+      const nextChat: ChatRecord = {
+        id: activeChatId,
+        title: chatTitle(messages),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        messages,
+      };
+      const next = existing
+        ? current.map((chat) => chat.id === activeChatId ? nextChat : chat)
+        : [nextChat, ...current];
+      localStorage.setItem("roofray_chats", JSON.stringify(next));
+      return next;
+    });
+  }, [activeChatId, messages]);
 
   useEffect(() => {
     if (autoScroll) endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -802,7 +976,7 @@ export default function RoofRayChat() {
   }
   void openChat;
 
-  function resetChat() {
+  function startNewChat() {
     setMessages([]);
     setRoofArea(null);
     setMonthlyBill(null);
@@ -811,6 +985,49 @@ export default function RoofRayChat() {
     setAutoScroll(true);
     setAttachments([]);
     setFileError(null);
+    setActiveChatId(crypto.randomUUID());
+    setSidebarOpen(false);
+  }
+
+  function resetChat() {
+    startNewChat();
+  }
+
+  function selectChat(id: string) {
+    const chat = chats.find((item) => item.id === id);
+    if (!chat) return;
+    setActiveChatId(id);
+    setMessages(chat.messages || []);
+    setHasStarted((chat.messages || []).length > 0);
+    setRoofArea(null);
+    setMonthlyBill(null);
+    setShading(null);
+    setAttachments([]);
+    setFileError(null);
+    setAutoScroll(true);
+    setSidebarOpen(false);
+  }
+
+  function renameChat(id: string) {
+    const chat = chats.find((item) => item.id === id);
+    if (!chat) return;
+    const title = window.prompt("Rename chat", chat.title);
+    if (!title?.trim()) return;
+    setChats((current) => current.map((item) => item.id === id ? { ...item, title: title.trim().slice(0, 50), updatedAt: Date.now() } : item));
+  }
+
+  function deleteChat(id: string) {
+    const chat = chats.find((item) => item.id === id);
+    if (!chat) return;
+    if (!window.confirm("Delete this conversation?")) return;
+    const remaining = chats.filter((item) => item.id !== id);
+    setChats(remaining);
+    localStorage.setItem("roofray_chats", JSON.stringify(remaining));
+    if (id === activeChatId) {
+      const next = remaining[0];
+      if (next) selectChat(next.id);
+      else startNewChat();
+    }
   }
 
   function closeChat() {
@@ -858,7 +1075,46 @@ export default function RoofRayChat() {
             : "fixed bottom-0 right-0 z-[80] flex h-[min(760px,100dvh)] w-full flex-col overflow-hidden border border-white/[0.07] bg-[#080E1C] text-white shadow-2xl shadow-black/60 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100dvh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl lg:bottom-7 lg:right-7"
         }
       >
-        <ChatHeader onReset={resetChat} onClose={closeChat} />
+        <div className="fixed left-0 top-0 z-[110] flex h-[60px] items-center px-2 md:hidden">
+          <button type="button" onClick={() => setSidebarOpen(true)} className="rr-icon-btn bg-[#0A1020]/90 backdrop-blur" aria-label="Open chat history" title="Chat history">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+        </div>
+
+        <ChatSidebar
+          chats={chats}
+          activeChatId={activeChatId}
+          collapsed={sidebarCollapsed}
+          mobileOpen={sidebarOpen}
+          onNewChat={startNewChat}
+          onSelect={selectChat}
+          onRename={renameChat}
+          onDelete={deleteChat}
+          onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+          onCloseMobile={() => setSidebarOpen(false)}
+        />
+
+        <div className={`flex min-h-0 h-full w-full flex-col transition-[margin] duration-200 ${sidebarCollapsed ? "md:ml-[72px] md:w-[calc(100%-72px)]" : "md:ml-[270px] md:w-[calc(100%-270px)]"}`}>
+          <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
+            <div className="flex min-w-0 items-center gap-2">
+              <button type="button" onClick={() => setSidebarOpen(true)} className="rr-icon-btn hidden md:flex" aria-label="Open chat history" title="Chat history">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+              </button>
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-medium text-slate-200">{chatTitle(messages)}</p>
+                <p className="text-[10px] text-slate-600">RoofRay AI Solar Assistant</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <button type="button" onClick={resetChat} className="rr-icon-btn" aria-label="Start new chat" title="New chat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 12a9 9 0 1 1 3.2 6.9"/><path d="M3 4v5h5"/></svg>
+              </button>
+              <button type="button" onClick={closeChat} className="rr-icon-btn" aria-label="Close chat" title="Close chat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </header>
+
         <DragOverlay visible={dragOver} />
 
         <div
@@ -905,6 +1161,7 @@ export default function RoofRayChat() {
           fileError={fileError}
           onDismissError={() => setFileError(null)}
         />
+        </div>
       </section>
     </>
   );
