@@ -278,7 +278,6 @@ function ChatSidebar({
 
         <div className={`flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] px-4 ${!mobileOpen ? "md:hidden" : ""}`}>
           <div className="flex min-w-0 items-center gap-2.5">
-              <Image src={LOGO_SRC} alt="RoofRay" width={42} height={42} className="h-9 w-9 object-contain" priority />
               <div className="min-w-0">
                 <p className="truncate text-[14px] font-semibold text-white">RoofRay</p>
                 <p className="truncate text-[10px] text-slate-500">AI Solar Assistant</p>
@@ -467,11 +466,9 @@ function UserMessage({ message }: { message: ChatMessage }) {
 
 function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry: (content: string) => void }) {
   return (
-    <div className="rr-msg-in flex items-start gap-3">
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.05] ring-1 ring-white/[0.07]">
-        <Image src={LOGO_SRC} alt="" width={18} height={18} className="h-[18px] w-[18px] object-contain" aria-hidden="true" />
-      </div>
-      <div className="min-w-0 max-w-[85%] pt-0.5 text-[14px] leading-relaxed text-slate-200">
+    <div className="flex items-start">
+        <Image src={LOGO_SRC} alt="" width={100} height={100} className="h-[55px] w-[55px] object-contain " aria-hidden="true" />
+      <div className="min-w-0 max-w-[85%] pt-4 text-[14px] leading-relaxed text-slate-200">
         {message.isError ? (
           <div>
             <p className="text-slate-400">{message.content}</p>
@@ -497,9 +494,7 @@ function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry:
 function ThinkingIndicator() {
   return (
     <div className="rr-msg-in flex items-center gap-3" role="status" aria-live="polite" aria-label="RoofRay is preparing a response">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.05] ring-1 ring-white/[0.07]">
-        <Image src={LOGO_SRC} alt="" width={18} height={18} className="h-[18px] w-[18px] object-contain" aria-hidden="true" />
-      </div>
+        <Image src={LOGO_SRC} alt="" width={100} height={100} className="h-[50px] w-[50px] object-contain" aria-hidden="true" />
       <span className="flex items-center gap-[5px] pt-0.5">
         <span className="rr-dot rr-dot-1 h-1.5 w-1.5 rounded-full bg-slate-500" />
         <span className="rr-dot rr-dot-2 h-1.5 w-1.5 rounded-full bg-slate-500" />
@@ -608,7 +603,6 @@ function ScrollToLatest({ visible, onClick }: { visible: boolean; onClick: () =>
       }`}
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
-      Latest
     </button>
   );
 }
@@ -622,11 +616,8 @@ function DragOverlay({ visible }: { visible: boolean }) {
     <div aria-hidden="true" className={`pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}>
       <div className="absolute inset-0 rounded-[inherit] bg-[#0A1020]/90 backdrop-blur-sm" />
       <div className="relative flex flex-col items-center gap-3 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-400/10">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7 text-blue-400" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-        </div>
-        <p className="text-[15px] font-medium text-white">Drop files to attach</p>
-        <p className="text-[12px] text-slate-400">Images, PDF, TXT, or CSV</p>
+        <p className="text-[30px] font-medium text-white">Drop files to attach</p>
+        <p className="text-[20px] text-slate-400">Images, PDF, TXT, or CSV</p>
       </div>
     </div>
   );
@@ -1160,15 +1151,8 @@ export default function RoofRayChat() {
           <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
             <div className="flex min-w-0 items-center gap-2">
               {/* Desktop compact rail owns the sidebar-open button when the sidebar is collapsed. */}
-              <div className="min-w-0">
-                <p className="truncate text-[13px] font-medium text-slate-200">{chatTitle(messages)}</p>
-                <p className="text-[10px] text-slate-600">RoofRay AI Solar Assistant</p>
-              </div>
             </div>
             <div className="flex items-center gap-0.5">
-              <button type="button" onClick={resetChat} className="rr-icon-btn" aria-label="Start new chat" title="New chat">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 12a9 9 0 1 1 3.2 6.9"/><path d="M3 4v5h5"/></svg>
-              </button>
               <button type="button" onClick={closeChat} className="rr-icon-btn" aria-label="Close chat" title="Close chat">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12"/></svg>
               </button>
