@@ -261,11 +261,11 @@ function ChatSidebar({
       />
       <aside
         className={`fixed inset-y-0 left-0 z-[100] flex flex-col border-r border-white/[0.06] bg-[#090F1C] text-white shadow-2xl shadow-black/40 transition-[width,transform] duration-200 ease-out
-          ${mobileOpen ? "w-[270px] translate-x-0" : "w-[56px] -translate-x-full md:translate-x-0"}`}
+          ${mobileOpen ? "w-[270px] translate-x-0" : "w-[56px] translate-x-0"}`}
         aria-label="RoofRay chat history"
       >
         {!mobileOpen && (
-          <div className="hidden h-[60px] shrink-0 items-center justify-center border-b border-white/[0.05] md:flex">
+          <div className="flex h-[60px] shrink-0 items-center justify-center border-b border-white/[0.05]">
             <button type="button" onClick={onOpenSidebar} className="rr-icon-btn" aria-label="Open chat history" title="Open sidebar">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]" aria-hidden="true">
                 <rect x="4" y="4" width="16" height="16" rx="2.5" />
@@ -284,9 +284,11 @@ function ChatSidebar({
                 <p className="truncate text-[10px] text-slate-500">AI Solar Assistant</p>
               </div>
           </div>
-          <button type="button" onClick={onCloseMobile} className="rr-icon-btn" aria-label="Close sidebar" title="Close sidebar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-              <path d="M18 6 6 18" /><path d="M6 6l12 12" />
+          <button type="button" onClick={onCloseMobile} className="rr-icon-btn" aria-label="Collapse sidebar" title="Collapse sidebar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]" aria-hidden="true">
+              <rect x="4" y="4" width="16" height="16" rx="2.5" />
+              <path d="M9 4v16" />
+              <path d="M6.5 8h.01M6.5 12h.01M6.5 16h.01" />
             </svg>
           </button>
         </div>
@@ -1142,12 +1144,6 @@ export default function RoofRayChat() {
             : "fixed bottom-0 right-0 z-[80] flex h-[min(760px,100dvh)] w-full flex-col overflow-hidden border border-white/[0.07] bg-[#080E1C] text-white shadow-2xl shadow-black/60 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100dvh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl lg:bottom-7 lg:right-7"
         }
       >
-        <div className="fixed left-0 top-0 z-[110] flex h-[60px] items-center px-2 md:hidden">
-          <button type="button" onClick={() => setSidebarOpen(true)} className="rr-icon-btn bg-[#0A1020]/90 backdrop-blur" aria-label="Open chat history" title="Chat history">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-          </button>
-        </div>
-
         <ChatSidebar
           chats={chats}
           activeChatId={activeChatId}
@@ -1160,7 +1156,7 @@ export default function RoofRayChat() {
           onOpenSidebar={() => setSidebarOpen(true)}
         />
 
-        <div className={`flex min-h-0 h-full w-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "md:ml-[270px] md:w-[calc(100%-270px)]" : "md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
+        <div className={`flex min-h-0 h-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "w-full md:ml-[270px] md:w-[calc(100%-270px)]" : "ml-[56px] w-[calc(100%-56px)] md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
           <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
             <div className="flex min-w-0 items-center gap-2">
               {/* Desktop compact rail owns the sidebar-open button when the sidebar is collapsed. */}
