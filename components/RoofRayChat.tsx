@@ -99,7 +99,8 @@ export default function RoofRayChat() {
   }
 
   useEffect(() => {
-    if (isFullScreenPage) setOpen(true);
+    // Keep the chat closed on normal pages; /chat owns the full-screen state.
+    setOpen(isFullScreenPage);
     setSolarContext(getStoredAnalysis());
     hydrateStoredLocation();
     const handleOpen = () => {
