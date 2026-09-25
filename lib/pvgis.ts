@@ -71,8 +71,12 @@ type PVGISResponse = {
         month?: number;
         E_d?: number;
         E_m?: number;
+        e_d?: number;
+        e_m?: number;
         "H(i)_d"?: number;
         "H(i)_m"?: number;
+        h_i_d?: number;
+        h_i_m?: number;
       }>;
     };
     totals?: {
@@ -80,9 +84,15 @@ type PVGISResponse = {
         E_d?: number;
         E_m?: number;
         E_y?: number;
+        e_d?: number;
+        e_m?: number;
+        e_y?: number;
         "H(i)_d"?: number;
         "H(i)_m"?: number;
         "H(i)_y"?: number;
+        h_i_d?: number;
+        h_i_m?: number;
+        h_i_y?: number;
       };
     };
   };
@@ -195,14 +205,14 @@ export async function getPVGISAnalysis({
           ? null
           : Number((annualEnergy / peakPowerKw).toFixed(2)),
       irradiationKwhM2: annualIrradiation,
-      averageDailyEnergyKwh: asNumber(fixed?.E_d),
+      averageDailyEnergyKwh: asNumber(fixed?.e_d ?? fixed?.E_d),
     },
     monthly: monthly.map((item) => ({
       month: item.month ?? 0,
-      energyKwh: item.E_m ?? 0,
-      irradiationKwhM2: item["H(i)_m"] ?? 0,
-      averageDailyEnergyKwh: item.E_d ?? 0,
-      averageDailyIrradiationKwhM2: item["H(i)_d"] ?? 0,
+      energyKwh: item.e_m ?? item.E_m ?? 0,
+      irradiationKwhM2: item.h_i_m ?? item["H(i)_m"] ?? 0,
+      averageDailyEnergyKwh: item.e_d ?? item.E_d ?? 0,
+      averageDailyIrradiationKwhM2: item.h_i_d ?? item["H(i)_d"] ?? 0,
     })),
     notes: [
       "PVGIS estimates solar-resource and PV-system performance from long-term radiation and meteorological data.",
