@@ -264,6 +264,7 @@ export default function RoofRayChat() {
         <section aria-label="RoofRay AI assistant" className={isFullScreenPage
           ? "fixed inset-0 z-[80] flex h-screen w-screen flex-col overflow-hidden bg-[#0B1220] text-white"
           : "fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7"}
+          >
           <div className="flex h-16 shrink-0 items-center justify-end border-b border-white/5 bg-[#0B1220] px-4">
             <div className="flex h-10 items-center gap-1">
               {/* Reset / New chat button */}
