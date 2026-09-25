@@ -253,6 +253,16 @@ function ChatSidebar({
   onOpenSidebar: () => void;
 }) {
   const router = useRouter();
+  const [profileName, setProfileName] = useState("Profile");
+
+  useEffect(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("roofray_user") || "{}");
+      setProfileName(user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Profile");
+    } catch {
+      setProfileName("Profile");
+    }
+  }, []);
 
   return (
     <>
@@ -394,7 +404,7 @@ function ChatSidebar({
                 <path d="M5 20c.8-3.2 3.2-5 7-5s6.2 1.8 7 5" />
               </svg>
             </span>
-            <span className={!mobileOpen ? "hidden" : "truncate"}>{(() => { try { const user = JSON.parse(localStorage.getItem("roofray_user") || "{}"); return user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Profile"; } catch { return "Profile"; } })()}</span>
+            <span className={!mobileOpen ? "hidden" : "truncate"}>{profileName}</span>
           </button>
         </div>
       </aside>
