@@ -722,7 +722,7 @@ function ChatComposer({
       )}
 
       <form onSubmit={(e) => { e.preventDefault(); if (canSend) onSend(); }} className="mx-auto max-w-[900px]">
-        <div className="rounded-2xl border border-white/[0.08] bg-[#0F1929]">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0F1929] outline-none focus-within:outline-none">
           <AttachmentPreview attachments={attachments} onRemove={onRemoveAttachment} />
           <div className="flex items-end gap-1 px-2 pb-2 pt-2">
             {/* + button */}
@@ -733,7 +733,7 @@ function ChatComposer({
                 aria-label="Attach file or photo"
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
-                className={`flex h-9 w-9 items-center justify-center rounded-xl border text-slate-400 transition-all duration-200 ${
+                className={`flex h-9 w-9 items-center justify-center rounded-xl border text-slate-400 transition-colors duration-200 outline-none focus:outline-none focus:ring-0 active:scale-100 ${
                   menuOpen ? "border-blue-400/30 bg-blue-400/10 text-blue-300" : "border-white/[0.07] bg-white/[0.03] hover:border-white/[0.12] hover:bg-white/[0.06] hover:text-slate-200"
                 }`}
               >
@@ -752,7 +752,7 @@ function ChatComposer({
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={loading}
-              className="min-h-[36px] flex-1 resize-none bg-transparent px-2 py-2 text-[14px] leading-6 text-white outline-none placeholder:text-slate-500 disabled:opacity-50"
+              className="min-h-[36px] flex-1 resize-none bg-transparent px-2 py-2 text-[14px] leading-6 text-white outline-none focus:outline-none focus:ring-0 placeholder:text-slate-500 disabled:opacity-50"
               style={{ maxHeight: COMPOSER_MAX_HEIGHT }}
             />
 
@@ -760,7 +760,7 @@ function ChatComposer({
               type="submit"
               disabled={!canSend}
               aria-label="Send message"
-              className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition-all duration-200 hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-white/[0.07] disabled:text-slate-600"
+              className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white outline-none transition-colors duration-200 hover:bg-blue-500 focus:outline-none focus:ring-0 active:scale-100 disabled:cursor-not-allowed disabled:bg-white/[0.07] disabled:text-slate-600"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-[16px] w-[16px]" aria-hidden="true"><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></svg>
             </button>
@@ -1180,7 +1180,7 @@ export default function RoofRayChat() {
         .rr-icon-btn { display:flex;align-items:center;justify-content:center;height:44px;width:44px;border-radius:10px;color:rgb(100 116 139);outline:none;transition:background-color .15s ease,color .15s ease,transform .1s ease; }
         .rr-icon-btn:hover { background-color:rgba(255,255,255,.05);color:rgb(203 213 225); }
         .rr-icon-btn:focus-visible { outline:2px solid rgba(96,165,250,.5);outline-offset:2px; }
-        .rr-icon-btn:active { transform:scale(.93); }
+        .rr-icon-btn:active { transform:none; }
       `}</style>
 
       <section
