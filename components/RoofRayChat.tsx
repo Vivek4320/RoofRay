@@ -750,6 +750,8 @@ export default function RoofRayChat() {
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [activeChatId, setActiveChatId] = useState("");
   const [pendingDeleteChat, setPendingDeleteChat] = useState<ChatRecord | null>(null);
+  const [pendingRenameChat, setPendingRenameChat] = useState<ChatRecord | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
@@ -1051,9 +1053,16 @@ export default function RoofRayChat() {
   function renameChat(id: string) {
     const chat = chats.find((item) => item.id === id);
     if (!chat) return;
-    const title = window.prompt("Rename chat", chat.title);
-    if (!title?.trim()) return;
-    setChats((current) => current.map((item) => item.id === id ? { ...item, title: title.trim().slice(0, 50), updatedAt: Date.now() } : item));
+    setPendingRenameChat(chat);
+    setRenameValue(chat.title);
+  }
+
+  function confirmRenameChat() {
+    if (!pendingRenameChat || !renameValue.trim()) return;
+    const title = renameValue.trim().slice(0, 50);
+    setChats((current) => current.map((item) => item.id === pendingRenameChat.id ? { ...item, title, updatedAt: Date.now() } : item));
+    setPendingRenameChat(null);
+    setRenameValue("");
   }
 
   function deleteChat(id: string) {
@@ -1160,6 +1169,40 @@ export default function RoofRayChat() {
               </button>
             </div>
           </header>
+
+        {pendingRenameChat && (
+          <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="rename-chat-title">
+            <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 shadow-2xl shadow-black/50">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
+                  <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </div>
+              <h2 id="rename-chat-title" className="text-base font-semibold text-white">Rename chat</h2>
+              <p className="mt-1.5 text-sm text-slate-400">Choose a new name for this conversation.</p>
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={(event) => setRenameValue(event.target.value.slice(0, 50))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") confirmRenameChat();
+                  if (event.key === "Escape") { setPendingRenameChat(null); setRenameValue(""); }
+                }}
+                maxLength={50}
+                className="mt-4 h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-400/40 focus:ring-2 focus:ring-blue-400/10"
+                aria-label="New chat name"
+              />
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" onClick={() => { setPendingRenameChat(null); setRenameValue(""); }} className="h-10 rounded-lg border border-white/[0.08] px-4 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white">
+                  Cancel
+                </button>
+                <button type="button" disabled={!renameValue.trim()} onClick={confirmRenameChat} className="h-10 rounded-lg bg-blue-500/15 px-4 text-sm font-medium text-blue-300 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-40">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {pendingDeleteChat && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="delete-chat-title">
