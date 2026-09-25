@@ -1058,7 +1058,6 @@ export default function RoofRayChat() {
   function deleteChat(id: string) {
     const chat = chats.find((item) => item.id === id);
     if (!chat) return;
-    if (!window.confirm("Delete this conversation?")) return;
     const remaining = chats.filter((item) => item.id !== id);
     setChats(remaining);
     localStorage.setItem("roofray_chats", JSON.stringify(remaining));
