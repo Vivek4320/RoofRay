@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 type SolarAnalysis = Record<string, unknown>;
@@ -65,7 +66,10 @@ function readNumber(value: unknown): number | null {
 }
 
 export default function RoofRayChat() {
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const isFullScreenPage = pathname === "/chat";
+  const [open, setOpen] = useState(isFullScreenPage);
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -95,6 +99,7 @@ export default function RoofRayChat() {
   }
 
   useEffect(() => {
+    if (isFullScreenPage) setOpen(true);
     setSolarContext(getStoredAnalysis());
     hydrateStoredLocation();
     const handleOpen = () => {
@@ -110,7 +115,7 @@ export default function RoofRayChat() {
     }
 
     return () => window.removeEventListener("roofray:open-chat", handleOpen);
-  }, []);
+  }, [isFullScreenPage]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
@@ -256,7 +261,9 @@ export default function RoofRayChat() {
   return (
     <>
       {open && (
-        <section aria-label="RoofRay AI assistant" className="fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7">
+        <section aria-label="RoofRay AI assistant" className={isFullScreenPage
+          ? "fixed inset-0 z-[80] flex h-screen w-screen flex-col overflow-hidden bg-[#0B1220] text-white"
+          : "fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7"}
           <div className="flex h-16 shrink-0 items-center justify-end border-b border-white/5 bg-[#0B1220] px-4">
             <div className="flex h-10 items-center gap-1">
               {/* Reset / New chat button */}
@@ -285,7 +292,7 @@ export default function RoofRayChat() {
               {/* Close button */}
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => { if (isFullScreenPage) router.push("/"); else setOpen(false); }}
                 aria-label="Close RoofRay chat"
                 title="Close"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-slate-500 transition-all duration-200 ease-out hover:bg-white/[0.06] hover:text-white active:scale-90"
