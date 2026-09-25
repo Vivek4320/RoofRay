@@ -240,6 +240,7 @@ function ChatSidebar({
   onRename,
   onDelete,
   onCloseMobile,
+  onOpenSidebar,
 }: {
   chats: ChatRecord[];
   activeChatId: string;
@@ -249,6 +250,7 @@ function ChatSidebar({
   onRename: (id: string) => void;
   onDelete: (id: string) => void;
   onCloseMobile: () => void;
+  onOpenSidebar: () => void;
 }) {
   return (
     <>
@@ -258,11 +260,23 @@ function ChatSidebar({
         aria-hidden="true"
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-[100] flex w-[270px] flex-col border-r border-white/[0.06] bg-[#090F1C] text-white shadow-2xl shadow-black/40 transition-transform duration-200 ease-out
-          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-[100] flex flex-col border-r border-white/[0.06] bg-[#090F1C] text-white shadow-2xl shadow-black/40 transition-[width,transform] duration-200 ease-out
+          ${mobileOpen ? "w-[270px] translate-x-0" : "w-[56px] -translate-x-full md:translate-x-0"}`}
         aria-label="RoofRay chat history"
       >
-        <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] px-4">
+        {!mobileOpen && (
+          <div className="hidden h-[60px] shrink-0 items-center justify-center border-b border-white/[0.05] md:flex">
+            <button type="button" onClick={onOpenSidebar} className="rr-icon-btn" aria-label="Open chat history" title="Open sidebar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]" aria-hidden="true">
+                <rect x="4" y="4" width="16" height="16" rx="2.5" />
+                <path d="M9 4v16" />
+                <path d="M6.5 8h.01M6.5 12h.01M6.5 16h.01" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        <div className={`flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] px-4 ${!mobileOpen ? "md:hidden" : ""}`}>
           <div className="flex min-w-0 items-center gap-2.5">
               <Image src={LOGO_SRC} alt="RoofRay" width={42} height={42} className="h-9 w-9 object-contain" priority />
               <div className="min-w-0">
@@ -277,7 +291,7 @@ function ChatSidebar({
           </button>
         </div>
 
-        <div className="p-3">
+        <div className={`p-3 ${!mobileOpen ? "md:hidden" : ""}`}>
           <button
             type="button"
             onClick={onNewChat}
@@ -291,7 +305,7 @@ function ChatSidebar({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        <div className={`min-h-0 flex-1 overflow-y-auto px-2 pb-3 ${!mobileOpen ? "md:hidden" : ""}`}>
             <p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">Recent chats</p>
             <div className="space-y-0.5">
               {chats.length === 0 ? (
@@ -363,7 +377,7 @@ function ChatSidebar({
             </div>
           </div>
 
-        <div className="border-t border-white/[0.05] p-3" />
+        <div className={`border-t border-white/[0.05] p-3 ${!mobileOpen ? "md:hidden" : ""}`} />
       </aside>
     </>
   );
@@ -1143,20 +1157,13 @@ export default function RoofRayChat() {
           onRename={renameChat}
           onDelete={deleteChat}
           onCloseMobile={() => setSidebarOpen(false)}
+          onOpenSidebar={() => setSidebarOpen(true)}
         />
 
-        <div className={`flex min-h-0 h-full w-full flex-col transition-[margin] duration-200 ${sidebarOpen ? "md:ml-[270px] md:w-[calc(100%-270px)]" : "md:ml-0 md:w-full"}`}>
+        <div className={`flex min-h-0 h-full w-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "md:ml-[270px] md:w-[calc(100%-270px)]" : "md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
           <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
             <div className="flex min-w-0 items-center gap-2">
-              {!sidebarOpen && (
-                <button type="button" onClick={() => setSidebarOpen(true)} className="rr-icon-btn" aria-label="Open chat history" title="Open sidebar">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]" aria-hidden="true">
-                    <rect x="4" y="4" width="16" height="16" rx="2.5" />
-                    <path d="M9 4v16" />
-                    <path d="M6.5 8h.01M6.5 12h.01M6.5 16h.01" />
-                  </svg>
-                </button>
-              )}
+              {/* Desktop compact rail owns the sidebar-open button when the sidebar is collapsed. */}
               <div className="min-w-0">
                 <p className="truncate text-[13px] font-medium text-slate-200">{chatTitle(messages)}</p>
                 <p className="text-[10px] text-slate-600">RoofRay AI Solar Assistant</p>
