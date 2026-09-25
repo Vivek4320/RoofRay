@@ -624,7 +624,9 @@ function AttachmentMenu({ open, onPhoto, onFile, onClose }: { open: boolean; onP
 
   useEffect(() => {
     if (!open) return;
-    function handleKey(e: globalThis.KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    function handleKey(e: globalThis.KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
@@ -634,15 +636,48 @@ function AttachmentMenu({ open, onPhoto, onFile, onClose }: { open: boolean; onP
       ref={menuRef}
       role="menu"
       aria-label="Attachment options"
-      className={`absolute bottom-full left-0 mb-2 min-w-[180px] origin-bottom-left rounded-2xl border border-white/[0.07] bg-[#111B2E] py-1.5 shadow-2xl shadow-black/50 transition-all duration-200 ${
-        open ? "pointer-events-auto scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"
+      className={`absolute bottom-full left-0 mb-2 w-[220px] origin-bottom-left rounded-2xl border border-white/[0.08] bg-[#101A2B]/98 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl transition-all duration-150 ${
+        open ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none translate-y-1 scale-95 opacity-0"
       }`}
     >
-      <button type="button" role="menuitem" onClick={() => { onPhoto(); onClose(); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-[13px] text-slate-300 transition-colors hover:bg-white/[0.05] hover:text-white">
-        <span aria-hidden="true" className="text-base">📷</span> Upload Photo
+      <p className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Attach</p>
+
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => { onPhoto(); onClose(); }}
+        className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] text-slate-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-0"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300 transition-colors group-hover:bg-blue-500/15" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <rect x="3" y="5" width="18" height="14" rx="2.5" />
+            <circle cx="8.5" cy="10" r="1.5" />
+            <path d="m5.5 17 4.5-4.5 3 3 2-2 3.5 3.5" />
+          </svg>
+        </span>
+        <span className="min-w-0">
+          <span className="block font-medium">Upload image</span>
+          <span className="mt-0.5 block text-[11px] text-slate-500">JPG, PNG, or WebP</span>
+        </span>
       </button>
-      <button type="button" role="menuitem" onClick={() => { onFile(); onClose(); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-[13px] text-slate-300 transition-colors hover:bg-white/[0.05] hover:text-white">
-        <span aria-hidden="true" className="text-base">📄</span> Upload File
+
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => { onFile(); onClose(); }}
+        className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] text-slate-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-0"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-slate-300 transition-colors group-hover:bg-white/[0.08]" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" />
+            <path d="M14 3.5V8h4" />
+            <path d="M9 12h6M9 15h6M9 18h4" />
+          </svg>
+        </span>
+        <span className="min-w-0">
+          <span className="block font-medium">Upload file</span>
+          <span className="mt-0.5 block text-[11px] text-slate-500">PDF, TXT, or CSV</span>
+        </span>
       </button>
     </div>
   );
@@ -733,11 +768,11 @@ function ChatComposer({
                 aria-label="Attach file or photo"
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
-                className={`flex h-9 w-9 items-center justify-center rounded-xl border text-slate-400 transition-colors duration-200 outline-none focus:outline-none focus:ring-0 active:scale-100 ${
-                  menuOpen ? "border-blue-400/30 bg-blue-400/10 text-blue-300" : "border-white/[0.07] bg-white/[0.03] hover:border-white/[0.12] hover:bg-white/[0.06] hover:text-slate-200"
+                className={`group flex h-9 w-9 items-center justify-center rounded-xl border text-slate-400 transition-colors duration-200 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 active:scale-100 ${
+                  menuOpen ? "border-blue-400/30 bg-blue-400/10 text-blue-300" : "border-white/[0.07] bg-white/[0.03] hover:border-blue-400/20 hover:bg-blue-500/[0.06] hover:text-slate-200"
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 transition-transform duration-200 ${menuOpen ? "rotate-45" : ""}`} aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : "group-hover:scale-105"}`} aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
               </button>
               <AttachmentMenu open={menuOpen} onPhoto={() => photoInputRef.current?.click()} onFile={() => fileInputRef.current?.click()} onClose={() => setMenuOpen(false)} />
             </div>
