@@ -252,6 +252,8 @@ function ChatSidebar({
   onCloseMobile: () => void;
   onOpenSidebar: () => void;
 }) {
+  const router = useRouter();
+
   return (
     <>
       <div
@@ -378,7 +380,23 @@ function ChatSidebar({
             </div>
           </div>
 
-        <div className={`border-t border-white/[0.05] p-3 ${!mobileOpen ? "md:hidden" : ""}`} />
+        <div className={`border-t border-white/[0.05] p-3 ${!mobileOpen ? "p-2" : ""}`}>
+          <button
+            type="button"
+            onClick={() => router.push("/profile")}
+            className={`flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-medium text-slate-300 transition hover:bg-white/[0.05] hover:text-white ${!mobileOpen ? "justify-center" : ""}`}
+            title="Profile"
+            aria-label="Profile"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-300 ring-1 ring-blue-400/10">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+                <circle cx="12" cy="8" r="3.5" />
+                <path d="M5 20c.8-3.2 3.2-5 7-5s6.2 1.8 7 5" />
+              </svg>
+            </span>
+            <span className={!mobileOpen ? "hidden" : "truncate"}>Profile</span>
+          </button>
+        </div>
       </aside>
     </>
   );
