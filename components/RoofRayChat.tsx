@@ -16,16 +16,30 @@ function getToken() {
 
 async function getValidToken() {
   const token = getToken();
-
-  // The chat API already verifies the access token server-side.
-  // Avoid an extra Supabase round-trip on every message.
-  if (token) return token;
-
   const refreshToken = localStorage.getItem("roofray_refresh_token") || "";
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!refreshToken || !supabaseUrl || !anonKey) return "";
+  if (!supabaseUrl || !anonKey) return "";
+
+  // First verify the cached access token. Supabase access tokens are short-lived,
+  // so an existing localStorage token may be expired even while the session is valid.
+  if (token) {
+    try {
+      const response = await fetch(supabaseUrl + "/auth/v1/user", {
+        headers: {
+          apikey: anonKey,
+          Authorization: "Bearer " + token,
+        },
+        cache: "no-store",
+      });
+      if (response.ok) return token;
+    } catch {
+      // Fall through to refresh the session.
+    }
+  }
+
+  if (!refreshToken) return "";
 
   try {
     const response = await fetch(
@@ -46,6 +60,7 @@ async function getValidToken() {
     const data = await response.json();
     if (data.access_token) localStorage.setItem("roofray_access_token", data.access_token);
     if (data.refresh_token) localStorage.setItem("roofray_refresh_token", data.refresh_token);
+    if (data.user) localStorage.setItem("roofray_user", JSON.stringify(data.user));
     return data.access_token || "";
   } catch {
     return "";
