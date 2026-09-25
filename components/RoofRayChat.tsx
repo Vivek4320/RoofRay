@@ -722,7 +722,7 @@ function ChatComposer({
       )}
 
       <form onSubmit={(e) => { e.preventDefault(); if (canSend) onSend(); }} className="mx-auto max-w-[900px]">
-        <div className="rounded-2xl border border-white/[0.08] bg-[#0F1929] transition-colors duration-200 focus-within:border-blue-500/30">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0F1929]">
           <AttachmentPreview attachments={attachments} onRemove={onRemoveAttachment} />
           <div className="flex items-end gap-1 px-2 pb-2 pt-2">
             {/* + button */}
