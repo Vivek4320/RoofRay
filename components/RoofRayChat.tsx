@@ -165,11 +165,11 @@ export default function RoofRayChat() {
     );
   }
 
-  async function refreshAnalysisWithRoofArea(areaSqFt: number) {
-    const location = solarContext?.location as Record<string, unknown> | undefined;
-    const latitude = readNumber(location?.latitude);
-    const longitude = readNumber(location?.longitude);
-    if (latitude === null || longitude === null) return;
+  async function refreshAnalysisWithRoofArea(areaSqFt: number): Promise<SolarAnalysis | null> {
+    const analysisLocation = solarContext?.location as Record<string, unknown> | undefined;
+    const latitude = readNumber(analysisLocation?.latitude) ?? locationCoords?.latitude ?? null;
+    const longitude = readNumber(analysisLocation?.longitude) ?? locationCoords?.longitude ?? null;
+    if (latitude === null || longitude === null) return null;
 
     try {
       const response = await fetch("/api/solar-analysis", {
@@ -187,8 +187,10 @@ export default function RoofRayChat() {
       if (response.ok && data.ok && data.analysis) {
         sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
         setSolarContext(data.analysis);
+        return data.analysis as SolarAnalysis;
       }
     } catch { }
+    return null;
   }
 
   async function sendMessage(text = input) {
@@ -207,10 +209,13 @@ export default function RoofRayChat() {
     let nextMonthlyBill = monthlyBill;
     let nextShading = shading;
 
+    let currentSolarContext = solarContext;
+
     if (roofArea === null && number !== null && number > 0) {
       nextRoofArea = number;
       setRoofArea(number);
-      void refreshAnalysisWithRoofArea(number);
+      const refreshedAnalysis = await refreshAnalysisWithRoofArea(number);
+      if (refreshedAnalysis) currentSolarContext = refreshedAnalysis;
     } else if (roofArea !== null && monthlyBill === null && number !== null && number > 0) {
       nextMonthlyBill = number;
       setMonthlyBill(number);
@@ -236,7 +241,7 @@ export default function RoofRayChat() {
         body: JSON.stringify({
           messages: nextMessages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
           solarContext: {
-            ...(solarContext || {}),
+            ...(currentSolarContext || {}),
             userInputs: { roofAreaSqFt: nextRoofArea, monthlyBillInr: nextMonthlyBill, shading: nextShading },
           },
         }),
