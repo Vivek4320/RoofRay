@@ -90,7 +90,7 @@ export default function Hero() {
               </span>{" "}
               before you invest.
             </p>
-          </div>
+          </div> 
 
           {/* Right: Interactive 3D Solar House Model */}
           <div className="relative flex flex-col items-center gap-2 animate-rise lg:animate-rise-delayed w-full">
