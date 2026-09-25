@@ -91,7 +91,7 @@ export default function RoofRayChat() {
       if (latitude !== null && longitude !== null) setLocationCoords({ latitude, longitude });
       if (accuracy !== null) setLocationAccuracy(accuracy);
       if (latitude !== null && longitude !== null) setLocationStatus(accuracy !== null && accuracy > 100 ? "warning" : "ready");
-    } catch {}
+    } catch { }
   }
 
   useEffect(() => {
@@ -148,7 +148,7 @@ export default function RoofRayChat() {
             sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
             setSolarContext(data.analysis);
           }
-        } catch {} finally { setLocationLoading(false); }
+        } catch { } finally { setLocationLoading(false); }
       },
       (error) => {
         setLocationLoading(false);
@@ -182,7 +182,7 @@ export default function RoofRayChat() {
         sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
         setSolarContext(data.analysis);
       }
-    } catch {}
+    } catch { }
   }
 
   async function sendMessage(text = input) {
@@ -258,33 +258,71 @@ export default function RoofRayChat() {
       {open && (
         <section aria-label="RoofRay AI assistant" className="fixed bottom-0 right-0 z-[80] flex h-[min(760px,100vh)] w-full flex-col overflow-hidden border border-blue-400/20 bg-[#0B1220] text-white shadow-2xl shadow-black/50 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100vh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-3xl lg:bottom-7 lg:right-7">
           <div className="flex h-16 shrink-0 items-center justify-end border-b border-white/5 bg-[#0B1220] px-4">
-            <div className="flex h-10 items-center gap-1 rounded-xl">
+            <div className="flex h-10 items-center gap-1">
+              {/* Reset / New chat button */}
               <button
                 type="button"
                 onClick={() => { setMessages([]); setRoofArea(null); setMonthlyBill(null); setShading(null); setHasStarted(false); }}
                 aria-label="Reset RoofRay chat"
                 title="New chat"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-transparent text-slate-500 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.06] hover:text-white hover:shadow-lg hover:shadow-black/20 active:scale-95"
+                className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-slate-500 transition-all duration-200 ease-out hover:bg-white/[0.06] hover:text-blue-400 active:scale-90"
               >
-                <span className="text-lg leading-none transition-transform duration-200 group-hover:rotate-180">↻</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px] transition-transform duration-500 ease-out group-hover:rotate-360"
+                >
+                  <path d="M3 12a9 9 0 1 1 3.2 6.9" />
+                  <path d="M3 4v5h5" />
+                </svg>
               </button>
+
+              {/* Close button */}
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close RoofRay chat"
                 title="Close"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-transparent text-slate-500 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.06] hover:text-white hover:shadow-lg hover:shadow-black/20 active:scale-95"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-slate-500 transition-all duration-200 ease-out hover:bg-white/[0.06] hover:text-white active:scale-90"
               >
-                <span className="text-2xl font-light leading-none transition-transform duration-200 group-hover:rotate-90">×</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px]"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
               </button>
             </div>
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#0B1220] p-4">
-            {!hasStarted && <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
-              <Image src="/Logo-removebg-preview.png" alt="RoofRay Logo" width={260} height={100} priority className="h-auto w-48 object-contain" />
-              <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">RoofRay</h2>
-            </div>}
+            {!hasStarted && (
+              <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
+                <Image
+                  src="/Logo-removebg-preview.png"
+                  alt="RoofRay Logo"
+                  width={260}
+                  height={100}
+                  priority
+                  className="h-auto w-52 object-contain"
+                />
+                <p className="mt-3 max-w-[260px] text-sm leading-relaxed text-slate-400">
+                  Ask me anything about your rooftop solar potential
+                </p>
+              </div>
+            )}
             {messages.filter((message) => message.content.trim()).map((message) => (
               <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex items-end gap-2 justify-start"}>
                 {message.role === "assistant" && (
