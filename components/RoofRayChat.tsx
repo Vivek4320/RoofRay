@@ -680,6 +680,7 @@ function AttachmentMenu({ open, onPhoto, onFile, onClose }: { open: boolean; onP
         </span>
       </button>
     </div>
+  );
 }
 
 /* ----------------------------------------------------------------------- */
