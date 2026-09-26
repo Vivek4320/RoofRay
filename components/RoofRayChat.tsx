@@ -1087,20 +1087,49 @@ export default function RoofRayChat() {
     }
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + validToken },
-        body: JSON.stringify({
-          messages: nextMessages.map(({ role, content: mc }) => ({ role, content: mc })),
-          solarContext: {
-            ...(currentSolarContext || {}),
-            userInputs: { roofAreaSqFt: nextRoofArea, monthlyBillInr: nextMonthlyBill, shading: nextShading },
+      const requestBody = {
+        messages: nextMessages.map(({ role, content: mc }) => ({
+          role,
+          content: mc,
+        })),
+        solarContext: {
+          ...(currentSolarContext || {}),
+          userInputs: {
+            roofAreaSqFt: nextRoofArea,
+            monthlyBillInr: nextMonthlyBill,
+            shading: nextShading,
           },
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || "Unable to get a response.");
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: data.message }]);
+        },
+      };
+
+      const sendChatRequest = (token: string) =>
+        fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+      let response = await sendChatRequest(validToken);
+
+      // Recover once from a stale access token without changing the chat UI.
+      if (response.status === 401) {
+        const refreshedToken = await getValidToken();
+        if (refreshedToken && refreshedToken !== validToken) {
+          response = await sendChatRequest(refreshedToken);
+        }
+      }
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Unable to get a response.");
+      }
+      setMessages((current) => [
+        ...current,
+        { id: crypto.randomUUID(), role: "assistant", content: data.message },
+      ]);
     } catch {
       setMessages((current) => [
         ...current,
