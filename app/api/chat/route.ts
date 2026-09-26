@@ -132,16 +132,38 @@ export async function POST(request: Request) {
       solarContext,
     ].join("\n");
 
+    // Keep the model configurable, but default to a currently supported
+    // production Gemini model so an old model ID cannot silently break chat.
+    const configuredModel = process.env.ROOFRAY_GEMINI_MODEL?.trim();
     const model =
-      process.env.ROOFRAY_GEMINI_MODEL &&
-      process.env.ROOFRAY_GEMINI_MODEL !== "your_supported_model_id"
-        ? process.env.ROOFRAY_GEMINI_MODEL
-        : "gemini-3.5-flash-lite";
+      configuredModel && configuredModel !== "your_supported_model_id"
+        ? configuredModel
+        : "gemini-3.5-flash";
 
-    const contents = messages.map((message) => ({
-      role: message.role === "assistant" ? "model" : "user",
-      parts: [{ text: message.content }],
-    }));
+    // Gemini conversation history must begin with a user turn and must
+    // alternate user/model turns. Normalize locally saved chats before sending.
+    const contents = messages
+      .map((message) => ({
+        role: message.role === "assistant" ? "model" : "user",
+        parts: [{ text: message.content }],
+      }))
+      .reduce((turns, turn) => {
+        if (turns.length === 0 && turn.role !== "user") return turns;
+        const previous = turns[turns.length - 1];
+        if (previous?.role === turn.role) {
+          previous.parts[0].text += "\n" + turn.parts[0].text;
+          return turns;
+        }
+        turns.push(turn);
+        return turns;
+      }, [] as Array<{ role: "user" | "model"; parts: [{ text: string }] }>);
+
+    if (!contents.length) {
+      return NextResponse.json(
+        { ok: false, error: "A user message is required." },
+        { status: 400 },
+      );
+    }
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
