@@ -153,6 +153,63 @@ export async function POST(request: Request) {
     }
 
 
+    // Once all intake fields are collected, do not let Gemini invent the
+    // feasibility numbers. Return the live RoofRay calculation directly.
+    const intakeComplete = [
+      nameInput, roofAreaInput, roofTypeInput, monthlyBillInput,
+      connectionTypeInput, ownershipInput, goalInput,
+    ].every((value) => value !== null && value !== undefined && String(value).trim() !== "");
+
+    if (intakeComplete) {
+      const planning = (solarContextObject.planningEstimate ?? {}) as Record<string, unknown>;
+      const placement = (solarContextObject.panelPlacement ?? {}) as Record<string, unknown>;
+      const estimate = (placement.estimate ?? {}) as Record<string, unknown>;
+      const panel = (placement.panel ?? {}) as Record<string, unknown>;
+      const location = (planning.location ?? solarContextObject.location ?? {}) as Record<string, unknown>;
+      const orientation = (solarContextObject.optimalOrientation ?? {}) as Record<string, unknown>;
+      const shadow = (solarContextObject.shadow ?? {}) as Record<string, unknown>;
+
+      const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : Number(v);
+      const lat = num(location.latitude);
+      const lon = num(location.longitude);
+      const size = num(planning.systemSizeKw ?? estimate.systemSizeKw);
+      const count = num(planning.panelCount ?? estimate.panelCount);
+      const watts = num(planning.panelPowerW ?? panel.assumedPowerW);
+      const monthly = num(planning.averageMonthlyGenerationKwh);
+      const annual = num(planning.annualGenerationAfterEstimatedShadingKwh ?? estimate.effectiveGenerationKwh);
+      const shade = num(planning.estimatedShadingPercent);
+      const direction = typeof planning.recommendedDirection === "string"
+        ? planning.recommendedDirection
+        : typeof orientation.direction === "string" ? orientation.direction : "";
+      const slope = num(planning.recommendedSlopeDeg ?? orientation.slopeDeg);
+      const risk = typeof shadow.currentRisk === "string" ? shadow.currentRisk : "";
+
+      const fmt = (v: number, digits = 0) => Number.isFinite(v) ? v.toFixed(digits) : "unavailable";
+      const locationLine = Number.isFinite(lat) && Number.isFinite(lon)
+        ? `📍 Live location: ${lat.toFixed(5)}, ${lon.toFixed(5)}`
+        : "📍 Live location: detected, but coordinates are unavailable.";
+
+      const answer = [
+        locationLine,
+        Number.isFinite(size) && Number.isFinite(count)
+          ? `🔋 Solar size: ~${fmt(size, 2)} kW (${Math.round(count)} × ${Math.round(watts || 450)}W panels).`
+          : "🔋 Solar size: unavailable from live analysis.",
+        Number.isFinite(monthly) || Number.isFinite(annual)
+          ? `⚡ Generation: ~${Number.isFinite(monthly) ? fmt(monthly) + " kWh/month" : ""}${Number.isFinite(monthly) && Number.isFinite(annual) ? " | " : ""}${Number.isFinite(annual) ? fmt(annual) + " kWh/year after estimated shading" : ""}.`
+          : "⚡ Generation: unavailable from live analysis.",
+        Number.isFinite(shade)
+          ? `🌤️ Shading estimate: ~${fmt(shade, 1)}% (geometric estimate from mapped obstacles + current sun path; risk: ${risk || "unavailable"}).`
+          : "🌤️ Shading estimate: unavailable from live spatial analysis.",
+        direction
+          ? `🧭 Solar direction: ${direction}${Number.isFinite(slope) ? ` at ~${fmt(slope, 0)}° optimal slope` : ""}.`
+          : "🧭 Solar direction: unavailable from PVGIS.",
+        `💰 Your current bill: ₹${Math.round(num(monthlyBillInput)) || 0}/month. Actual savings depend on tariff and net-metering/export rules.`,
+        "⚠️ These are live location-based planning estimates, not final installation specifications; structural and electrical checks still require a site assessment.",
+      ].join("\n");
+
+      return NextResponse.json({ ok: true, message: answer });
+    }
+
     const systemPrompt = [
       "You are RoofRay, the AI solar feasibility assistant inside the RoofRay website.",
       "Help the user understand rooftop solar feasibility using the live RoofRay analysis supplied below.",
