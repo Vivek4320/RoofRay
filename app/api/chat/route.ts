@@ -106,28 +106,49 @@ export async function POST(request: Request) {
       ? solarContextObject.userInputs as Record<string, unknown>
       : {};
 
-    // Keep the project intake questions fixed so Gemini cannot rewrite or vary them.
-    // The actual solar analysis remains Gemini-powered after all three inputs are collected.
+    // Keep the installer-style project intake questions fixed so Gemini cannot
+    // rewrite or vary them. Location is captured automatically by the website.
+    // Gemini is used only after the complete intake is collected.
     const fixedQuestions = {
       roofArea: "What is the area of your roof in square feet?",
+      roofType: "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)",
       monthlyBill: "What is your average monthly electricity bill in ₹?",
       shading: "How much shading does your roof receive?",
+      connectionType: "What type of electricity connection do you have? (Residential, Commercial, or Other)",
+      ownership: "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)",
+      goal: "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)",
     };
 
     const roofAreaInput = userInputs.roofAreaSqFt;
+    const roofTypeInput = userInputs.roofType;
     const monthlyBillInput = userInputs.monthlyBillInr;
     const shadingInput = userInputs.shading;
+    const connectionTypeInput = userInputs.connectionType;
+    const ownershipInput = userInputs.ownership;
+    const goalInput = userInputs.goal;
     const latestUserMessage = messages[messages.length - 1];
 
     if (latestUserMessage?.role === "user") {
       if (roofAreaInput === null || roofAreaInput === undefined) {
         return NextResponse.json({ ok: true, message: fixedQuestions.roofArea });
       }
+      if (roofTypeInput === null || roofTypeInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.roofType });
+      }
       if (monthlyBillInput === null || monthlyBillInput === undefined) {
         return NextResponse.json({ ok: true, message: fixedQuestions.monthlyBill });
       }
       if (shadingInput === null || shadingInput === undefined) {
         return NextResponse.json({ ok: true, message: fixedQuestions.shading });
+      }
+      if (connectionTypeInput === null || connectionTypeInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.connectionType });
+      }
+      if (ownershipInput === null || ownershipInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.ownership });
+      }
+      if (goalInput === null || goalInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.goal });
       }
     }
 
@@ -140,12 +161,12 @@ export async function POST(request: Request) {
       "Answer only what the user asked. Do not add unnecessary background, explanations, summaries, repeated information, or follow-up offers.",
       "For greetings or simple conversational messages, reply naturally in one short sentence.",
       "During input collection, ask for missing project inputs ONE AT A TIME, using one short question only.",
-      "Normal input order: roof area in square feet, monthly electricity bill in INR, then shading (No / Partial / Heavy).",
+      "Normal input order: roof area, roof type, monthly electricity bill, shading, connection type, property permission, then installation goal.",
       "Browser location is captured automatically when available. Do not ask for latitude/longitude unless location capture failed.",
       "Do not invent measurements, irradiation, shadow data, panel counts, system size, generation, savings, payback, or coverage.",
       "Treat PVGIS, mapped roof, obstacle/shadow, and panel-placement values in the supplied context as the source of truth.",
       "User-reported shading (No / Partial / Heavy) is separate from calculated geometric shadow analysis; do not present user-reported shading as a measured shadow result.",
-      "After all required inputs are collected, stop asking questions and give a concise feasibility summary using only the supplied RoofRay analysis and user inputs.",
+      "After all seven required inputs are collected, stop asking questions and give a concise feasibility summary using only the supplied RoofRay analysis and user inputs.",
       "After all inputs are complete, answer in 2-3 short sentences or at most 3 short bullets.",
       "Prefer concrete analysis values over generic conclusions. If a value is missing, say it is unavailable instead of guessing.",
       "Never describe the roof as a 'great candidate', 'excellent', 'ideal', 'best', or similar unless the supplied analysis explicitly supports that exact conclusion.",
