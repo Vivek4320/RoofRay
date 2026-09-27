@@ -57,20 +57,65 @@ export async function POST(request: Request) {
         elevationDeg: sample.elevationDeg,
       })),
     );
-    const panelPlacement = roof
+    // Always calculate a planning estimate from the user's actual roof area when
+    // available. A mapped roof footprint is useful for spatial validation, but it
+    // should not block the solar-size/generation estimate if footprint mapping fails.
+    const planningRoofAreaM2 = roofAreaM2 ?? roof?.areaM2 ?? null;
+    const shadingFactor = shadow.timeSeries.length
+      ? shadow.timeSeries.filter(
+          (sample) => sample.risk === "high" || sample.risk === "medium",
+        ).length / shadow.timeSeries.length * 0.15
+      : 0;
+
+    const panelPlacement = planningRoofAreaM2 !== null
       ? estimatePanelPlacement({
-          roofAreaM2: roofAreaM2 ?? roof.areaM2,
+          roofAreaM2: planningRoofAreaM2,
           annualSpecificYieldKwhPerKwp: pvgis.annual.specificYieldKwhPerKwp,
           recommendedDirection: pvgis.optimalOrientation.direction,
-          shadingFactor: shadow.timeSeries.length
-            ? shadow.timeSeries.filter((sample) => sample.risk === "high" || sample.risk === "medium").length / shadow.timeSeries.length * 0.15
-            : 0,
+          shadingFactor,
         })
       : null;
 
+    const averageMonthlyGenerationKwh =
+      panelPlacement?.estimate.effectiveGenerationKwh !== null &&
+      panelPlacement?.estimate.effectiveGenerationKwh !== undefined
+        ? Number((panelPlacement.estimate.effectiveGenerationKwh / 12).toFixed(0))
+        : null;
+
+    const estimatedShadingPercent = Number((shadingFactor * 100).toFixed(1));
+
     return NextResponse.json({
       ok: true,
-      analysis: { ...pvgis, sunCycle, obstacles, roof, shadow, panelPlacement },
+      analysis: {
+        ...pvgis,
+        sunCycle,
+        obstacles,
+        roof,
+        shadow,
+        panelPlacement,
+        planningEstimate: {
+          location: {
+            latitude,
+            longitude,
+          },
+          roofAreaM2: planningRoofAreaM2,
+          roofAreaSqFt:
+            planningRoofAreaM2 === null
+              ? null
+              : Number((planningRoofAreaM2 / 0.092903).toFixed(0)),
+          estimatedShadingPercent,
+          averageMonthlyGenerationKwh,
+          annualGenerationAfterEstimatedShadingKwh:
+            panelPlacement?.estimate.effectiveGenerationKwh ?? null,
+          systemSizeKw: panelPlacement?.estimate.systemSizeKw ?? null,
+          panelCount: panelPlacement?.estimate.panelCount ?? null,
+          panelPowerW: panelPlacement?.panel.assumedPowerW ?? null,
+          recommendedDirection: pvgis.optimalOrientation.direction,
+          recommendedSlopeDeg: pvgis.optimalOrientation.slopeDeg,
+          note:
+            "These are location-based planning estimates. Final panel count, layout, structure, electrical design, and shading require a physical site assessment.",
+        },
+      },
     });
   } catch (error) {
     console.error("[RoofRay] Solar analysis failed:", error);
