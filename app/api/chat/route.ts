@@ -226,40 +226,48 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
+    const requestGemini = async (modelName: string) =>
+      fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: systemPrompt }],
+            },
+            contents,
+            generationConfig: {
+              maxOutputTokens: 1200,
+            },
+          }),
+          cache: "no-store",
         },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemPrompt }],
-          },
-          contents,
-          generationConfig: {
-            maxOutputTokens: 1200,
-          },
-        }),
-        cache: "no-store",
-      }
-    );
+      );
 
-    const data = await response.json().catch(() => ({}));
+    let response = await requestGemini(model);
+    let data = await response.json().catch(() => ({}));
+
+    // If the primary model hits a temporary/free-tier quota, try a separate
+    // stable Flash model before returning the quota error to the UI.
+    if (response.status === 429 && model !== "gemini-3.6-flash") {
+      console.warn("[RoofRay] Primary Gemini model quota reached; trying fallback model.");
+      response = await requestGemini("gemini-3.6-flash");
+      data = await response.json().catch(() => ({}));
+    }
 
     if (!response.ok) {
-      console.error(
-        "[RoofRay] Gemini request failed:",
-        response.status,
-        data
-      );
+      console.error("[RoofRay] Gemini request failed:", response.status, data);
 
       const providerMessage =
         typeof data?.error?.message === "string"
           ? data.error.message
           : "";
+
+      const status = response.status === 429 ? 429 : 502;
 
       return NextResponse.json(
         {
@@ -268,7 +276,7 @@ export async function POST(request: Request) {
             ? `RoofRay AI could not answer right now: ${providerMessage}`
             : "RoofRay AI could not answer right now. Please try again.",
         },
-        { status: 502 }
+        { status }
       );
     }
 
