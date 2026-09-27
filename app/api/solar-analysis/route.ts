@@ -42,11 +42,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "lossPercent must be between 0 and 100." }, { status: 400 });
     }
 
-    const [pvgis, obstacles, roof] = await Promise.all([
+    // PVGIS is required for generation. Roof-footprint and mapped-obstacle
+    // services are enrichment only: if either one fails, the user's own roof
+    // area + PVGIS can still produce a real planning estimate.
+    const [pvgisResult, obstaclesResult, roofResult] = await Promise.allSettled([
       getPVGISAnalysis({ latitude, longitude, peakPowerKw, lossPercent }),
       getNearbyObstacleAnalysis(latitude, longitude, obstacleRadiusMeters),
       getRoofFootprint(latitude, longitude),
     ]);
+
+    if (pvgisResult.status === "rejected") {
+      throw pvgisResult.reason;
+    }
+
+    const pvgis = pvgisResult.value;
+    const obstacles =
+      obstaclesResult.status === "fulfilled"
+        ? obstaclesResult.value
+        : { obstacles: [], source: "unavailable" };
+
+    const roof =
+      roofResult.status === "fulfilled"
+        ? roofResult.value
+        : null;
 
     const sunCycle = buildCurrentSunCycle(latitude, longitude);
     const shadow = analyzeShadowTimeline(
