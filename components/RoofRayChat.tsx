@@ -498,7 +498,7 @@ function UserMessage({ message }: { message: ChatMessage }) {
   return (
     <div className="rr-msg-in group flex justify-end">
       <div className="relative max-w-[75%]">
-        <div className="rr-user-bubble rounded-2xl rounded-br-[6px] px-4 py-3 text-[14px] leading-relaxed text-slate-100">
+        <div className="rr-user-bubble rounded-2xl px-4 py-3 text-[14px] leading-relaxed text-slate-100">
           {message.content}<span className="rr-message-meta">✓✓</span>
         </div>
         <button
@@ -1231,7 +1231,7 @@ export default function RoofRayChat() {
         @keyframes rr-border-spin { to { --rr-border-angle: 360deg; } }
         .rr-chat-shell { --rr-bg:#080E1C; position:relative; isolation:isolate; background:var(--rr-bg); border:1px solid rgba(74,163,255,.34); }
         .rr-chat-shell::before { content:""; position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:inherit; padding:1px; background:conic-gradient(from var(--rr-border-angle), transparent 0 300deg, rgba(50,145,255,.12) 324deg, #52a9ff 345deg, transparent 360deg); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude; animation:rr-border-spin 7s linear infinite; filter:drop-shadow(0 0 7px rgba(64,158,255,.55)); }
-        .rr-chat-shell > * { position:relative; z-index:1; }
+        .rr-chat-shell > .rr-chat-main { position:relative; z-index:1; }
         .rr-grid-surface { background-color:#080E1C; background-image:linear-gradient(rgba(60,130,210,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(60,130,210,.055) 1px,transparent 1px); background-size:26px 26px; }
         .rr-grid-overlay { position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 50% 45%, transparent 0, rgba(8,14,28,.1) 48%, rgba(8,14,28,.46) 100%); }
         .rr-user-bubble { position:relative; background:linear-gradient(145deg,#173e73,#102b55); border:1px solid rgba(67,151,255,.58); box-shadow:0 8px 26px rgba(0,0,0,.18); }
@@ -1281,7 +1281,7 @@ export default function RoofRayChat() {
           onOpenSidebar={() => setSidebarOpen(true)}
         />
 
-        <div className={`flex min-h-0 h-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "w-full md:ml-[270px] md:w-[calc(100%-270px)]" : "ml-[56px] w-[calc(100%-56px)] md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
+        <div className={`rr-chat-main flex min-h-0 h-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "w-full md:ml-[270px] md:w-[calc(100%-270px)]" : "ml-[56px] w-[calc(100%-56px)] md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
           <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
             <div className="flex min-w-0 items-center gap-2">
               {/* Desktop compact rail owns the sidebar-open button when the sidebar is collapsed. */}
