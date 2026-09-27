@@ -989,7 +989,19 @@ export default function RoofRayChat() {
     setOpen(isFullScreenPage);
     setSolarContext(getStoredAnalysis());
     hydrateStoredLocation();
-    const handleOpen = () => { setOpen(true); if (!getStoredAnalysis()) void loadLocationAnalysis(); };
+
+    // On /chat the component is already open, so openChat() is not called.
+    // Explicitly request browser location here so Chrome/Edge can show the
+    // native permission prompt on first visit.
+    const hasStoredLocation = Boolean(sessionStorage.getItem("roofray_location"));
+    if (isFullScreenPage && !hasStoredLocation) {
+      void loadLocationAnalysis();
+    }
+
+    const handleOpen = () => {
+      setOpen(true);
+      if (!sessionStorage.getItem("roofray_location")) void loadLocationAnalysis();
+    };
     window.addEventListener("roofray:open-chat", handleOpen);
     if (sessionStorage.getItem("roofray_pending_chat") === "true") {
       sessionStorage.removeItem("roofray_pending_chat");
