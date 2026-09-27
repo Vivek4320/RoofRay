@@ -498,8 +498,8 @@ function UserMessage({ message }: { message: ChatMessage }) {
   return (
     <div className="rr-msg-in group flex justify-end">
       <div className="relative max-w-[75%]">
-        <div className="rounded-2xl rounded-br-[6px] bg-[#1A3A6B] px-4 py-3 text-[14px] leading-relaxed text-slate-100 ring-1 ring-white/[0.06]">
-          {message.content}
+        <div className="rr-user-bubble rounded-2xl rounded-br-[6px] px-4 py-3 text-[14px] leading-relaxed text-slate-100">
+          {message.content}<span className="rr-message-meta">✓✓</span>
         </div>
         <button
           type="button"
@@ -525,26 +525,20 @@ function UserMessage({ message }: { message: ChatMessage }) {
 }
 
 function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry: (content: string) => void }) {
+  const isShadingQuestion = /how much shading does your roof receive/i.test(message.content);
   return (
-    <div className="flex items-start">
-        <Image src={LOGO_SRC} alt="" width={100} height={100} className="h-[55px] w-[55px] object-contain " aria-hidden="true" />
-      <div className="min-w-0 max-w-[85%] pt-4 text-[14px] leading-relaxed text-slate-200">
+    <div className="rr-assistant-row rr-msg-in flex items-start">
+      <div className="rr-avatar-wrap shrink-0"><Image src={LOGO_SRC} alt="RoofRay" width={100} height={100} className="h-[44px] w-[44px] object-contain" /></div>
+      <div className="rr-assistant-card min-w-0 max-w-[85%] px-4 pb-4 pt-3 text-[14px] leading-relaxed text-slate-200">
         {message.isError ? (
-          <div>
-            <p className="text-slate-400">{message.content}</p>
-            {message.failedInput && (
-              <button
-                type="button"
-                onClick={() => onRetry(message.failedInput as string)}
-                className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 transition-all duration-200 hover:border-blue-400/30 hover:text-blue-300"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M3 12a9 9 0 1 1 3.2 6.9" /><path d="M3 4v5h5" /></svg>
-                Try again
-              </button>
-            )}
-          </div>
+          <div><p className="text-slate-400">{message.content}</p>{message.failedInput && <button type="button" onClick={() => onRetry(message.failedInput as string)} className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 hover:border-blue-400/30 hover:text-blue-300"><span aria-hidden="true">↻</span> Try again</button>}</div>
         ) : (
-          renderAssistantContent(message.content)
+          <>
+            {renderAssistantContent(message.content)}
+            {isShadingQuestion && <div className="rr-choice-row mt-4 grid grid-cols-3 gap-2.5">
+              {[["☼","No"],["◐","Partial"],["☁","Heavy"]].map(([icon,label]) => <button key={label} type="button" onClick={() => onRetry(label)} className="rr-choice-button"><span className="rr-choice-icon">{icon}</span><span>{label}</span></button>)}
+            </div>}
+          </>
         )}
       </div>
     </div>
@@ -1233,6 +1227,22 @@ export default function RoofRayChat() {
       <style>{`
         @keyframes rr-dot { 0%,80%,100%{opacity:.2;transform:scale(.85)} 40%{opacity:1;transform:scale(1)} }
         @keyframes rr-msg-in { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+                @property --rr-border-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+        @keyframes rr-border-spin { to { --rr-border-angle: 360deg; } }
+        .rr-chat-shell { --rr-bg:#080E1C; position:relative; isolation:isolate; background:var(--rr-bg); border:1px solid rgba(74,163,255,.34); }
+        .rr-chat-shell::before { content:""; position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:inherit; padding:1px; background:conic-gradient(from var(--rr-border-angle), transparent 0 300deg, rgba(50,145,255,.12) 324deg, #52a9ff 345deg, transparent 360deg); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude; animation:rr-border-spin 7s linear infinite; filter:drop-shadow(0 0 7px rgba(64,158,255,.55)); }
+        .rr-chat-shell > * { position:relative; z-index:1; }
+        .rr-grid-surface { background-color:#080E1C; background-image:linear-gradient(rgba(60,130,210,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(60,130,210,.055) 1px,transparent 1px); background-size:26px 26px; }
+        .rr-grid-overlay { position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 50% 45%, transparent 0, rgba(8,14,28,.1) 48%, rgba(8,14,28,.46) 100%); }
+        .rr-user-bubble { position:relative; background:linear-gradient(145deg,#173e73,#102b55); border:1px solid rgba(67,151,255,.58); box-shadow:0 8px 26px rgba(0,0,0,.18); }
+        .rr-message-meta { display:block; margin-top:6px; text-align:right; font-size:10px; color:rgba(125,190,255,.75); }
+        .rr-avatar-wrap { display:flex; align-items:center; justify-content:center; width:44px; height:44px; margin-right:8px; border:1px solid rgba(58,147,255,.34); border-radius:50%; background:rgba(7,17,32,.82); box-shadow:0 0 0 4px rgba(25,102,181,.05),0 0 16px rgba(48,140,255,.1); }
+        .rr-assistant-card { position:relative; border:1px solid rgba(56,137,231,.45); border-radius:14px; background:linear-gradient(145deg,rgba(13,29,50,.92),rgba(8,20,37,.9)); box-shadow:0 10px 28px rgba(0,0,0,.15); }
+        .rr-assistant-card::before { content:""; position:absolute; left:-1px; top:-1px; width:8px; height:8px; border-left:2px solid #48a0ff; border-top:2px solid #48a0ff; box-shadow:-2px -2px 9px rgba(55,157,255,.8); }
+        .rr-assistant-card::after { content:""; position:absolute; right:-1px; bottom:-1px; width:8px; height:8px; border-right:2px solid #48a0ff; border-bottom:2px solid #48a0ff; box-shadow:2px 2px 9px rgba(55,157,255,.75); }
+        .rr-choice-button { min-height:48px; display:flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(66,128,194,.34); border-radius:12px; background:rgba(12,29,50,.62); color:#cbd5e1; font-size:13px; font-weight:500; transition:all .18s ease; }
+        .rr-choice-button:hover { border-color:rgba(71,163,255,.85); background:rgba(28,73,126,.35); color:#fff; box-shadow:0 0 18px rgba(46,144,255,.12); transform:translateY(-1px); }
+        .rr-choice-icon { color:#74b9ff; font-size:19px; line-height:1; }
         .rr-dot { animation: rr-dot 1.1s ease-in-out infinite; }
         .rr-dot-2 { animation-delay: 160ms; }
         .rr-dot-3 { animation-delay: 320ms; }
@@ -1255,8 +1265,8 @@ export default function RoofRayChat() {
         onDrop={handleDrop}
         className={
           isFullScreenPage
-            ? "fixed inset-0 z-[80] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#080E1C] text-white"
-            : "fixed bottom-0 right-0 z-[80] flex h-[min(760px,100dvh)] w-full flex-col overflow-hidden border border-white/[0.07] bg-[#080E1C] text-white shadow-2xl shadow-black/60 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100dvh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl lg:bottom-7 lg:right-7"
+            ? "rr-chat-shell fixed inset-0 z-[80] flex h-[100dvh] w-screen flex-col overflow-hidden text-white"
+            : "rr-chat-shell fixed bottom-0 right-0 z-[80] flex h-[min(760px,100dvh)] w-full flex-col overflow-hidden text-white shadow-2xl shadow-black/60 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100dvh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl lg:bottom-7 lg:right-7"
         }
       >
         <ChatSidebar
@@ -1349,8 +1359,9 @@ export default function RoofRayChat() {
           role="log"
           aria-live="polite"
           aria-label="Conversation with RoofRay"
-          className="rr-scroll relative flex-1 overflow-y-auto overscroll-contain"
+          className="rr-scroll rr-grid-surface relative flex-1 overflow-y-auto overscroll-contain"
         >
+          <div className="rr-grid-overlay" aria-hidden="true" />
           <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
             {!hasStarted ? (
               <EmptyState />
