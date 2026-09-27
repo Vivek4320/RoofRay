@@ -1219,8 +1219,12 @@ export default function RoofRayChat() {
     setMessages(chat.messages || []);
     setHasStarted((chat.messages || []).length > 0);
     setRoofArea(null);
+    setRoofType(null);
     setMonthlyBill(null);
     setShading(null);
+    setConnectionType(null);
+    setOwnership(null);
+    setGoal(null);
     setAttachments([]);
     setFileError(null);
     setAutoScroll(true);
