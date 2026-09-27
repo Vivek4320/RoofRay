@@ -110,25 +110,28 @@ export async function POST(request: Request) {
     // rewrite or vary them. Location is captured automatically by the website.
     // Gemini is used only after the complete intake is collected.
     const fixedQuestions = {
+      name: "What is your name?",
       roofArea: "What is the area of your roof in square feet?",
       roofType: "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)",
       monthlyBill: "What is your average monthly electricity bill in ₹?",
-      shading: "How much shading does your roof receive?",
       connectionType: "What type of electricity connection do you have? (Residential, Commercial, or Other)",
       ownership: "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)",
       goal: "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)",
     };
 
+    const nameInput = userInputs.name;
     const roofAreaInput = userInputs.roofAreaSqFt;
     const roofTypeInput = userInputs.roofType;
     const monthlyBillInput = userInputs.monthlyBillInr;
-    const shadingInput = userInputs.shading;
     const connectionTypeInput = userInputs.connectionType;
     const ownershipInput = userInputs.ownership;
     const goalInput = userInputs.goal;
     const latestUserMessage = messages[messages.length - 1];
 
     if (latestUserMessage?.role === "user") {
+      if (nameInput === null || nameInput === undefined || String(nameInput).trim() === "") {
+        return NextResponse.json({ ok: true, message: fixedQuestions.name });
+      }
       if (roofAreaInput === null || roofAreaInput === undefined) {
         return NextResponse.json({ ok: true, message: fixedQuestions.roofArea });
       }
@@ -137,9 +140,6 @@ export async function POST(request: Request) {
       }
       if (monthlyBillInput === null || monthlyBillInput === undefined) {
         return NextResponse.json({ ok: true, message: fixedQuestions.monthlyBill });
-      }
-      if (shadingInput === null || shadingInput === undefined) {
-        return NextResponse.json({ ok: true, message: fixedQuestions.shading });
       }
       if (connectionTypeInput === null || connectionTypeInput === undefined) {
         return NextResponse.json({ ok: true, message: fixedQuestions.connectionType });
@@ -161,11 +161,12 @@ export async function POST(request: Request) {
       "Answer only what the user asked. Do not add unnecessary background, explanations, summaries, repeated information, or follow-up offers.",
       "For greetings or simple conversational messages, reply naturally in one short sentence.",
       "During input collection, ask for missing project inputs ONE AT A TIME, using one short question only.",
-      "Normal input order: roof area, roof type, monthly electricity bill, shading, connection type, property permission, then installation goal.",
-      "Browser location is captured automatically when available. Do not ask for latitude/longitude unless location capture failed.",
+      "Normal input order: name, roof area, roof type, monthly electricity bill, connection type, property permission, then installation goal.",
+      "Browser location is captured automatically when RoofRay opens. Use the supplied geometric shadow analysis to estimate shading automatically; never ask the user to self-report shading.",
+      "If location analysis or shadow data is unavailable, clearly say the shading estimate is unavailable instead of asking the user for shading.",
       "Do not invent measurements, irradiation, shadow data, panel counts, system size, generation, savings, payback, or coverage.",
       "Treat PVGIS, mapped roof, obstacle/shadow, and panel-placement values in the supplied context as the source of truth.",
-      "User-reported shading (No / Partial / Heavy) is separate from calculated geometric shadow analysis; do not present user-reported shading as a measured shadow result.",
+      "Use the supplied shadow analysis as an estimated shading result and clearly label it as an estimate.",
       "After all seven required inputs are collected, stop asking questions and give a concise feasibility summary using only the supplied RoofRay analysis and user inputs.",
       "After all inputs are complete, answer in 2-3 short sentences or at most 3 short bullets.",
       "Prefer concrete analysis values over generic conclusions. If a value is missing, say it is unavailable instead of guessing.",
