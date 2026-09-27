@@ -524,33 +524,86 @@ function UserMessage({ message }: { message: ChatMessage }) {
   );
 }
 
-function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry: (content: string) => void }) {
+function AssistantMessage({
+  message,
+  onRetry,
+}: {
+  message: ChatMessage;
+  onRetry: (content: string) => void;
+}) {
   const choiceGroups: Array<{ pattern: RegExp; options: string[] }> = [
-    { pattern: /what type of roof do you have/i, options: ["RCC/Concrete", "Metal Sheet", "Tile", "Other"] },
-    { pattern: /what type of electricity connection do you have/i, options: ["Residential", "Commercial", "Other"] },
-    { pattern: /do you own the property, or do you have permission/i, options: ["Own", "Permission", "No"] },
-    { pattern: /what is your main goal for installing solar/i, options: ["Reduce electricity bill", "Maximum generation", "Cost/subsidy", "Just check feasibility"] },
+    {
+      pattern: /what type of roof do you have/i,
+      options: ["RCC/Concrete", "Metal Sheet", "Tile", "Other"],
+    },
+    {
+      pattern: /what type of electricity connection do you have/i,
+      options: ["Residential", "Commercial", "Other"],
+    },
+    {
+      pattern: /do you own the property, or do you have permission/i,
+      options: ["Own", "Permission", "No"],
+    },
+    {
+      pattern: /what is your main goal for installing solar/i,
+      options: [
+        "Reduce electricity bill",
+        "Maximum generation",
+        "Cost/subsidy",
+        "Just check feasibility",
+      ],
+    },
   ];
-  const choiceGroup = choiceGroups.find(({ pattern }) => pattern.test(message.content));
+
+  const choiceGroup = choiceGroups.find(({ pattern }) =>
+    pattern.test(message.content),
+  );
 
   return (
     <div className="rr-assistant-row rr-msg-in flex items-start">
-      <div className="rr-avatar-wrap shrink-0"><Image src={LOGO_SRC} alt="RoofRay" width={100} height={100} className="h-[44px] w-[44px] object-contain" /></div>
+      <div className="rr-avatar-wrap shrink-0">
+        <Image
+          src={LOGO_SRC}
+          alt="RoofRay"
+          width={100}
+          height={100}
+          className="h-[44px] w-[44px] object-contain"
+        />
+      </div>
+
       <div className="rr-assistant-card min-w-0 max-w-[85%] px-4 pb-4 pt-3 text-[14px] leading-relaxed text-slate-200">
         {message.isError ? (
-          <div><p className="text-slate-400">{message.content}</p>{message.failedInput && <button type="button" onClick={() => onRetry(message.failedInput as string)} className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 hover:border-blue-400/30 hover:text-blue-300"><span aria-hidden="true">↻</span> Try again</button></div>
+          <div>
+            <p className="text-slate-400">{message.content}</p>
+            {message.failedInput ? (
+              <button
+                type="button"
+                onClick={() => onRetry(message.failedInput ?? "")}
+                className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 hover:border-blue-400/30 hover:text-blue-300"
+              >
+                <span aria-hidden="true">↻</span>
+                Try again
+              </button>
+            ) : null}
+          </div>
         ) : (
           <>
             {renderAssistantContent(message.content)}
-            {choiceGroup && (
+
+            {choiceGroup ? (
               <div className="rr-choice-row mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                 {choiceGroup.options.map((label) => (
-                  <button key={label} type="button" onClick={() => onRetry(label)} className="rr-choice-button">
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => onRetry(label)}
+                    className="rr-choice-button"
+                  >
                     <span>{label}</span>
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
           </>
         )}
       </div>
