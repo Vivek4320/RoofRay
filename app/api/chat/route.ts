@@ -239,7 +239,7 @@ export async function POST(request: Request) {
           },
           contents,
           generationConfig: {
-            maxOutputTokens: 240,
+            maxOutputTokens: 600,
           },
         }),
         cache: "no-store",
