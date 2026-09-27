@@ -1133,9 +1133,13 @@ export default function RoofRayChat() {
 
     const normalized = content.toLowerCase();
 
+    const isGreeting = /^(hi|hii|hello|hey|good morning|good afternoon|good evening)[!.\s]*$/i.test(content.trim());
+
     if (name === null) {
-      nextName = content.replace(/\s+/g, " ").trim().slice(0, 80);
-      if (nextName) setName(nextName);
+      if (!isGreeting) {
+        nextName = content.replace(/\s+/g, " ").trim().slice(0, 80);
+        if (nextName) setName(nextName);
+      }
     } else if (roofArea === null && number !== null && number > 0) {
       nextRoofArea = number;
       setRoofArea(number);
