@@ -527,9 +527,11 @@ function UserMessage({ message }: { message: ChatMessage }) {
 function AssistantMessage({
   message,
   onRetry,
+  onLocationPermission,
 }: {
   message: ChatMessage;
   onRetry: (content: string) => void;
+  onLocationPermission?: () => void;
 }) {
   const choiceGroups: Array<{ pattern: RegExp; options: string[] }> = [
     {
@@ -558,6 +560,7 @@ function AssistantMessage({
   const choiceGroup = choiceGroups.find(({ pattern }) =>
     pattern.test(message.content),
   );
+  const needsLocationPermission = /i need your location permission/i.test(message.content);
 
   return (
     <div className="rr-assistant-row rr-msg-in flex items-start">
@@ -589,6 +592,17 @@ function AssistantMessage({
         ) : (
           <>
             {renderAssistantContent(message.content)}
+
+            {needsLocationPermission ? (
+              <button
+                type="button"
+                onClick={onLocationPermission}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-2.5 text-[13px] font-semibold text-blue-300 transition hover:border-blue-400/50 hover:bg-blue-500/20 hover:text-blue-200"
+              >
+                <span aria-hidden="true">📍</span>
+                Allow Location
+              </button>
+            ) : null}
 
             {choiceGroup ? (
               <div className="rr-choice-row mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -1019,8 +1033,22 @@ export default function RoofRayChat() {
             setActiveChatId(latest.id);
             setMessages(latest.messages || []);
             setHasStarted((latest.messages || []).length > 0);
+          } else {
+            setMessages([{
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
+            }]);
+            setHasStarted(true);
           }
         }
+      } else {
+        setMessages([{
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
+        }]);
+        setHasStarted(true);
       }
     } catch { /* ignore malformed local history */ }
   }, []);
@@ -1295,7 +1323,11 @@ export default function RoofRayChat() {
   void openChat;
 
   function startNewChat() {
-    setMessages([]);
+    setMessages([{
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
+    }]);
     setName(null);
     setRoofArea(null);
     setRoofType(null);
@@ -1538,7 +1570,12 @@ export default function RoofRayChat() {
                   message.role === "user" ? (
                     <UserMessage key={message.id} message={message} />
                   ) : (
-                    <AssistantMessage key={message.id} message={message} onRetry={(t) => void sendMessage(t)} />
+                    <AssistantMessage
+                      key={message.id}
+                      message={message}
+                      onRetry={(t) => void sendMessage(t)}
+                      onLocationPermission={() => void loadLocationAnalysis()}
+                    />
                   )
                 )}
                 {loading && <ThinkingIndicator />}
