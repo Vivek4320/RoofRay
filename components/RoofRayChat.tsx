@@ -498,7 +498,7 @@ function UserMessage({ message }: { message: ChatMessage }) {
   return (
     <div className="rr-msg-in group flex justify-end">
       <div className="relative max-w-full">
-        <div className="rr-user-bubble inline-flex w-max max-w-full items-center whitespace-nowrap rounded-full px-4 py-2 text-[14px] leading-5 text-slate-100">
+        <div className="rr-user-bubble inline-block w-auto min-w-fit max-w-full rounded-full px-4 py-2 text-[14px] leading-5 text-slate-100">
           {message.content}<span className="rr-message-meta">✓✓</span>
         </div>
         <button
@@ -1234,7 +1234,7 @@ export default function RoofRayChat() {
         .rr-chat-shell > .rr-chat-main { position:relative; z-index:1; }
         .rr-grid-surface { background-color:#080E1C; background-image:linear-gradient(rgba(60,130,210,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(60,130,210,.055) 1px,transparent 1px); background-size:26px 26px; }
         .rr-grid-overlay { position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 50% 45%, transparent 0, rgba(8,14,28,.1) 48%, rgba(8,14,28,.46) 100%); }
-        .rr-user-bubble { position:relative; background:linear-gradient(145deg,#173e73,#102b55); border:1px solid rgba(67,151,255,.58); box-shadow:0 8px 26px rgba(0,0,0,.18); }
+        .rr-user-bubble { position:relative; width:auto; min-height:0; height:auto; aspect-ratio:auto; background:linear-gradient(145deg,#173e73,#102b55); border:1px solid rgba(67,151,255,.58); box-shadow:0 8px 26px rgba(0,0,0,.18); }
         .rr-message-meta { display:inline-block; margin-left:7px; font-size:10px; line-height:1; color:rgba(125,190,255,.75); vertical-align:middle; }
         .rr-avatar-wrap { display:flex; align-items:center; justify-content:center; width:44px; height:44px; margin-right:8px; border:1px solid rgba(58,147,255,.34); border-radius:50%; background:rgba(7,17,32,.82); box-shadow:0 0 0 4px rgba(25,102,181,.05),0 0 16px rgba(48,140,255,.1); }
         .rr-assistant-card { position:relative; border:1px solid rgba(56,137,231,.45); border-radius:14px; background:linear-gradient(145deg,rgba(13,29,50,.92),rgba(8,20,37,.9)); box-shadow:0 10px 28px rgba(0,0,0,.15); }
