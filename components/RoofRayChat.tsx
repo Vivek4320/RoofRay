@@ -1056,6 +1056,22 @@ export default function RoofRayChat() {
       setLocationLoading(false);
       return;
     }
+    // Check the browser permission state first. If it is still "prompt",
+    // getCurrentPosition below will open the native location permission dialog.
+    // If it is "denied", browsers will not show the dialog again until the
+    // user re-enables Location for this site in browser settings.
+    try {
+      const permissionApi = navigator.permissions?.query
+        ? await navigator.permissions.query({ name: "geolocation" as PermissionName })
+        : null;
+      if (permissionApi?.state === "denied") {
+        setLocationStatus("denied");
+        setLocationLoading(false);
+        return;
+      }
+    } catch {
+      // Continue with getCurrentPosition when Permissions API is unavailable.
+    }
     setLocationLoading(true);
     setLocationStatus("detecting");
 
@@ -1535,6 +1551,24 @@ export default function RoofRayChat() {
             onClick={() => { setAutoScroll(true); endRef.current?.scrollIntoView({ behavior: "smooth" }); }}
           />
         </div>
+
+        {(locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
+          <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-slate-200">📍 RoofRay needs your location</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Allow location access to calculate PVGIS generation, nearby-obstacle shading, panel count and system size.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadLocationAnalysis()}
+              className="shrink-0 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[11px] font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
+            >
+              {locationStatus === "denied" ? "Enable Location" : "Allow Location"}
+            </button>
+          </div>
+        )}
 
         <ChatComposer
           input={input}
