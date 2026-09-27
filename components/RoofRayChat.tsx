@@ -525,7 +525,15 @@ function UserMessage({ message }: { message: ChatMessage }) {
 }
 
 function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry: (content: string) => void }) {
-  const isShadingQuestion = /how much shading does your roof receive/i.test(message.content);
+  const choiceGroups: Array<{ pattern: RegExp; options: string[] }> = [
+    { pattern: /what type of roof do you have/i, options: ["RCC/Concrete", "Metal Sheet", "Tile", "Other"] },
+    { pattern: /how much shading does your roof receive/i, options: ["No", "Partial", "Heavy"] },
+    { pattern: /what type of electricity connection do you have/i, options: ["Residential", "Commercial", "Other"] },
+    { pattern: /do you own the property, or do you have permission/i, options: ["Own", "Permission", "No"] },
+    { pattern: /what is your main goal for installing solar/i, options: ["Reduce electricity bill", "Maximum generation", "Cost/subsidy", "Just check feasibility"] },
+  ];
+  const choiceGroup = choiceGroups.find(({ pattern }) => pattern.test(message.content));
+
   return (
     <div className="rr-assistant-row rr-msg-in flex items-start">
       <div className="rr-avatar-wrap shrink-0"><Image src={LOGO_SRC} alt="RoofRay" width={100} height={100} className="h-[44px] w-[44px] object-contain" /></div>
@@ -535,9 +543,15 @@ function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry:
         ) : (
           <>
             {renderAssistantContent(message.content)}
-            {isShadingQuestion && <div className="rr-choice-row mt-4 grid grid-cols-3 gap-2.5">
-              {[["☼","No"],["◐","Partial"],["☁","Heavy"]].map(([icon,label]) => <button key={label} type="button" onClick={() => onRetry(label)} className="rr-choice-button"><span className="rr-choice-icon">{icon}</span><span>{label}</span></button>)}
-            </div>}
+            {choiceGroup && (
+              <div className="rr-choice-row mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                {choiceGroup.options.map((label) => (
+                  <button key={label} type="button" onClick={() => onRetry(label)} className="rr-choice-button">
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -818,8 +832,12 @@ export default function RoofRayChat() {
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
+  const [roofType, setRoofType] = useState<string | null>(null);
   const [monthlyBill, setMonthlyBill] = useState<number | null>(null);
   const [shading, setShading] = useState<string | null>(null);
+  const [connectionType, setConnectionType] = useState<string | null>(null);
+  const [ownership, setOwnership] = useState<string | null>(null);
+  const [goal, setGoal] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
@@ -1053,24 +1071,51 @@ export default function RoofRayChat() {
 
     const number = readNumber(content.replace(/[^0-9.]/g, ""));
     let nextRoofArea = roofArea;
+    let nextRoofType = roofType;
     let nextMonthlyBill = monthlyBill;
     let nextShading = shading;
+    let nextConnectionType = connectionType;
+    let nextOwnership = ownership;
+    let nextGoal = goal;
     let currentSolarContext = solarContext;
+
+    const normalized = content.toLowerCase();
 
     if (roofArea === null && number !== null && number > 0) {
       nextRoofArea = number;
       setRoofArea(number);
       const refreshedAnalysis = await refreshAnalysisWithRoofArea(number);
       if (refreshedAnalysis) currentSolarContext = refreshedAnalysis;
-    } else if (roofArea !== null && monthlyBill === null && number !== null && number > 0) {
+    } else if (roofArea !== null && roofType === null) {
+      if (normalized.includes("rcc") || normalized.includes("concrete")) nextRoofType = "RCC/Concrete";
+      else if (normalized.includes("metal") || normalized.includes("sheet")) nextRoofType = "Metal Sheet";
+      else if (normalized.includes("tile")) nextRoofType = "Tile";
+      else if (normalized.includes("other")) nextRoofType = "Other";
+      if (nextRoofType) setRoofType(nextRoofType);
+    } else if (roofArea !== null && roofType !== null && monthlyBill === null && number !== null && number > 0) {
       nextMonthlyBill = number;
       setMonthlyBill(number);
-    } else if (roofArea !== null && monthlyBill !== null && shading === null) {
-      const normalized = content.toLowerCase();
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && shading === null) {
       if (["no", "none", "no shading"].includes(normalized)) nextShading = "No";
       else if (normalized.includes("partial")) nextShading = "Partial";
       else if (normalized.includes("heavy")) nextShading = "Heavy";
       if (nextShading) setShading(nextShading);
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && shading !== null && connectionType === null) {
+      if (normalized.includes("residential") || normalized.includes("home") || normalized.includes("house")) nextConnectionType = "Residential";
+      else if (normalized.includes("commercial") || normalized.includes("business") || normalized.includes("shop")) nextConnectionType = "Commercial";
+      else if (normalized.includes("other")) nextConnectionType = "Other";
+      if (nextConnectionType) setConnectionType(nextConnectionType);
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && shading !== null && connectionType !== null && ownership === null) {
+      if (normalized.includes("own") || normalized.includes("owner")) nextOwnership = "Own";
+      else if (normalized.includes("permission") || normalized.includes("yes")) nextOwnership = "Permission";
+      else if (normalized === "no" || normalized.includes("don't") || normalized.includes("do not")) nextOwnership = "No";
+      if (nextOwnership) setOwnership(nextOwnership);
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && shading !== null && connectionType !== null && ownership !== null && goal === null) {
+      if (normalized.includes("bill") || normalized.includes("reduce")) nextGoal = "Reduce electricity bill";
+      else if (normalized.includes("maximum") || normalized.includes("max") || normalized.includes("generation")) nextGoal = "Maximum generation";
+      else if (normalized.includes("cost") || normalized.includes("subsidy")) nextGoal = "Cost/subsidy";
+      else if (normalized.includes("feasibility") || normalized.includes("check")) nextGoal = "Just check feasibility";
+      if (nextGoal) setGoal(nextGoal);
     }
 
     const validToken = await getValidToken();
@@ -1090,8 +1135,12 @@ export default function RoofRayChat() {
           ...(currentSolarContext || {}),
           userInputs: {
             roofAreaSqFt: nextRoofArea,
+            roofType: nextRoofType,
             monthlyBillInr: nextMonthlyBill,
             shading: nextShading,
+            connectionType: nextConnectionType,
+            ownership: nextOwnership,
+            goal: nextGoal,
           },
         },
       };
@@ -1146,8 +1195,12 @@ export default function RoofRayChat() {
   function startNewChat() {
     setMessages([]);
     setRoofArea(null);
+    setRoofType(null);
     setMonthlyBill(null);
     setShading(null);
+    setConnectionType(null);
+    setOwnership(null);
+    setGoal(null);
     setHasStarted(false);
     setAutoScroll(true);
     setAttachments([]);
@@ -1216,8 +1269,12 @@ export default function RoofRayChat() {
   const visibleMessages = messages.filter((m) => m.content.trim());
   const composerPlaceholder =
     roofArea === null ? "e.g. 1200 sq ft"
+    : roofType === null ? "RCC/Concrete, Metal Sheet, Tile, or Other"
     : monthlyBill === null ? "e.g. ₹2500 per month"
     : shading === null ? "No, Partial, or Heavy"
+    : connectionType === null ? "Residential, Commercial, or Other"
+    : ownership === null ? "Own, Permission, or No"
+    : goal === null ? "Reduce bill, Maximum generation, Cost/subsidy, or Feasibility"
     : "Ask RoofRay anything...";
 
   if (!open) return null;
