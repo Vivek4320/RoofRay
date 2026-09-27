@@ -54,14 +54,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = (
+      process.env.GEMINI_API_KEY ||
+      process.env.Gemini_KEY ||
+      process.env.GOOGLE_API_KEY
+    )?.trim();
 
     if (!apiKey) {
       return NextResponse.json(
         {
           ok: false,
           error:
-            "RoofRay AI is not configured yet. Add GEMINI_API_KEY on the server.",
+            "RoofRay AI is not configured yet. Add GEMINI_API_KEY (or Gemini_KEY) to the server environment.",
         },
         { status: 503 }
       );
@@ -133,21 +137,22 @@ export async function POST(request: Request) {
     ].join("\n");
 
     // Keep the model configurable, but default to a currently supported
-    // production Gemini model so an old model ID cannot silently break chat.
+    // Gemini model so an outdated model ID cannot silently break chat.
     const configuredModel = process.env.ROOFRAY_GEMINI_MODEL?.trim();
     const model =
       configuredModel && configuredModel !== "your_supported_model_id"
         ? configuredModel
-        : "gemini-3.5-flash";
+        : "gemini-3.8-flash";
 
     // Gemini conversation history must begin with a user turn and must
     // alternate user/model turns. Normalize locally saved chats before sending.
-    const contents = messages
-      .map((message) => ({
-        role: message.role === "assistant" ? "model" : "user",
-        parts: [{ text: message.content }],
-      }))
-      .reduce((turns, turn) => {
+    const contents: Array<{ role: "user" | "model"; parts: [{ text: string }] }> = messages.reduce(
+      (turns, message) => {
+        const turn = {
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: message.content }] as [{ text: string }],
+        } as { role: "user" | "model"; parts: [{ text: string }] };
+
         if (turns.length === 0 && turn.role !== "user") return turns;
         const previous = turns[turns.length - 1];
         if (previous?.role === turn.role) {
@@ -156,7 +161,9 @@ export async function POST(request: Request) {
         }
         turns.push(turn);
         return turns;
-      }, [] as Array<{ role: "user" | "model"; parts: [{ text: string }] }>);
+      },
+      [] as Array<{ role: "user" | "model"; parts: [{ text: string }] }>
+    );
 
     if (!contents.length) {
       return NextResponse.json(

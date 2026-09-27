@@ -19,12 +19,12 @@ import {
 import { saveSession, supabaseAuth } from '@/lib/supabase';
 
 const METRICS = [
-  { label: 'System size', value: '9.1 kW', sub: '26 panels', icon: '⚡' },
-  { label: 'Est. generation', value: '38.6 units', sub: 'per day, avg.', icon: '☀️' },
-  { label: 'Investment', value: '₹6,18,000', sub: 'before subsidy', icon: '💰' },
-  { label: 'Monthly savings', value: '₹2,180', sub: 'at current tariff', icon: '📉' },
-  { label: 'Payback period', value: '4.2 yrs', sub: 'vs 25-yr panel life', icon: '⏱️' },
-  { label: 'Sun-hours', value: '5.4 / day', sub: 'long-term avg, this point', icon: '🌤️' },
+  {label: 'System size', value: '0.kW', sub: '0 panels', icon: '⚡' },
+  { label: 'Est. generation', value: '0 units', sub: 'per day, avg.', icon: '☀️' },
+  { label: 'Investment', value: '₹0', sub: 'before subsidy', icon: '💰' },
+  { label: 'Monthly savings', value: '₹0', sub: 'at current tariff', icon: '📉' },
+  { label: 'Payback period', value: '0 yrs', sub: 'vs 25-yr panel life', icon: '⏱️' },
+  { label: 'Sun-hours', value: '0 / day', sub: 'long-term avg, this point', icon: '🌤️' },
 ];
 
 export default function ReportPreview() {
