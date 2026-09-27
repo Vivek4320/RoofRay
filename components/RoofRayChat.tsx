@@ -882,6 +882,8 @@ export default function RoofRayChat() {
   const [locationStatus, setLocationStatus] = useState<"idle" | "detecting" | "ready" | "warning" | "denied" | "unavailable">("idle");
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const locationMessageShownRef = useRef(false);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
   const [name, setName] = useState<string | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
@@ -925,6 +927,17 @@ export default function RoofRayChat() {
   void locationLoading;
   void locationStatus;
   void locationAccuracy;
+  void locationLabel;
+
+  async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
+    try {
+      const response = await fetch('/api/reverse-geocode?lat=' + encodeURIComponent(latitude) + '&lon=' + encodeURIComponent(longitude), { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      return response.ok && typeof data.displayName === 'string' ? data.displayName : null;
+    } catch {
+      return null;
+    }
+  }
 
   function hydrateStoredLocation() {
     try {
@@ -934,7 +947,10 @@ export default function RoofRayChat() {
       const latitude = readNumber(value.latitude);
       const longitude = readNumber(value.longitude);
       const accuracy = readNumber(value.accuracy);
-      if (latitude !== null && longitude !== null) setLocationCoords({ latitude, longitude });
+      if (latitude !== null && longitude !== null) {
+        setLocationCoords({ latitude, longitude });
+        void reverseGeocode(latitude, longitude).then((label) => { if (label) setLocationLabel(label); });
+      }
       if (accuracy !== null) setLocationAccuracy(accuracy);
       if (latitude !== null && longitude !== null) setLocationStatus(accuracy !== null && accuracy > 100 ? "warning" : "ready");
     } catch { }
@@ -1052,6 +1068,13 @@ export default function RoofRayChat() {
         setLocationAccuracy(accuracy);
         setLocationStatus(accuracy > 100 ? "warning" : "ready");
         sessionStorage.setItem("roofray_location", JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }));
+        const resolvedLocation = await reverseGeocode(latitude, longitude);
+        if (resolvedLocation) setLocationLabel(resolvedLocation);
+        if (!locationMessageShownRef.current) {
+          locationMessageShownRef.current = true;
+          setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: resolvedLocation ? "📍 Location detected: " + resolvedLocation : "📍 Location detected: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) }]);
+          setHasStarted(true);
+        }
         try {
           const response = await fetch("/api/solar-analysis", {
             method: "POST",
@@ -1257,6 +1280,8 @@ export default function RoofRayChat() {
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
+    setLocationLabel(null);
+    locationMessageShownRef.current = false;
     setHasStarted(false);
     setAutoScroll(true);
     setAttachments([]);
@@ -1281,6 +1306,8 @@ export default function RoofRayChat() {
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
+    setLocationLabel(null);
+    locationMessageShownRef.current = false;
     setAttachments([]);
     setFileError(null);
     setAutoScroll(true);
