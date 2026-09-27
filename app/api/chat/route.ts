@@ -251,11 +251,20 @@ export async function POST(request: Request) {
     let response = await requestGemini(model);
     let data = await response.json().catch(() => ({}));
 
-    // If the primary model hits a temporary/free-tier quota, try a separate
-    // stable Flash model before returning the quota error to the UI.
-    if (response.status === 429 && model !== "gemini-3.6-flash") {
-      console.warn("[RoofRay] Primary Gemini model quota reached; trying fallback model.");
-      response = await requestGemini("gemini-3.6-flash");
+    // 429 = quota/rate limit and 503 = temporary model capacity.
+    // Try other supported Flash models for these recoverable Gemini failures.
+    const recoverableStatus = response.status === 429 || response.status === 503;
+    const fallbackModels = ["gemini-3.7-flash", "gemini-3.6-flash"].filter(
+      (fallbackModel) => fallbackModel !== model,
+    );
+
+    for (const fallbackModel of fallbackModels) {
+      if (!recoverableStatus || response.ok) break;
+
+      console.warn(
+        `[RoofRay] Gemini ${model} returned ${response.status}; trying ${fallbackModel}.`,
+      );
+      response = await requestGemini(fallbackModel);
       data = await response.json().catch(() => ({}));
     }
 
@@ -267,14 +276,17 @@ export async function POST(request: Request) {
           ? data.error.message
           : "";
 
-      const status = response.status === 429 ? 429 : 502;
+      const status =
+        response.status === 429 || response.status === 503
+          ? response.status
+          : 502;
 
       return NextResponse.json(
         {
           ok: false,
           error: providerMessage
             ? `RoofRay AI could not answer right now: ${providerMessage}`
-            : "RoofRay AI could not answer right now. Please try again.",
+            : `RoofRay AI request failed (HTTP ${response.status}). Please try again.`,
         },
         { status }
       );
