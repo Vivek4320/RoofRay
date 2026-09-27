@@ -1244,16 +1244,22 @@ export default function RoofRayChat() {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Unable to get a response.");
+        console.error("[RoofRay] Chat request failed:", response.status, data);
+        throw new Error(typeof data.error === "string" ? data.error : "Unable to get a response.");
+      }
+      if (typeof data.message !== "string" || !data.message.trim()) {
+        throw new Error("RoofRay returned an empty response.");
       }
       setMessages((current) => [
         ...current,
         { id: crypto.randomUUID(), role: "assistant", content: data.message },
       ]);
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("[RoofRay] Chat UI error:", error);
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: "RoofRay couldn't complete that request. Please try again.", isError: true, failedInput: content },
+        { id: crypto.randomUUID(), role: "assistant", content: "RoofRay couldn't complete that request. " + errorMessage, isError: true, failedInput: content },
       ]);
     } finally { setLoading(false); }
   }
