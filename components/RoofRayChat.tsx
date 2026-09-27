@@ -1072,18 +1072,9 @@ export default function RoofRayChat() {
     // getCurrentPosition below will open the native location permission dialog.
     // If it is "denied", browsers will not show the dialog again until the
     // user re-enables Location for this site in browser settings.
-    try {
-      const permissionApi = navigator.permissions?.query
-        ? await navigator.permissions.query({ name: "geolocation" as PermissionName })
-        : null;
-      if (permissionApi?.state === "denied") {
-        setLocationStatus("denied");
-        setLocationLoading(false);
-        return;
-      }
-    } catch {
-      // Continue with getCurrentPosition when Permissions API is unavailable.
-    }
+    // Do not gate the request behind the Permissions API. Calling
+    // getCurrentPosition() directly is the browser-native way to trigger the
+    // permission prompt when the current state is "ask/prompt".
     setLocationLoading(true);
     setLocationStatus("detecting");
 
@@ -1123,6 +1114,10 @@ export default function RoofRayChat() {
       },
       (error) => {
         setLocationLoading(false);
+        console.warn("[RoofRay] Geolocation failed:", {
+          code: error.code,
+          message: error.message,
+        });
         if (error.code === 1) setLocationStatus("denied");
         else setLocationStatus("unavailable");
       },
@@ -1564,7 +1559,7 @@ export default function RoofRayChat() {
           />
         </div>
 
-        {(locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
+        {(locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
           <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-slate-200">📍 RoofRay needs your location</p>
