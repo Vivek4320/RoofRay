@@ -99,6 +99,38 @@ export async function POST(request: Request) {
     const solarContext = body.solarContext
       ? JSON.stringify(body.solarContext).slice(0, 50000)
       : "No live solar analysis is available yet.";
+    const solarContextObject = body.solarContext && typeof body.solarContext === "object"
+      ? body.solarContext
+      : {};
+    const userInputs = (solarContextObject.userInputs && typeof solarContextObject.userInputs === "object")
+      ? solarContextObject.userInputs as Record<string, unknown>
+      : {};
+
+    // Keep the project intake questions fixed so Gemini cannot rewrite or vary them.
+    // The actual solar analysis remains Gemini-powered after all three inputs are collected.
+    const fixedQuestions = {
+      roofArea: "What is the area of your roof in square feet?",
+      monthlyBill: "What is your average monthly electricity bill in ₹?",
+      shading: "How much shading does your roof receive?",
+    };
+
+    const roofAreaInput = userInputs.roofAreaSqFt;
+    const monthlyBillInput = userInputs.monthlyBillInr;
+    const shadingInput = userInputs.shading;
+    const latestUserMessage = messages[messages.length - 1];
+
+    if (latestUserMessage?.role === "user") {
+      if (roofAreaInput === null || roofAreaInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.roofArea });
+      }
+      if (monthlyBillInput === null || monthlyBillInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.monthlyBill });
+      }
+      if (shadingInput === null || shadingInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.shading });
+      }
+    }
+
 
     const systemPrompt = [
       "You are RoofRay, the AI solar feasibility assistant inside the RoofRay website.",
