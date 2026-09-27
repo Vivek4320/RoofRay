@@ -527,7 +527,6 @@ function UserMessage({ message }: { message: ChatMessage }) {
 function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry: (content: string) => void }) {
   const choiceGroups: Array<{ pattern: RegExp; options: string[] }> = [
     { pattern: /what type of roof do you have/i, options: ["RCC/Concrete", "Metal Sheet", "Tile", "Other"] },
-    { pattern: /how much shading does your roof receive/i, options: ["No", "Partial", "Heavy"] },
     { pattern: /what type of electricity connection do you have/i, options: ["Residential", "Commercial", "Other"] },
     { pattern: /do you own the property, or do you have permission/i, options: ["Own", "Permission", "No"] },
     { pattern: /what is your main goal for installing solar/i, options: ["Reduce electricity bill", "Maximum generation", "Cost/subsidy", "Just check feasibility"] },
@@ -539,7 +538,7 @@ function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry:
       <div className="rr-avatar-wrap shrink-0"><Image src={LOGO_SRC} alt="RoofRay" width={100} height={100} className="h-[44px] w-[44px] object-contain" /></div>
       <div className="rr-assistant-card min-w-0 max-w-[85%] px-4 pb-4 pt-3 text-[14px] leading-relaxed text-slate-200">
         {message.isError ? (
-          <div><p className="text-slate-400">{message.content}</p>{message.failedInput && <button type="button" onClick={() => onRetry(message.failedInput as string)} className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 hover:border-blue-400/30 hover:text-blue-300"><span aria-hidden="true">↻</span> Try again</button>}</div>
+          <div><p className="text-slate-400">{message.content}</p>{message.failedInput && <button type="button" onClick={() => onRetry(message.failedInput as string)} className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 hover:border-blue-400/30 hover:text-blue-300"><span aria-hidden="true">↻</span> Try again</button></div>
         ) : (
           <>
             {renderAssistantContent(message.content)}
@@ -831,10 +830,10 @@ export default function RoofRayChat() {
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
+  const [name, setName] = useState<string | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
   const [roofType, setRoofType] = useState<string | null>(null);
   const [monthlyBill, setMonthlyBill] = useState<number | null>(null);
-  const [shading, setShading] = useState<string | null>(null);
   const [connectionType, setConnectionType] = useState<string | null>(null);
   const [ownership, setOwnership] = useState<string | null>(null);
   const [goal, setGoal] = useState<string | null>(null);
@@ -1070,10 +1069,10 @@ export default function RoofRayChat() {
     setLoading(true);
 
     const number = readNumber(content.replace(/[^0-9.]/g, ""));
+    let nextName = name;
     let nextRoofArea = roofArea;
     let nextRoofType = roofType;
     let nextMonthlyBill = monthlyBill;
-    let nextShading = shading;
     let nextConnectionType = connectionType;
     let nextOwnership = ownership;
     let nextGoal = goal;
@@ -1081,7 +1080,10 @@ export default function RoofRayChat() {
 
     const normalized = content.toLowerCase();
 
-    if (roofArea === null && number !== null && number > 0) {
+    if (name === null) {
+      nextName = content.replace(/\s+/g, " ").trim().slice(0, 80);
+      if (nextName) setName(nextName);
+    } else if (roofArea === null && number !== null && number > 0) {
       nextRoofArea = number;
       setRoofArea(number);
       const refreshedAnalysis = await refreshAnalysisWithRoofArea(number);
@@ -1095,22 +1097,17 @@ export default function RoofRayChat() {
     } else if (roofArea !== null && roofType !== null && monthlyBill === null && number !== null && number > 0) {
       nextMonthlyBill = number;
       setMonthlyBill(number);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && shading === null) {
-      if (["no", "none", "no shading"].includes(normalized)) nextShading = "No";
-      else if (normalized.includes("partial")) nextShading = "Partial";
-      else if (normalized.includes("heavy")) nextShading = "Heavy";
-      if (nextShading) setShading(nextShading);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && shading !== null && connectionType === null) {
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType === null) {
       if (normalized.includes("residential") || normalized.includes("home") || normalized.includes("house")) nextConnectionType = "Residential";
       else if (normalized.includes("commercial") || normalized.includes("business") || normalized.includes("shop")) nextConnectionType = "Commercial";
       else if (normalized.includes("other")) nextConnectionType = "Other";
       if (nextConnectionType) setConnectionType(nextConnectionType);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && shading !== null && connectionType !== null && ownership === null) {
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership === null) {
       if (normalized.includes("own") || normalized.includes("owner")) nextOwnership = "Own";
       else if (normalized.includes("permission") || normalized.includes("yes")) nextOwnership = "Permission";
       else if (normalized === "no" || normalized.includes("don't") || normalized.includes("do not")) nextOwnership = "No";
       if (nextOwnership) setOwnership(nextOwnership);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && shading !== null && connectionType !== null && ownership !== null && goal === null) {
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership !== null && goal === null) {
       if (normalized.includes("bill") || normalized.includes("reduce")) nextGoal = "Reduce electricity bill";
       else if (normalized.includes("maximum") || normalized.includes("max") || normalized.includes("generation")) nextGoal = "Maximum generation";
       else if (normalized.includes("cost") || normalized.includes("subsidy")) nextGoal = "Cost/subsidy";
@@ -1134,10 +1131,10 @@ export default function RoofRayChat() {
         solarContext: {
           ...(currentSolarContext || {}),
           userInputs: {
+            name: nextName,
             roofAreaSqFt: nextRoofArea,
             roofType: nextRoofType,
             monthlyBillInr: nextMonthlyBill,
-            shading: nextShading,
             connectionType: nextConnectionType,
             ownership: nextOwnership,
             goal: nextGoal,
@@ -1188,16 +1185,18 @@ export default function RoofRayChat() {
       return;
     }
     setOpen(true);
-    if (!solarContext) void loadLocationAnalysis();
+    // Ask for browser location as soon as the user opens RoofRay. If permission
+    // was already granted, the browser returns it silently.
+    void loadLocationAnalysis();
   }
   void openChat;
 
   function startNewChat() {
     setMessages([]);
+    setName(null);
     setRoofArea(null);
     setRoofType(null);
     setMonthlyBill(null);
-    setShading(null);
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
@@ -1218,10 +1217,10 @@ export default function RoofRayChat() {
     setActiveChatId(id);
     setMessages(chat.messages || []);
     setHasStarted((chat.messages || []).length > 0);
+    setName(null);
     setRoofArea(null);
     setRoofType(null);
     setMonthlyBill(null);
-    setShading(null);
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
@@ -1272,10 +1271,10 @@ export default function RoofRayChat() {
 
   const visibleMessages = messages.filter((m) => m.content.trim());
   const composerPlaceholder =
-    roofArea === null ? "e.g. 1200 sq ft"
+    name === null ? "Enter your name"
+    : roofArea === null ? "e.g. 1200 sq ft"
     : roofType === null ? "RCC/Concrete, Metal Sheet, Tile, or Other"
     : monthlyBill === null ? "e.g. ₹2500 per month"
-    : shading === null ? "No, Partial, or Heavy"
     : connectionType === null ? "Residential, Commercial, or Other"
     : ownership === null ? "Own, Permission, or No"
     : goal === null ? "Reduce bill, Maximum generation, Cost/subsidy, or Feasibility"
