@@ -990,17 +990,11 @@ export default function RoofRayChat() {
     setSolarContext(getStoredAnalysis());
     hydrateStoredLocation();
 
-    // On /chat the component is already open, so openChat() is not called.
-    // Explicitly request browser location here so Chrome/Edge can show the
-    // native permission prompt on first visit.
-    const hasStoredLocation = Boolean(sessionStorage.getItem("roofray_location"));
-    if (isFullScreenPage && !hasStoredLocation) {
-      void loadLocationAnalysis();
-    }
-
+    // Do not request geolocation automatically on page load. Browsers may
+    // suppress permission prompts unless the request follows a user gesture.
+    // The visible "Allow Location" button below calls loadLocationAnalysis().
     const handleOpen = () => {
       setOpen(true);
-      if (!sessionStorage.getItem("roofray_location")) void loadLocationAnalysis();
     };
     window.addEventListener("roofray:open-chat", handleOpen);
     if (sessionStorage.getItem("roofray_pending_chat") === "true") {
@@ -1562,9 +1556,9 @@ export default function RoofRayChat() {
         {(locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
           <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
             <div className="min-w-0">
-              <p className="text-[12px] font-medium text-slate-200">📍 RoofRay needs your location</p>
+              <p className="text-[12px] font-semibold text-slate-100">📍 I need your location permission</p>
               <p className="mt-0.5 text-[11px] text-slate-500">
-                Allow location access to calculate PVGIS generation, nearby-obstacle shading, panel count and system size.
+                Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.
               </p>
             </div>
             <button
