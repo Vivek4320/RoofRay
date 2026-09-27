@@ -497,8 +497,8 @@ function UserMessage({ message }: { message: ChatMessage }) {
 
   return (
     <div className="rr-msg-in group flex justify-end">
-      <div className="relative max-w-[82%]">
-        <div className="rr-user-bubble inline-block w-fit max-w-[78%] rounded-full px-4 py-2 text-[14px] leading-5 text-slate-100">
+      <div className="relative max-w-full">
+        <div className="rr-user-bubble inline-flex w-max max-w-full items-center whitespace-nowrap rounded-full px-4 py-2 text-[14px] leading-5 text-slate-100">
           {message.content}<span className="rr-message-meta">✓✓</span>
         </div>
         <button
