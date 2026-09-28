@@ -1063,11 +1063,11 @@ export default function RoofRayChat() {
     setAutoScroll(distanceFromBottom < AUTO_SCROLL_THRESHOLD);
   }
 
-  async function loadLocationAnalysis() {
+  async function loadLocationAnalysis(): Promise<boolean> {
     if (!navigator.geolocation) {
       setLocationStatus("unavailable");
       setLocationLoading(false);
-      return;
+      return false;
     }
     // Check the browser permission state first. If it is still "prompt",
     // getCurrentPosition below will open the native location permission dialog.
@@ -1079,51 +1079,57 @@ export default function RoofRayChat() {
     setLocationLoading(true);
     setLocationStatus("detecting");
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-        const accuracy = position.coords.accuracy;
-        setLocationCoords({ latitude, longitude });
-        setLocationAccuracy(accuracy);
-        setLocationStatus(accuracy > 100 ? "warning" : "ready");
-        sessionStorage.setItem("roofray_location", JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }));
-        const resolvedLocation = await reverseGeocode(latitude, longitude);
-        if (resolvedLocation) setLocationLabel(resolvedLocation);
-        if (!locationMessageShownRef.current) {
-          locationMessageShownRef.current = true;
-          setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: resolvedLocation ? "📍 Location detected: " + resolvedLocation : "📍 Location detected: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) }]);
-          setHasStarted(true);
-        }
-        try {
-          const response = await fetch("/api/solar-analysis", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              latitude,
-              longitude,
-              peakPowerKw: 1,
-              obstacleRadiusMeters: 500,
-            }),
-          });
-          const data = await response.json();
-          if (response.ok && data.ok && data.analysis) {
-            sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
-            setSolarContext(data.analysis);
+    return new Promise<boolean>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+          setLocationCoords({ latitude, longitude });
+          setLocationAccuracy(accuracy);
+          setLocationStatus(accuracy > 100 ? "warning" : "ready");
+          sessionStorage.setItem("roofray_location", JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }));
+          const resolvedLocation = await reverseGeocode(latitude, longitude);
+          if (resolvedLocation) setLocationLabel(resolvedLocation);
+          if (!locationMessageShownRef.current) {
+            locationMessageShownRef.current = true;
+            setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: resolvedLocation ? "📍 Location detected: " + resolvedLocation : "📍 Location detected: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) }]);
+            setHasStarted(true);
           }
-        } catch { } finally { setLocationLoading(false); }
-      },
-      (error) => {
-        setLocationLoading(false);
-        console.warn("[RoofRay] Geolocation failed:", {
-          code: error.code,
-          message: error.message,
-        });
-        if (error.code === 1) setLocationStatus("denied");
-        else setLocationStatus("unavailable");
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
-    );
+          try {
+            const response = await fetch("/api/solar-analysis", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                latitude,
+                longitude,
+                peakPowerKw: 1,
+                obstacleRadiusMeters: 500,
+              }),
+            });
+            const data = await response.json();
+            if (response.ok && data.ok && data.analysis) {
+              sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
+              setSolarContext(data.analysis);
+            }
+          } catch { } finally {
+            setLocationLoading(false);
+          }
+          resolve(true);
+        },
+        (error) => {
+          setLocationLoading(false);
+          console.warn("[RoofRay] Geolocation failed:", {
+            code: error.code,
+            message: error.message,
+          });
+          if (error.code === 1) setLocationStatus("denied");
+          else setLocationStatus("unavailable");
+          resolve(false);
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+      );
+    });
   }
 
   async function refreshAnalysisWithRoofArea(areaSqFt: number): Promise<SolarAnalysis | null> {
@@ -1218,8 +1224,12 @@ export default function RoofRayChat() {
       else if (normalized.includes("feasibility")) nextGoal = "Just check feasibility";
       if (nextGoal) {
         setGoal(nextGoal);
-        // Final question answered: request location now, not at chatbot startup.
-        void loadLocationAnalysis();
+        // Final question answered: request location first, then generate the report.
+        const locationReady = await loadLocationAnalysis();
+        if (!locationReady) {
+          setLoading(false);
+          return;
+        }
       }
     }
 
