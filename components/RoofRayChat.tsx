@@ -903,6 +903,7 @@ export default function RoofRayChat() {
   const [roofArea, setRoofArea] = useState<number | null>(null);
   const [roofType, setRoofType] = useState<string | null>(null);
   const [monthlyBill, setMonthlyBill] = useState<number | null>(null);
+  const [applianceDetails, setApplianceDetails] = useState<string | null>(null);
   const [connectionType, setConnectionType] = useState<string | null>(null);
   const [ownership, setOwnership] = useState<string | null>(null);
   const [goal, setGoal] = useState<string | null>(null);
@@ -1184,6 +1185,7 @@ export default function RoofRayChat() {
     let nextRoofArea = roofArea;
     let nextRoofType = roofType;
     let nextMonthlyBill = monthlyBill;
+    let nextApplianceDetails = applianceDetails;
     let nextConnectionType = connectionType;
     let nextOwnership = ownership;
     let nextGoal = goal;
@@ -1212,7 +1214,10 @@ export default function RoofRayChat() {
     } else if (roofArea !== null && roofType !== null && monthlyBill === null && number !== null && number > 0) {
       nextMonthlyBill = number;
       setMonthlyBill(number);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType === null) {
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceDetails === null) {
+      nextApplianceDetails = content.replace(/\s+/g, " ").trim().slice(0, 500);
+      if (nextApplianceDetails) setApplianceDetails(nextApplianceDetails);
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceDetails !== null && connectionType === null) {
       if (normalized.includes("residential")) nextConnectionType = "Residential";
       else if (normalized.includes("commercial")) nextConnectionType = "Commercial";
       else if (normalized.includes("other")) nextConnectionType = "Other";
@@ -1259,6 +1264,7 @@ export default function RoofRayChat() {
             roofAreaSqFt: nextRoofArea,
             roofType: nextRoofType,
             monthlyBillInr: nextMonthlyBill,
+            applianceDetails: nextApplianceDetails,
             connectionType: nextConnectionType,
             ownership: nextOwnership,
             goal: nextGoal,
@@ -1344,6 +1350,7 @@ export default function RoofRayChat() {
     setRoofArea(null);
     setRoofType(null);
     setMonthlyBill(null);
+    setApplianceDetails(null);
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
@@ -1370,6 +1377,7 @@ export default function RoofRayChat() {
     setRoofArea(null);
     setRoofType(null);
     setMonthlyBill(null);
+    setApplianceDetails(null);
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
