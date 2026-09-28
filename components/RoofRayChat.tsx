@@ -1215,6 +1215,75 @@ export default function RoofRayChat() {
     return null;
   }
 
+  async function generateFinalReport(analysis: SolarAnalysis) {
+    if (loading || goal === null) return;
+    setLoading(true);
+
+    try {
+      const validToken = await getValidToken();
+      if (!validToken) {
+        throw new Error("Your login session is not available. Please log in again, then try your message.");
+      }
+
+      const requestBody = {
+        messages: messages.map(({ role, content: mc }) => ({
+          role,
+          content: mc,
+        })),
+        solarContext: {
+          ...(analysis || {}),
+          userInputs: {
+            name,
+            roofAreaSqFt: roofArea,
+            roofType,
+            monthlyBillInr: monthlyBill,
+            applianceDetails,
+            connectionType,
+            ownership,
+            goal,
+          },
+        },
+      };
+
+      const sendChatRequest = (token: string) =>
+        fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+      let response = await sendChatRequest(validToken);
+      if (response.status === 401) {
+        const refreshedToken = await getValidToken();
+        if (refreshedToken && refreshedToken !== validToken) {
+          response = await sendChatRequest(refreshedToken);
+        }
+      }
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok || typeof data.message !== "string" || !data.message.trim()) {
+        throw new Error(typeof data.error === "string" ? data.error : "Unable to generate the solar report.");
+      }
+
+      setMessages((current) => [
+        ...current,
+        { id: crypto.randomUUID(), role: "assistant", content: data.message },
+      ]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("[RoofRay] Final report error:", error);
+      setMessages((current) => [
+        ...current,
+        { id: crypto.randomUUID(), role: "assistant", content: "RoofRay couldn't generate the report. " + errorMessage, isError: true },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function sendMessage(text = input) {
     const content = text.trim();
     if (!content && attachments.length === 0) return;
@@ -1664,7 +1733,10 @@ export default function RoofRayChat() {
                       key={message.id}
                       message={message}
                       onRetry={(t) => void sendMessage(t)}
-                      onLocationPermission={() => void loadLocationAnalysis(roofArea)}
+                      onLocationPermission={async () => {
+                        const liveAnalysis = await loadLocationAnalysis(roofArea);
+                        if (liveAnalysis) await generateFinalReport(liveAnalysis);
+                      }}
                     />
                   )
                 )}
