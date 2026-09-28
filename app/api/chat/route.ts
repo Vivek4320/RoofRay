@@ -130,12 +130,14 @@ export async function POST(request: Request) {
     const goalInput = userInputs.goal;
     const latestUserMessage = messages[messages.length - 1];
 
+    // The final report must never depend on Gemini. Appliance details are
+    // optional for report generation; the six core intake fields plus goal are
+    // enough to complete the deterministic RoofRay solar analysis.
     const intakeComplete = [
       nameInput,
       roofAreaInput,
       roofTypeInput,
       monthlyBillInput,
-      applianceDetailsInput,
       connectionTypeInput,
       ownershipInput,
       goalInput,
