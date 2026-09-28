@@ -1079,7 +1079,7 @@ export default function RoofRayChat() {
     setLocationLoading(true);
     setLocationStatus("detecting");
 
-    return new Promise<boolean>((resolve) => {
+    return new Promise<SolarAnalysis | null>((resolve) => {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const latitude = position.coords.latitude;
@@ -1114,6 +1114,7 @@ export default function RoofRayChat() {
             if (response.ok && data.ok && data.analysis) {
               sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
               setSolarContext(data.analysis);
+              setLocationLoading(false);
               resolve(data.analysis as SolarAnalysis);
               return;
             }
