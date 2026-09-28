@@ -134,6 +134,7 @@ export async function POST(request: Request) {
     // These are planning assumptions, not measured consumption.
     const applianceLoad = (() => {
       const text = String(applianceDetailsInput ?? "").toLowerCase();
+
       const quantity = (patterns: RegExp[]) => {
         for (const pattern of patterns) {
           const match = text.match(pattern);
@@ -141,12 +142,32 @@ export async function POST(request: Request) {
         }
         return 0;
       };
-      const bulbs = quantity([/(\d+(?:\.\d+)?)\s*(?:bulb|bulbs|light|lights)/i]);
-      const fans = quantity([/(\d+(?:\.\d+)?)\s*(?:fan|fans)/i]);
-      const acs = quantity([/(\d+(?:\.\d+)?)\s*(?:ac|acs|air\s*conditioner|air\s*conditioners)/i]);
-      const refrigerators = quantity([/(\d+(?:\.\d+)?)\s*(?:refrigerator|refrigerators|fridge|fridges)/i]);
-      const tvs = quantity([/(\d+(?:\.\d+)?)\s*(?:tv|tvs|television|televisions)/i]);
-      const pumps = quantity([/(\d+(?:\.\d+)?)\s*(?:water\s*pump|water\s*pumps|pump|pumps)/i]);
+
+      const bulbs = quantity([
+        /(?:bulb|bulbs|light|lights)\s*:\s*(\d+(?:\.\d+)?)/i,
+        /(\d+(?:\.\d+)?)\s*(?:bulb|bulbs|light|lights)/i,
+      ]);
+      const fans = quantity([
+        /(?:fan|fans)\s*:\s*(\d+(?:\.\d+)?)/i,
+        /(\d+(?:\.\d+)?)\s*(?:fan|fans)/i,
+      ]);
+      const acs = quantity([
+        /(?:ac|acs|air\s*conditioner|air\s*conditioners)\s*:\s*(\d+(?:\.\d+)?)/i,
+        /(\d+(?:\.\d+)?)\s*(?:ac|acs|air\s*conditioner|air\s*conditioners)/i,
+      ]);
+      const refrigerators = quantity([
+        /(?:refrigerator|refrigerators|fridge|fridges)\s*:\s*(\d+(?:\.\d+)?)/i,
+        /(\d+(?:\.\d+)?)\s*(?:refrigerator|refrigerators|fridge|fridges)/i,
+      ]);
+      const tvs = quantity([
+        /(?:tv|tvs|television|televisions)\s*:\s*(\d+(?:\.\d+)?)/i,
+        /(\d+(?:\.\d+)?)\s*(?:tv|tvs|television|televisions)/i,
+      ]);
+      const pumps = quantity([
+        /(?:water\s*pump|water\s*pumps|pump|pumps)\s*:\s*(\d+(?:\.\d+)?)/i,
+        /(\d+(?:\.\d+)?)\s*(?:water\s*pump|water\s*pumps|pump|pumps)/i,
+      ]);
+
       const watts =
         bulbs * 10 +
         fans * 75 +
@@ -154,78 +175,11 @@ export async function POST(request: Request) {
         refrigerators * 200 +
         tvs * 100 +
         pumps * 750;
+
       return { bulbs, fans, acs, refrigerators, tvs, pumps, watts, kw: watts / 1000 };
     })();
 
-    if (latestUserMessage?.role === "user") {
-      if (nameInput === null || nameInput === undefined || String(nameInput).trim() === "") {
-        return NextResponse.json({ ok: true, message: fixedQuestions.name });
-      }
-      if (roofAreaInput === null || roofAreaInput === undefined) {
-        return NextResponse.json({ ok: true, message: fixedQuestions.roofArea });
-      }
-      if (roofTypeInput === null || roofTypeInput === undefined) {
-        return NextResponse.json({ ok: true, message: fixedQuestions.roofType });
-      }
-      if (monthlyBillInput === null || monthlyBillInput === undefined) {
-        return NextResponse.json({ ok: true, message: fixedQuestions.monthlyBill });
-      }
-      if (applianceDetailsInput === null || applianceDetailsInput === undefined || String(applianceDetailsInput).trim() === "") {
-        return NextResponse.json({ ok: true, message: fixedQuestions.appliances });
-      }
-      if (connectionTypeInput === null || connectionTypeInput === undefined) {
-        return NextResponse.json({ ok: true, message: fixedQuestions.connectionType });
-      }
-      if (ownershipInput === null || ownershipInput === undefined) {
-        return NextResponse.json({ ok: true, message: fixedQuestions.ownership });
-      }
-      if (goalInput === null || goalInput === undefined) {
-        return NextResponse.json({ ok: true, message: fixedQuestions.goal });
-      }
-    }
-
-
-    // Once all intake fields are collected, do not let Gemini invent the
-    // feasibility numbers. Return the live RoofRay calculation directly.
-    const intakeComplete = [
-      nameInput, roofAreaInput, roofTypeInput, monthlyBillInput,
-      applianceDetailsInput, connectionTypeInput, ownershipInput, goalInput,
-    ].every((value) => value !== null && value !== undefined && String(value).trim() !== "");
-
-    if (intakeComplete) {
-      const planning = (solarContextObject.planningEstimate ?? {}) as Record<string, unknown>;
-      const placement = (solarContextObject.panelPlacement ?? {}) as Record<string, unknown>;
-      const estimate = (placement.estimate ?? {}) as Record<string, unknown>;
-      const panel = (placement.panel ?? {}) as Record<string, unknown>;
-      const location = (planning.location ?? solarContextObject.location ?? {}) as Record<string, unknown>;
-      const orientation = (solarContextObject.optimalOrientation ?? {}) as Record<string, unknown>;
-      const shadow = (solarContextObject.shadow ?? {}) as Record<string, unknown>;
-
-      const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : Number(v);
-      const lat = num(location.latitude);
-      const lon = num(location.longitude);
-      const roofAreaSqFt = num(roofAreaInput);
-      const roofAreaM2 = Number.isFinite(roofAreaSqFt) ? roofAreaSqFt * 0.092903 : null;
-      const specificYield = num((solarContextObject.annual as Record<string, unknown> | undefined)?.specificYieldKwhPerKwp);
-      const panelAreaM2 = num(panel.areaM2) || 1.952748;
-      const panelWatts = num(panel.assumedPowerW) || 450;
-
-      // Use the live API's planning values first. If an older/stale deployment
-      // returns PVGIS but omits planningEstimate, rebuild the same planning
-      // calculation from the user's roof area + live PVGIS yield instead of
-      // showing "unavailable".
-      const fallbackCount =
-        roofAreaM2 !== null && Number.isFinite(roofAreaM2)
-          ? Math.max(0, Math.floor((roofAreaM2 * 0.72) / panelAreaM2))
-          : NaN;
-      const fallbackSize = Number.isFinite(fallbackCount)
-        ? Number(((fallbackCount * panelWatts) / 1000).toFixed(2))
-        : NaN;
-      const fallbackAnnual = Number.isFinite(specificYield) && Number.isFinite(fallbackSize)
-        ? Math.round(fallbackSize * specificYield)
-        : NaN;
-
-      const estimatedLoadKw = applianceLoad.kw;
+  const estimatedLoadKw = applianceLoad.kw;
       const size = num(planning.systemSizeKw ?? estimate.systemSizeKw) || fallbackSize;
       const count = num(planning.panelCount ?? estimate.panelCount) || fallbackCount;
       const watts = num(planning.panelPowerW ?? panel.assumedPowerW) || panelWatts;
@@ -258,40 +212,87 @@ export async function POST(request: Request) {
       const sunshineHours = weatherNum(dailyWeather.sunshineDurationHours);
 
 
-      const fmt = (v: number, digits = 0) => Number.isFinite(v) ? v.toFixed(digits) : "unavailable";
-      const locationLine = Number.isFinite(lat) && Number.isFinite(lon)
-        ? `📍 Live location: ${lat.toFixed(5)}, ${lon.toFixed(5)}`
-        : "📍 Live location: detected, but coordinates are unavailable.";
+      const fmt = (v: number, digits = 0) =>
+        Number.isFinite(v) ? v.toFixed(digits) : "unavailable";
+
+      const locationLine =
+        Number.isFinite(lat) && Number.isFinite(lon)
+          ? `📍 Location: ${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E`
+          : "📍 Location: detected, coordinates unavailable.";
+
+      const roofAreaForReport =
+        Number.isFinite(roofAreaSqFt) ? roofAreaSqFt : num(planning.roofAreaSqFt);
+
+      const generationLine =
+        Number.isFinite(monthly) || Number.isFinite(annual)
+          ? `⚡ Expected generation: ${Number.isFinite(monthly) ? `~${fmt(monthly)} kWh/month` : ""}${Number.isFinite(monthly) && Number.isFinite(annual) ? " | " : ""}${Number.isFinite(annual) ? `~${fmt(annual)} kWh/year` : ""} (planning estimate).`
+          : "⚡ Expected generation: currently unavailable from the live PV analysis.";
+
+      const shadingLine = Number.isFinite(shade)
+        ? `🌤️ Estimated shading: ~${fmt(shade, 1)}% (${risk ? `current risk: ${risk}` : "mapped-obstacle estimate"}).`
+        : "🌤️ Estimated shading: unavailable because mapped obstacle analysis did not return usable data.";
+
+      const directionLine = direction
+        ? `🧭 Recommended direction: ${direction}${Number.isFinite(slope) ? ` | optimal tilt ~${fmt(slope, 0)}°` : ""}.`
+        : "🧭 Recommended direction: unavailable from the PV resource analysis.";
+
+      const weatherLine =
+        Number.isFinite(temperatureC) || Number.isFinite(cloudCover)
+          ? `🌦️ Weather now: ${Number.isFinite(temperatureC) ? `${fmt(temperatureC, 1)}°C` : ""}${Number.isFinite(temperatureC) && Number.isFinite(cloudCover) ? " | " : ""}${Number.isFinite(cloudCover) ? `cloud cover ${fmt(cloudCover, 0)}%` : ""}.`
+          : "🌦️ Weather now: live Open-Meteo data unavailable.";
+
+      const solarLine =
+        Number.isFinite(solarRadiation) || Number.isFinite(dni)
+          ? `☀️ Solar radiation: ${Number.isFinite(solarRadiation) ? `${fmt(solarRadiation, 0)} W/m² GHI` : ""}${Number.isFinite(solarRadiation) && Number.isFinite(dni) ? " | " : ""}${Number.isFinite(dni) ? `${fmt(dni, 0)} W/m² DNI` : ""}.`
+          : "☀️ Solar radiation: live Open-Meteo data unavailable.";
+
+      const daylightLine =
+        Number.isFinite(daylightHours)
+          ? `🕒 Daylight: ~${fmt(daylightHours, 1)} hours${Number.isFinite(sunshineHours) ? ` | sunshine forecast ~${fmt(sunshineHours, 1)} hours` : ""}.`
+          : "🕒 Daylight: unavailable from the live weather service.";
 
       const answer = [
+        "☀️ ROOFRAY SOLAR FEASIBILITY REPORT",
+        "",
         locationLine,
-        Number.isFinite(estimatedLoadKw)
-          ? `🏠 Estimated household connected load: ~${fmt(estimatedLoadKw, 2)} kW based on the appliance quantities provided (planning estimate).`
-          : "🏠 Estimated household connected load: unavailable from appliance details.",
+        "",
+        "🏠 PROPERTY DETAILS",
+        Number.isFinite(roofAreaForReport) ? `Roof area: ~${fmt(roofAreaForReport)} sq ft` : "Roof area: unavailable",
+        typeof roofTypeInput === "string" && roofTypeInput.trim() ? `Roof type: ${roofTypeInput}` : "",
+        `Monthly electricity bill: ₹${Math.round(num(monthlyBillInput)) || 0}`,
+        typeof connectionTypeInput === "string" && connectionTypeInput.trim() ? `Connection: ${connectionTypeInput}` : "",
+        typeof ownershipInput === "string" && ownershipInput.trim() ? `Property permission: ${ownershipInput}` : "",
+        "",
+        "⚡ RECOMMENDED SOLAR SYSTEM",
         Number.isFinite(size) && Number.isFinite(count)
-          ? `🔋 Solar size: ~${fmt(size, 2)} kW (${Math.round(count)} × ${Math.round(watts || 450)}W panels).`
-          : "🔋 Solar size: unavailable from live analysis.",
-        Number.isFinite(monthly) || Number.isFinite(annual)
-          ? `⚡ Generation: ~${Number.isFinite(monthly) ? fmt(monthly) + " kWh/month" : ""}${Number.isFinite(monthly) && Number.isFinite(annual) ? " | " : ""}${Number.isFinite(annual) ? fmt(annual) + " kWh/year after estimated shading" : ""}.`
-          : "⚡ Generation: unavailable from live analysis.",
-        Number.isFinite(shade)
-          ? `🌤️ Shading estimate: ~${fmt(shade, 1)}% (geometric estimate from mapped obstacles + current sun path; risk: ${risk || "unavailable"}).`
-          : "🌤️ Shading estimate: unavailable from live spatial analysis.",
-        direction
-          ? `🧭 Solar direction: ${direction}${Number.isFinite(slope) ? ` at ~${fmt(slope, 0)}° optimal slope` : ""}.`
-          : "🧭 Solar direction: unavailable from PVGIS.",
-        Number.isFinite(temperatureC) || Number.isFinite(cloudCover)
-          ? `🌤️ Weather now: ${Number.isFinite(temperatureC) ? fmt(temperatureC, 1) + "°C" : ""}${Number.isFinite(temperatureC) && Number.isFinite(cloudCover) ? " | " : ""}${Number.isFinite(cloudCover) ? "cloud cover " + fmt(cloudCover, 0) + "%" : ""}.`
-          : "🌤️ Weather now: unavailable from Open-Meteo.",
-        Number.isFinite(solarRadiation) || Number.isFinite(dni)
-          ? `☀️ Solar radiation now: ${Number.isFinite(solarRadiation) ? fmt(solarRadiation, 0) + " W/m² GHI" : ""}${Number.isFinite(solarRadiation) && Number.isFinite(dni) ? " | " : ""}${Number.isFinite(dni) ? fmt(dni, 0) + " W/m² DNI" : ""}.`
-          : "☀️ Solar radiation now: unavailable from Open-Meteo.",
-        Number.isFinite(daylightHours) || Number.isFinite(sunshineHours)
-          ? `🕒 Daylight: ${Number.isFinite(daylightHours) ? fmt(daylightHours, 1) + " h" : ""}${Number.isFinite(daylightHours) && Number.isFinite(sunshineHours) ? " | " : ""}${Number.isFinite(sunshineHours) ? fmt(sunshineHours, 1) + " h sunshine forecast" : ""}.`
-          : "🕒 Daylight: unavailable from Open-Meteo.",
-        `💰 Your current bill: ₹${Math.round(num(monthlyBillInput)) || 0}/month. Actual savings depend on tariff and net-metering/export rules.`,
-        "⚠️ These are live location-based planning estimates, not final installation specifications; structural and electrical checks still require a site assessment.",
-      ].join("\n");
+          ? `Recommended capacity: ~${fmt(size, 2)} kW`
+          : "Recommended capacity: unavailable",
+        Number.isFinite(count)
+          ? `Panels: ${Math.round(count)} × ${Math.round(watts || 450)}W`
+          : "Panels: unavailable",
+        generationLine,
+        "",
+        "🌤️ SITE & SUN ANALYSIS",
+        shadingLine,
+        directionLine,
+        "",
+        "🌦️ CURRENT SOLAR CONDITIONS",
+        weatherLine,
+        solarLine,
+        daylightLine,
+        "",
+        "🏠 HOUSEHOLD LOAD",
+        Number.isFinite(estimatedLoadKw) && estimatedLoadKw > 0
+          ? `Estimated connected load: ~${fmt(estimatedLoadKw, 2)} kW based on the appliance quantities provided.`
+          : "Estimated connected load: no appliance quantity could be parsed.",
+        "",
+        "💰 BILL & SAVINGS",
+        `Current electricity bill: ₹${Math.round(num(monthlyBillInput)) || 0}/month.`,
+        "Actual savings depend on tariff, self-consumption, net-metering/export rules and the final installed system.",
+        "",
+        "⚠️ PLANNING NOTE",
+        "These are location-based planning estimates. Final panel layout, structure, electrical design and on-site shading require a physical site assessment.",
+      ].filter(Boolean).join("\n");
 
       return NextResponse.json({ ok: true, message: answer });
     }
