@@ -246,6 +246,17 @@ export async function POST(request: Request) {
         : typeof orientation.direction === "string" ? orientation.direction : "";
       const slope = num(planning.recommendedSlopeDeg ?? orientation.slopeDeg);
       const risk = typeof shadow.currentRisk === "string" ? shadow.currentRisk : "";
+      const weather = (solarContextObject.weather ?? {}) as Record<string, unknown>;
+      const currentWeather = (weather.current ?? {}) as Record<string, unknown>;
+      const dailyWeather = (weather.daily ?? {}) as Record<string, unknown>;
+      const weatherNum = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : Number(v);
+      const temperatureC = weatherNum(currentWeather.temperatureC);
+      const cloudCover = weatherNum(currentWeather.cloudCoverPercent);
+      const solarRadiation = weatherNum(currentWeather.shortwaveRadiationWm2);
+      const dni = weatherNum(currentWeather.directNormalIrradianceWm2);
+      const daylightHours = weatherNum(dailyWeather.daylightDurationHours);
+      const sunshineHours = weatherNum(dailyWeather.sunshineDurationHours);
+
 
       const fmt = (v: number, digits = 0) => Number.isFinite(v) ? v.toFixed(digits) : "unavailable";
       const locationLine = Number.isFinite(lat) && Number.isFinite(lon)
@@ -268,6 +279,17 @@ export async function POST(request: Request) {
           : "🌤️ Shading estimate: unavailable from live spatial analysis.",
         direction
           ? `🧭 Solar direction: ${direction}${Number.isFinite(slope) ? ` at ~${fmt(slope, 0)}° optimal slope` : ""}.`
+          : "🧭 Solar direction: unavailable from PVGIS.",
+        Number.isFinite(temperatureC) || Number.isFinite(cloudCover)
+          ? `🌤️ Weather now: ${Number.isFinite(temperatureC) ? fmt(temperatureC, 1) + "°C" : ""}${Number.isFinite(temperatureC) && Number.isFinite(cloudCover) ? " | " : ""}${Number.isFinite(cloudCover) ? "cloud cover " + fmt(cloudCover, 0) + "%" : ""}.`
+          : "🌤️ Weather now: unavailable from Open-Meteo.",
+        Number.isFinite(solarRadiation) || Number.isFinite(dni)
+          ? `☀️ Solar radiation now: ${Number.isFinite(solarRadiation) ? fmt(solarRadiation, 0) + " W/m² GHI" : ""}${Number.isFinite(solarRadiation) && Number.isFinite(dni) ? " | " : ""}${Number.isFinite(dni) ? fmt(dni, 0) + " W/m² DNI" : ""}.`
+          : "☀️ Solar radiation now: unavailable from Open-Meteo.",
+        Number.isFinite(daylightHours) || Number.isFinite(sunshineHours)
+          ? `🕒 Daylight: ${Number.isFinite(daylightHours) ? fmt(daylightHours, 1) + " h" : ""}${Number.isFinite(daylightHours) && Number.isFinite(sunshineHours) ? " | " : ""}${Number.isFinite(sunshineHours) ? fmt(sunshineHours, 1) + " h sunshine forecast" : ""}.`
+          : "🕒 Daylight: unavailable from Open-Meteo.",
+
           : "🧭 Solar direction: unavailable from PVGIS.",
         `💰 Your current bill: ₹${Math.round(num(monthlyBillInput)) || 0}/month. Actual savings depend on tariff and net-metering/export rules.`,
         "⚠️ These are live location-based planning estimates, not final installation specifications; structural and electrical checks still require a site assessment.",
