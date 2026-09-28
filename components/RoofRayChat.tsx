@@ -1168,9 +1168,20 @@ export default function RoofRayChat() {
               resolve(data.analysis as SolarAnalysis);
               return;
             }
-          } catch { }
+          } catch (error) {
+            console.warn("[RoofRay] Live solar analysis failed after location detection:", error);
+            // Do not stop the intake/report flow just because the optional
+            // live-analysis service failed. The final report route has its own
+            // fallback handling and can still report the detected location and
+            // the user's collected inputs.
+          }
           setLocationLoading(false);
-          resolve(null);
+          resolve({
+            location: {
+              latitude,
+              longitude,
+            },
+          } as SolarAnalysis);
         },
         (error) => {
           setLocationLoading(false);
