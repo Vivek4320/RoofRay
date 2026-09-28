@@ -172,12 +172,35 @@ export async function POST(request: Request) {
       const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : Number(v);
       const lat = num(location.latitude);
       const lon = num(location.longitude);
-      const size = num(planning.systemSizeKw ?? estimate.systemSizeKw);
-      const count = num(planning.panelCount ?? estimate.panelCount);
-      const watts = num(planning.panelPowerW ?? panel.assumedPowerW);
-      const monthly = num(planning.averageMonthlyGenerationKwh);
-      const annual = num(planning.annualGenerationAfterEstimatedShadingKwh ?? estimate.effectiveGenerationKwh);
-      const shade = num(planning.estimatedShadingPercent);
+      const roofAreaSqFt = num(roofAreaInput);
+      const roofAreaM2 = Number.isFinite(roofAreaSqFt) ? roofAreaSqFt * 0.092903 : null;
+      const specificYield = num((solarContextObject.annual as Record<string, unknown> | undefined)?.specificYieldKwhPerKwp);
+      const panelAreaM2 = num(panel.areaM2) || 1.952748;
+      const panelWatts = num(panel.assumedPowerW) || 450;
+
+      // Use the live API's planning values first. If an older/stale deployment
+      // returns PVGIS but omits planningEstimate, rebuild the same planning
+      // calculation from the user's roof area + live PVGIS yield instead of
+      // showing "unavailable".
+      const fallbackCount = Number.isFinite(roofAreaM2)
+        ? Math.max(0, Math.floor((roofAreaM2 * 0.72) / panelAreaM2))
+        : NaN;
+      const fallbackSize = Number.isFinite(fallbackCount)
+        ? Number(((fallbackCount * panelWatts) / 1000).toFixed(2))
+        : NaN;
+      const fallbackAnnual = Number.isFinite(specificYield) && Number.isFinite(fallbackSize)
+        ? Math.round(fallbackSize * specificYield)
+        : NaN;
+
+      const size = num(planning.systemSizeKw ?? estimate.systemSizeKw) || fallbackSize;
+      const count = num(planning.panelCount ?? estimate.panelCount) || fallbackCount;
+      const watts = num(planning.panelPowerW ?? panel.assumedPowerW) || panelWatts;
+      const shadeFromShadow = Array.isArray(shadow.timeSeries)
+        ? (shadow.timeSeries as Array<Record<string, unknown>>).filter((sample) => sample.risk === "high" || sample.risk === "medium")).length / Math.max(1, (shadow.timeSeries as unknown[]).length) * 15
+        : NaN;
+      const shade = num(planning.estimatedShadingPercent) || shadeFromShadow;
+      const monthly = num(planning.averageMonthlyGenerationKwh) || (Number.isFinite(fallbackAnnual) ? Math.round(fallbackAnnual * (1 - (Number.isFinite(shade) ? shade / 100 : 0)) / 12) : NaN);
+      const annual = num(planning.annualGenerationAfterEstimatedShadingKwh ?? estimate.effectiveGenerationKwh) || (Number.isFinite(fallbackAnnual) ? Math.round(fallbackAnnual * (1 - (Number.isFinite(shade) ? shade / 100 : 0))) : NaN);
       const direction = typeof planning.recommendedDirection === "string"
         ? planning.recommendedDirection
         : typeof orientation.direction === "string" ? orientation.direction : "";
