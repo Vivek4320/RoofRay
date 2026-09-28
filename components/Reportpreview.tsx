@@ -39,6 +39,63 @@ export default function ReportPreview() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [reportData, setReportData] = useState<any>(null);
+
+  useEffect(() => {
+    const loadReport = () => {
+      try {
+        const raw = sessionStorage.getItem("roofray_report_data");
+        if (raw) setReportData(JSON.parse(raw));
+      } catch {}
+    };
+    loadReport();
+    window.addEventListener("roofray_report_ready", loadReport);
+    return () => window.removeEventListener("roofray_report_ready", loadReport);
+  }, []);
+
+  const planning = reportData?.solarContext?.planningEstimate ?? {};
+  const dynamicMetrics = reportData
+    ? [
+        {
+          label: "System size",
+          value: Number.isFinite(Number(planning.systemSizeKw)) ? Number(planning.systemSizeKw).toFixed(2) + " kW" : "—",
+          sub: Number.isFinite(Number(planning.panelCount)) ? Math.round(Number(planning.panelCount)) + " panels" : "live analysis",
+          icon: "⚡",
+        },
+        {
+          label: "Est. generation",
+          value: Number.isFinite(Number(planning.averageMonthlyGenerationKwh)) ? Math.round(Number(planning.averageMonthlyGenerationKwh)) + " units" : "—",
+          sub: "per month, avg.",
+          icon: "☀️",
+        },
+        {
+          label: "Investment",
+          value: "—",
+          sub: "site-specific quote",
+          icon: "💰",
+        },
+        {
+          label: "Monthly savings",
+          value: Number.isFinite(Number(reportData?.userInputs?.monthlyBillInr)) ? "₹" + Math.round(Number(reportData.userInputs.monthlyBillInr)) : "—",
+          sub: "current monthly bill",
+          icon: "📉",
+        },
+        {
+          label: "Payback period",
+          value: "—",
+          sub: "calculated after tariff/quote",
+          icon: "⏱️",
+        },
+        {
+          label: "Sun-hours",
+          value: Number.isFinite(Number(reportData?.solarContext?.weather?.daily?.sunshineDurationHours))
+            ? Number(reportData.solarContext.weather.daily.sunshineDurationHours).toFixed(1) + " / day"
+            : "—",
+          sub: "Open-Meteo current forecast",
+          icon: "🌤️",
+        },
+      ]
+    : METRICS;
 
   useEffect(() => {
     const checkAuth = () => {
@@ -177,7 +234,7 @@ export default function ReportPreview() {
                     : 'opacity-100'
                 }`}
               >
-                {METRICS.map((m, i) => (
+                {dynamicMetrics.map((m, i) => (
                   <div
                     key={m.label}
                     className="group p-4 sm:p-6 lg:p-8 transition-all duration-300 hover:bg-primary/5"
@@ -242,7 +299,7 @@ export default function ReportPreview() {
             {/* Footer */}
             <div className="border-t border-primary/20 px-4 sm:px-6 py-3 sm:py-4 lg:px-8 bg-[#0D1424]/90">
               <p className="font-mono text-xs leading-relaxed text-muted">
-                Forecast window: next 14 days, Open-Meteo · Irradiance baseline:
+                Forecast window: next 7 days, Open-Meteo · Solar radiation:
                 NASA POWER · Subsidy slab not yet applied — ask for PM Surya Ghar
                 estimate
               </p>
