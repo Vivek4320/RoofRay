@@ -145,7 +145,7 @@ export async function POST(request: Request) {
     ];
 
     const pdf = buildPdf(lines);
-    return new NextResponse(pdf, {
+    return new NextResponse(Buffer.from(pdf), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
