@@ -557,8 +557,11 @@ function AssistantMessage({
     },
   ];
 
+  const [customApplianceMode, setCustomApplianceMode] = useState(false);
+  const [customApplianceValue, setCustomApplianceValue] = useState("");
+
   const applianceChoiceGroup = /how many (tvs|fans|acs|refrigerators|bulbs\/lights|water pumps) do you have/i.test(message.content)
-    ? { options: ["0", "1", "2", "3", "4+", "None"] }
+    ? { options: ["0", "1", "2", "3", "4+", "None", "Custom"] }
     : null;
   const choiceGroup = choiceGroups.find(({ pattern }) =>
     pattern.test(message.content),
@@ -613,13 +616,55 @@ function AssistantMessage({
                   <button
                     key={label}
                     type="button"
-                    onClick={() => onRetry(label)}
+                    onClick={() => {
+                      if (applianceChoiceGroup && label === "Custom") {
+                        setCustomApplianceMode(true);
+                        setCustomApplianceValue("");
+                        return;
+                      }
+                      onRetry(label);
+                    }}
                     className="rr-choice-button"
                   >
                     <span>{label}</span>
                   </button>
                 ))}
               </div>
+            ) : null}
+
+            {applianceChoiceGroup && customApplianceMode ? (
+              <form
+                className="mt-3 flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const value = customApplianceValue.trim();
+                  if (/^\\d+$/.test(value)) {
+                    onRetry(value);
+                    setCustomApplianceMode(false);
+                    setCustomApplianceValue("");
+                  }
+                }}
+              >
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  autoFocus
+                  value={customApplianceValue}
+                  onChange={(event) => setCustomApplianceValue(event.target.value)}
+                  placeholder="Enter quantity"
+                  aria-label="Custom appliance quantity"
+                  className="min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[13px] text-white outline-none placeholder:text-slate-500 focus:border-blue-400/40 focus:ring-2 focus:ring-blue-400/10"
+                />
+                <button
+                  type="submit"
+                  disabled={!/^\\d+$/.test(customApplianceValue.trim())}
+                  className="rr-choice-button px-4 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Add
+                </button>
+              </form>
             ) : null}
           </>
         )}
@@ -1223,7 +1268,7 @@ export default function RoofRayChat() {
       const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
       const selectedAppliance = applianceNames[applianceStep];
       const selectedQuantity = content.trim();
-      if (/^(0|1|2|3|4\+|none)$/i.test(selectedQuantity)) {
+      if (/^(0|1|2|3|4\+|none|\\d+)$/i.test(selectedQuantity)) {
         const entry = `${selectedAppliance}: ${selectedQuantity.toLowerCase() === "none" ? "0" : selectedQuantity}`;
         nextApplianceDetails = [applianceDetails, entry].filter(Boolean).join(", ");
         nextApplianceStep = applianceStep + 1;
@@ -1402,6 +1447,7 @@ export default function RoofRayChat() {
     setRoofType(null);
     setMonthlyBill(null);
     setApplianceDetails(null);
+    setApplianceStep(0);
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
