@@ -1504,6 +1504,9 @@ export default function RoofRayChat() {
         ...current,
         { id: crypto.randomUUID(), role: "assistant", content: fixedNextQuestion },
       ]);
+      if (goal === null && nextGoal !== null) {
+        await persistReportAndDownloadPdf(fixedNextQuestion, currentSolarContext || {}, { name: nextName, roofAreaSqFt: nextRoofArea, roofType: nextRoofType, monthlyBillInr: nextMonthlyBill, applianceDetails: nextApplianceDetails, connectionType: nextConnectionType, ownership: nextOwnership, goal: nextGoal });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("[RoofRay] Chat UI error:", error);
