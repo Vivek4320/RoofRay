@@ -35,7 +35,11 @@ export default function RoofRayChatGate() {
   // Never mount the chat on authentication pages.
   if (AUTH_ROUTES.has(pathname)) return null;
 
-  // The assistant is private: only authenticated users can see/use it.
+  // RoofRayChat is a dedicated /chat page now.
+  // Do not mount it globally on the homepage, footer, about, contact, etc.
+  if (pathname !== "/chat") return null;
+
+  // The chat is private and requires an authenticated session.
   if (!isAuthenticated) return null;
 
   return <RoofRayChat />;
