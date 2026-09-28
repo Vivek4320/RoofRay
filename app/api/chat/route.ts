@@ -130,6 +130,33 @@ export async function POST(request: Request) {
     const goalInput = userInputs.goal;
     const latestUserMessage = messages[messages.length - 1];
 
+    // Estimate connected household load from the appliance quantities supplied by the user.
+    // These are planning assumptions, not measured consumption.
+    const applianceLoad = (() => {
+      const text = String(applianceDetailsInput ?? "").toLowerCase();
+      const quantity = (patterns: RegExp[]) => {
+        for (const pattern of patterns) {
+          const match = text.match(pattern);
+          if (match) return Number(match[1]);
+        }
+        return 0;
+      };
+      const bulbs = quantity([/(\d+(?:\.\d+)?)\s*(?:bulb|bulbs|light|lights)/i]);
+      const fans = quantity([/(\d+(?:\.\d+)?)\s*(?:fan|fans)/i]);
+      const acs = quantity([/(\d+(?:\.\d+)?)\s*(?:ac|acs|air\s*conditioner|air\s*conditioners)/i]);
+      const refrigerators = quantity([/(\d+(?:\.\d+)?)\s*(?:refrigerator|refrigerators|fridge|fridges)/i]);
+      const tvs = quantity([/(\d+(?:\.\d+)?)\s*(?:tv|tvs|television|televisions)/i]);
+      const pumps = quantity([/(\d+(?:\.\d+)?)\s*(?:water\s*pump|water\s*pumps|pump|pumps)/i]);
+      const watts =
+        bulbs * 10 +
+        fans * 75 +
+        acs * 1500 +
+        refrigerators * 200 +
+        tvs * 100 +
+        pumps * 750;
+      return { bulbs, fans, acs, refrigerators, tvs, pumps, watts, kw: watts / 1000 };
+    })();
+
     if (latestUserMessage?.role === "user") {
       if (nameInput === null || nameInput === undefined || String(nameInput).trim() === "") {
         return NextResponse.json({ ok: true, message: fixedQuestions.name });
@@ -198,6 +225,7 @@ export async function POST(request: Request) {
         ? Math.round(fallbackSize * specificYield)
         : NaN;
 
+      const estimatedLoadKw = applianceLoad.kw;
       const size = num(planning.systemSizeKw ?? estimate.systemSizeKw) || fallbackSize;
       const count = num(planning.panelCount ?? estimate.panelCount) || fallbackCount;
       const watts = num(planning.panelPowerW ?? panel.assumedPowerW) || panelWatts;
@@ -226,6 +254,9 @@ export async function POST(request: Request) {
 
       const answer = [
         locationLine,
+        Number.isFinite(estimatedLoadKw)
+          ? `🏠 Estimated household connected load: ~${fmt(estimatedLoadKw, 2)} kW based on the appliance quantities provided (planning estimate).`
+          : "🏠 Estimated household connected load: unavailable from appliance details.",
         Number.isFinite(size) && Number.isFinite(count)
           ? `🔋 Solar size: ~${fmt(size, 2)} kW (${Math.round(count)} × ${Math.round(watts || 450)}W panels).`
           : "🔋 Solar size: unavailable from live analysis.",
@@ -260,6 +291,7 @@ export async function POST(request: Request) {
       "Treat PVGIS, mapped roof, obstacle/shadow, and panel-placement values in the supplied context as the source of truth.",
       "Use the supplied shadow analysis as an estimated shading result and clearly label it as an estimate.",
       "After all eight required inputs are collected, stop asking questions and give a concrete location-based feasibility summary using the supplied RoofRay analysis and user inputs.",
+      "For appliance details, estimate connected household load using these planning assumptions: bulb 10W, fan 75W, AC 1500W, refrigerator 200W, TV 100W, water pump 750W. Clearly label the result as an estimated connected load, not actual measured consumption.",
       "When planningEstimate is present, ALWAYS use its concrete values: estimated panel count, system size in kW, average monthly generation in kWh, annual generation after estimated shading, estimated shading percentage, and recommended direction/slope.",
       "If the user provided roof area, use that roof area to size the planning estimate even if mapped roof footprint data is unavailable.",
       "Use the PVGIS location-based specific yield and the RoofRay panel-placement estimate to calculate the expected solar generation; do not replace these values with generic statements.",
