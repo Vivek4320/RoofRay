@@ -289,8 +289,6 @@ export async function POST(request: Request) {
         Number.isFinite(daylightHours) || Number.isFinite(sunshineHours)
           ? `🕒 Daylight: ${Number.isFinite(daylightHours) ? fmt(daylightHours, 1) + " h" : ""}${Number.isFinite(daylightHours) && Number.isFinite(sunshineHours) ? " | " : ""}${Number.isFinite(sunshineHours) ? fmt(sunshineHours, 1) + " h sunshine forecast" : ""}.`
           : "🕒 Daylight: unavailable from Open-Meteo.",
-
-          : "🧭 Solar direction: unavailable from PVGIS.",
         `💰 Your current bill: ₹${Math.round(num(monthlyBillInput)) || 0}/month. Actual savings depend on tariff and net-metering/export rules.`,
         "⚠️ These are live location-based planning estimates, not final installation specifications; structural and electrical checks still require a site assessment.",
       ].join("\n");
