@@ -3,7 +3,7 @@ import { Outfit, Plus_Jakarta_Sans, DM_Mono } from 'next/font/google';
 // TypeScript: allow side-effect global CSS import without explicit type declarations
 // @ts-ignore
 import './globals.css';
-import RoofRayChat from '@/components/RoofRayChat';
+import RoofRayChatGate from '@/components/RoofRayChatGate';
 
 const outfit = Outfit({
   variable: '--font-display',
@@ -44,7 +44,7 @@ export default function RootLayout({
           Skip to content
         </a>
         {children}
-        <RoofRayChat />
+        <RoofRayChatGate />
       </body>
     </html>
   );
