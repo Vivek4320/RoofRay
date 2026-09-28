@@ -1201,13 +1201,24 @@ export default function RoofRayChat() {
     } else if (roofArea !== null && roofType !== null && monthlyBill === null && number !== null && number > 0) {
       nextMonthlyBill = number;
       setMonthlyBill(number);
-    } else if (roofArea !== null && monthlyBill !== null && shading === null) {
-      const normalized = content.toLowerCase();
-      if (["no", "none", "no shading"].includes(normalized)) nextShading = "No";
-      else if (normalized.includes("partial")) nextShading = "Partial";
-      else if (normalized.includes("heavy")) nextShading = "Heavy";
-      if (nextShading) {
-        setShading(nextShading);
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType === null) {
+      if (normalized.includes("residential")) nextConnectionType = "Residential";
+      else if (normalized.includes("commercial")) nextConnectionType = "Commercial";
+      else if (normalized.includes("other")) nextConnectionType = "Other";
+      if (nextConnectionType) setConnectionType(nextConnectionType);
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership === null) {
+      if (normalized.includes("own")) nextOwnership = "Own";
+      else if (normalized.includes("permission")) nextOwnership = "Permission";
+      else if (normalized.includes("no")) nextOwnership = "No";
+      if (nextOwnership) setOwnership(nextOwnership);
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership !== null && goal === null) {
+      if (normalized.includes("reduce")) nextGoal = "Reduce electricity bill";
+      else if (normalized.includes("maximum")) nextGoal = "Maximum generation";
+      else if (normalized.includes("cost") || normalized.includes("subsidy")) nextGoal = "Cost/subsidy";
+      else if (normalized.includes("feasibility")) nextGoal = "Just check feasibility";
+      if (nextGoal) {
+        setGoal(nextGoal);
+        // Final question answered: request location now, not at chatbot startup.
         void loadLocationAnalysis();
       }
     }
@@ -1555,7 +1566,7 @@ export default function RoofRayChat() {
           />
         </div>
 
-        {shading !== null && (locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
+        {goal !== null && (locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
           <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
             <div className="min-w-0">
               <p className="text-[12px] font-semibold text-slate-100">📍 I need your location permission</p>
