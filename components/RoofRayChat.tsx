@@ -1598,3 +1598,36 @@ export default function RoofRayChat() {
 
         {goal !== null && (locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
           <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold text-slate-100">📍 I need your location permission</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadLocationAnalysis()}
+              className="shrink-0 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[11px] font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
+            >
+              {locationStatus === "denied" ? "Enable Location" : "Allow Location"}
+            </button>
+          </div>
+        )}
+
+        <ChatComposer
+          input={input}
+          onInputChange={setInput}
+          onSend={() => void sendMessage()}
+          loading={loading}
+          placeholder={composerPlaceholder}
+          attachments={attachments}
+          onRemoveAttachment={removeAttachment}
+          onAddFiles={addFiles}
+          fileError={fileError}
+          onDismissError={() => setFileError(null)}
+        />
+        </div>
+      </section>
+    </>
+  );
+}
