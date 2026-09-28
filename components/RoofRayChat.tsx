@@ -909,12 +909,12 @@ export default function RoofRayChat() {
     setOpen(isFullScreenPage);
     setSolarContext(getStoredAnalysis());
     hydrateStoredLocation();
-    const handleOpen = () => { setOpen(true); if (!getStoredAnalysis()) void loadLocationAnalysis(); };
+    // Open the chat immediately. Location is intentionally requested only at the final question.
+    const handleOpen = () => { setOpen(true); };
     window.addEventListener("roofray:open-chat", handleOpen);
     if (sessionStorage.getItem("roofray_pending_chat") === "true") {
       sessionStorage.removeItem("roofray_pending_chat");
       setOpen(true);
-      void loadLocationAnalysis();
     }
     return () => window.removeEventListener("roofray:open-chat", handleOpen);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1076,7 +1076,11 @@ export default function RoofRayChat() {
       if (["no", "none", "no shading"].includes(normalized)) nextShading = "No";
       else if (normalized.includes("partial")) nextShading = "Partial";
       else if (normalized.includes("heavy")) nextShading = "Heavy";
-      if (nextShading) setShading(nextShading);
+      if (nextShading) {
+        setShading(nextShading);
+        // Request the user's location only after the final shading question is answered.
+        void loadLocationAnalysis();
+      }
     }
 
     const validToken = await getValidToken();
@@ -1145,7 +1149,6 @@ export default function RoofRayChat() {
       return;
     }
     setOpen(true);
-    if (!solarContext) void loadLocationAnalysis();
   }
   void openChat;
 
