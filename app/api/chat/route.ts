@@ -114,6 +114,7 @@ export async function POST(request: Request) {
       roofArea: "What is the area of your roof in square feet?",
       roofType: "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)",
       monthlyBill: "What is your average monthly electricity bill in ₹?",
+      appliances: "Approximately how many electrical appliances do you have? Please tell me the quantity of bulbs, fans, ACs, refrigerators, TVs, water pumps, etc.",
       connectionType: "What type of electricity connection do you have? (Residential, Commercial, or Other)",
       ownership: "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)",
       goal: "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)",
@@ -123,6 +124,7 @@ export async function POST(request: Request) {
     const roofAreaInput = userInputs.roofAreaSqFt;
     const roofTypeInput = userInputs.roofType;
     const monthlyBillInput = userInputs.monthlyBillInr;
+    const applianceDetailsInput = userInputs.applianceDetails;
     const connectionTypeInput = userInputs.connectionType;
     const ownershipInput = userInputs.ownership;
     const goalInput = userInputs.goal;
@@ -141,6 +143,9 @@ export async function POST(request: Request) {
       if (monthlyBillInput === null || monthlyBillInput === undefined) {
         return NextResponse.json({ ok: true, message: fixedQuestions.monthlyBill });
       }
+      if (applianceDetailsInput === null || applianceDetailsInput === undefined || String(applianceDetailsInput).trim() === "") {
+        return NextResponse.json({ ok: true, message: fixedQuestions.appliances });
+      }
       if (connectionTypeInput === null || connectionTypeInput === undefined) {
         return NextResponse.json({ ok: true, message: fixedQuestions.connectionType });
       }
@@ -157,7 +162,7 @@ export async function POST(request: Request) {
     // feasibility numbers. Return the live RoofRay calculation directly.
     const intakeComplete = [
       nameInput, roofAreaInput, roofTypeInput, monthlyBillInput,
-      connectionTypeInput, ownershipInput, goalInput,
+      applianceDetailsInput, connectionTypeInput, ownershipInput, goalInput,
     ].every((value) => value !== null && value !== undefined && String(value).trim() !== "");
 
     if (intakeComplete) {
@@ -248,13 +253,13 @@ export async function POST(request: Request) {
       "Answer only what the user asked. Do not add unnecessary background, explanations, summaries, repeated information, or follow-up offers.",
       "For greetings or simple conversational messages, reply naturally in one short sentence.",
       "During input collection, ask for missing project inputs ONE AT A TIME, using one short question only.",
-      "Normal input order: name, roof area, roof type, monthly electricity bill, connection type, property permission, then installation goal.",
+      "Normal input order: name, roof area, roof type, monthly electricity bill, appliance quantities/details, connection type, property permission, then installation goal.",
       "Browser location is captured automatically when RoofRay opens. Use the supplied geometric shadow analysis to estimate shading automatically; never ask the user to self-report shading.",
       "If location analysis or shadow data is unavailable, clearly say the shading estimate is unavailable instead of asking the user for shading.",
       "Do not invent measurements, irradiation, shadow data, panel counts, system size, generation, savings, payback, or coverage.",
       "Treat PVGIS, mapped roof, obstacle/shadow, and panel-placement values in the supplied context as the source of truth.",
       "Use the supplied shadow analysis as an estimated shading result and clearly label it as an estimate.",
-      "After all seven required inputs are collected, stop asking questions and give a concrete location-based feasibility summary using the supplied RoofRay analysis and user inputs.",
+      "After all eight required inputs are collected, stop asking questions and give a concrete location-based feasibility summary using the supplied RoofRay analysis and user inputs.",
       "When planningEstimate is present, ALWAYS use its concrete values: estimated panel count, system size in kW, average monthly generation in kWh, annual generation after estimated shading, estimated shading percentage, and recommended direction/slope.",
       "If the user provided roof area, use that roof area to size the planning estimate even if mapped roof footprint data is unavailable.",
       "Use the PVGIS location-based specific yield and the RoofRay panel-placement estimate to calculate the expected solar generation; do not replace these values with generic statements.",
