@@ -182,9 +182,10 @@ export async function POST(request: Request) {
       // returns PVGIS but omits planningEstimate, rebuild the same planning
       // calculation from the user's roof area + live PVGIS yield instead of
       // showing "unavailable".
-      const fallbackCount = Number.isFinite(roofAreaM2)
-        ? Math.max(0, Math.floor((roofAreaM2 * 0.72) / panelAreaM2))
-        : NaN;
+      const fallbackCount =
+        roofAreaM2 !== null && Number.isFinite(roofAreaM2)
+          ? Math.max(0, Math.floor((roofAreaM2 * 0.72) / panelAreaM2))
+          : NaN;
       const fallbackSize = Number.isFinite(fallbackCount)
         ? Number(((fallbackCount * panelWatts) / 1000).toFixed(2))
         : NaN;
