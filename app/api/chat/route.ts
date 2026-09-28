@@ -99,6 +99,116 @@ export async function POST(request: Request) {
     const solarContext = body.solarContext
       ? JSON.stringify(body.solarContext).slice(0, 50000)
       : "No live solar analysis is available yet.";
+    const solarContextObject = body.solarContext && typeof body.solarContext === "object"
+      ? body.solarContext
+      : {};
+    const userInputs = (solarContextObject.userInputs && typeof solarContextObject.userInputs === "object")
+      ? solarContextObject.userInputs as Record<string, unknown>
+      : {};
+
+    // Keep the installer-style project intake questions fixed so Gemini cannot
+    // rewrite or vary them. Location is captured automatically by the website.
+    // Gemini is used only after the complete intake is collected.
+    const fixedQuestions = {
+      name: "What is your name?",
+      roofArea: "What is the area of your roof in square feet?",
+      roofType: "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)",
+      monthlyBill: "What is your average monthly electricity bill in ₹?",
+      connectionType: "What type of electricity connection do you have? (Residential, Commercial, or Other)",
+      ownership: "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)",
+      goal: "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)",
+    };
+
+    const nameInput = userInputs.name;
+    const roofAreaInput = userInputs.roofAreaSqFt;
+    const roofTypeInput = userInputs.roofType;
+    const monthlyBillInput = userInputs.monthlyBillInr;
+    const connectionTypeInput = userInputs.connectionType;
+    const ownershipInput = userInputs.ownership;
+    const goalInput = userInputs.goal;
+    const latestUserMessage = messages[messages.length - 1];
+
+    if (latestUserMessage?.role === "user") {
+      if (nameInput === null || nameInput === undefined || String(nameInput).trim() === "") {
+        return NextResponse.json({ ok: true, message: fixedQuestions.name });
+      }
+      if (roofAreaInput === null || roofAreaInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.roofArea });
+      }
+      if (roofTypeInput === null || roofTypeInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.roofType });
+      }
+      if (monthlyBillInput === null || monthlyBillInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.monthlyBill });
+      }
+      if (connectionTypeInput === null || connectionTypeInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.connectionType });
+      }
+      if (ownershipInput === null || ownershipInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.ownership });
+      }
+      if (goalInput === null || goalInput === undefined) {
+        return NextResponse.json({ ok: true, message: fixedQuestions.goal });
+      }
+    }
+
+
+    // Once all intake fields are collected, do not let Gemini invent the
+    // feasibility numbers. Return the live RoofRay calculation directly.
+    const intakeComplete = [
+      nameInput, roofAreaInput, roofTypeInput, monthlyBillInput,
+      connectionTypeInput, ownershipInput, goalInput,
+    ].every((value) => value !== null && value !== undefined && String(value).trim() !== "");
+
+    if (intakeComplete) {
+      const planning = (solarContextObject.planningEstimate ?? {}) as Record<string, unknown>;
+      const placement = (solarContextObject.panelPlacement ?? {}) as Record<string, unknown>;
+      const estimate = (placement.estimate ?? {}) as Record<string, unknown>;
+      const panel = (placement.panel ?? {}) as Record<string, unknown>;
+      const location = (planning.location ?? solarContextObject.location ?? {}) as Record<string, unknown>;
+      const orientation = (solarContextObject.optimalOrientation ?? {}) as Record<string, unknown>;
+      const shadow = (solarContextObject.shadow ?? {}) as Record<string, unknown>;
+
+      const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : Number(v);
+      const lat = num(location.latitude);
+      const lon = num(location.longitude);
+      const size = num(planning.systemSizeKw ?? estimate.systemSizeKw);
+      const count = num(planning.panelCount ?? estimate.panelCount);
+      const watts = num(planning.panelPowerW ?? panel.assumedPowerW);
+      const monthly = num(planning.averageMonthlyGenerationKwh);
+      const annual = num(planning.annualGenerationAfterEstimatedShadingKwh ?? estimate.effectiveGenerationKwh);
+      const shade = num(planning.estimatedShadingPercent);
+      const direction = typeof planning.recommendedDirection === "string"
+        ? planning.recommendedDirection
+        : typeof orientation.direction === "string" ? orientation.direction : "";
+      const slope = num(planning.recommendedSlopeDeg ?? orientation.slopeDeg);
+      const risk = typeof shadow.currentRisk === "string" ? shadow.currentRisk : "";
+
+      const fmt = (v: number, digits = 0) => Number.isFinite(v) ? v.toFixed(digits) : "unavailable";
+      const locationLine = Number.isFinite(lat) && Number.isFinite(lon)
+        ? `📍 Live location: ${lat.toFixed(5)}, ${lon.toFixed(5)}`
+        : "📍 Live location: detected, but coordinates are unavailable.";
+
+      const answer = [
+        locationLine,
+        Number.isFinite(size) && Number.isFinite(count)
+          ? `🔋 Solar size: ~${fmt(size, 2)} kW (${Math.round(count)} × ${Math.round(watts || 450)}W panels).`
+          : "🔋 Solar size: unavailable from live analysis.",
+        Number.isFinite(monthly) || Number.isFinite(annual)
+          ? `⚡ Generation: ~${Number.isFinite(monthly) ? fmt(monthly) + " kWh/month" : ""}${Number.isFinite(monthly) && Number.isFinite(annual) ? " | " : ""}${Number.isFinite(annual) ? fmt(annual) + " kWh/year after estimated shading" : ""}.`
+          : "⚡ Generation: unavailable from live analysis.",
+        Number.isFinite(shade)
+          ? `🌤️ Shading estimate: ~${fmt(shade, 1)}% (geometric estimate from mapped obstacles + current sun path; risk: ${risk || "unavailable"}).`
+          : "🌤️ Shading estimate: unavailable from live spatial analysis.",
+        direction
+          ? `🧭 Solar direction: ${direction}${Number.isFinite(slope) ? ` at ~${fmt(slope, 0)}° optimal slope` : ""}.`
+          : "🧭 Solar direction: unavailable from PVGIS.",
+        `💰 Your current bill: ₹${Math.round(num(monthlyBillInput)) || 0}/month. Actual savings depend on tariff and net-metering/export rules.`,
+        "⚠️ These are live location-based planning estimates, not final installation specifications; structural and electrical checks still require a site assessment.",
+      ].join("\n");
+
+      return NextResponse.json({ ok: true, message: answer });
+    }
 
     const systemPrompt = [
       "You are RoofRay, the AI solar feasibility assistant inside the RoofRay website.",
@@ -108,13 +218,19 @@ export async function POST(request: Request) {
       "Answer only what the user asked. Do not add unnecessary background, explanations, summaries, repeated information, or follow-up offers.",
       "For greetings or simple conversational messages, reply naturally in one short sentence.",
       "During input collection, ask for missing project inputs ONE AT A TIME, using one short question only.",
-      "Normal input order: roof area in square feet, monthly electricity bill in INR, then shading (No / Partial / Heavy).",
-      "Browser location is captured automatically when available. Do not ask for latitude/longitude unless location capture failed.",
+      "Normal input order: name, roof area, roof type, monthly electricity bill, connection type, property permission, then installation goal.",
+      "Browser location is captured automatically when RoofRay opens. Use the supplied geometric shadow analysis to estimate shading automatically; never ask the user to self-report shading.",
+      "If location analysis or shadow data is unavailable, clearly say the shading estimate is unavailable instead of asking the user for shading.",
       "Do not invent measurements, irradiation, shadow data, panel counts, system size, generation, savings, payback, or coverage.",
       "Treat PVGIS, mapped roof, obstacle/shadow, and panel-placement values in the supplied context as the source of truth.",
-      "User-reported shading (No / Partial / Heavy) is separate from calculated geometric shadow analysis; do not present user-reported shading as a measured shadow result.",
-      "After all required inputs are collected, stop asking questions and give a concise feasibility summary using only the supplied RoofRay analysis and user inputs.",
-      "After all inputs are complete, answer in 2-3 short sentences or at most 3 short bullets.",
+      "Use the supplied shadow analysis as an estimated shading result and clearly label it as an estimate.",
+      "After all seven required inputs are collected, stop asking questions and give a concrete location-based feasibility summary using the supplied RoofRay analysis and user inputs.",
+      "When planningEstimate is present, ALWAYS use its concrete values: estimated panel count, system size in kW, average monthly generation in kWh, annual generation after estimated shading, estimated shading percentage, and recommended direction/slope.",
+      "If the user provided roof area, use that roof area to size the planning estimate even if mapped roof footprint data is unavailable.",
+      "Use the PVGIS location-based specific yield and the RoofRay panel-placement estimate to calculate the expected solar generation; do not replace these values with generic statements.",
+      "For a ₹ monthly bill, explain that bill reduction depends on the user's tariff, export/net-metering rules, and actual consumption. Do not invent a precise rupee saving unless the supplied analysis contains a justified tariff/savings calculation.",
+      "Clearly label panel count, system size, generation, and shading as planning estimates, not final installation specifications.",
+      "After all inputs are complete, answer in 3-5 short bullets so the user can see the location, system size, panels, generation, shading estimate, and key caveat.",
       "Prefer concrete analysis values over generic conclusions. If a value is missing, say it is unavailable instead of guessing.",
       "Never describe the roof as a 'great candidate', 'excellent', 'ideal', 'best', or similar unless the supplied analysis explicitly supports that exact conclusion.",
       "Never claim the system will 'easily cover' electricity needs unless the supplied analysis contains a defensible coverage calculation.",
@@ -172,49 +288,69 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
+    const requestGemini = async (modelName: string) =>
+      fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: systemPrompt }],
+            },
+            contents,
+            generationConfig: {
+              maxOutputTokens: 1200,
+            },
+          }),
+          cache: "no-store",
         },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemPrompt }],
-          },
-          contents,
-          generationConfig: {
-            maxOutputTokens: 240,
-          },
-        }),
-        cache: "no-store",
-      }
+      );
+
+    let response = await requestGemini(model);
+    let data = await response.json().catch(() => ({}));
+
+    // 429 = quota/rate limit and 503 = temporary model capacity.
+    // Try other supported Flash models for these recoverable Gemini failures.
+    const recoverableStatus = response.status === 429 || response.status === 503;
+    const fallbackModels = ["gemini-3.7-flash", "gemini-3.6-flash"].filter(
+      (fallbackModel) => fallbackModel !== model,
     );
 
-    const data = await response.json().catch(() => ({}));
+    for (const fallbackModel of fallbackModels) {
+      if (!recoverableStatus || response.ok) break;
+
+      console.warn(
+        `[RoofRay] Gemini ${model} returned ${response.status}; trying ${fallbackModel}.`,
+      );
+      response = await requestGemini(fallbackModel);
+      data = await response.json().catch(() => ({}));
+    }
 
     if (!response.ok) {
-      console.error(
-        "[RoofRay] Gemini request failed:",
-        response.status,
-        data
-      );
+      console.error("[RoofRay] Gemini request failed:", response.status, data);
 
       const providerMessage =
         typeof data?.error?.message === "string"
           ? data.error.message
           : "";
 
+      const status =
+        response.status === 429 || response.status === 503
+          ? response.status
+          : 502;
+
       return NextResponse.json(
         {
           ok: false,
           error: providerMessage
             ? `RoofRay AI could not answer right now: ${providerMessage}`
-            : "RoofRay AI could not answer right now. Please try again.",
+            : `RoofRay AI request failed (HTTP ${response.status}). Please try again.`,
         },
-        { status: 502 }
+        { status }
       );
     }
 

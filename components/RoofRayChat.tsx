@@ -497,9 +497,9 @@ function UserMessage({ message }: { message: ChatMessage }) {
 
   return (
     <div className="rr-msg-in group flex justify-end">
-      <div className="relative max-w-[75%]">
-        <div className="rounded-2xl rounded-br-[6px] bg-[#1A3A6B] px-4 py-3 text-[14px] leading-relaxed text-slate-100 ring-1 ring-white/[0.06]">
-          {message.content}
+      <div className="relative max-w-full">
+        <div className="rr-user-bubble inline-block w-auto min-w-fit max-w-full rounded-full px-4 py-2 text-[14px] leading-5 text-slate-100">
+          {message.content}<span className="rr-message-meta">✓✓</span>
         </div>
         <button
           type="button"
@@ -524,27 +524,101 @@ function UserMessage({ message }: { message: ChatMessage }) {
   );
 }
 
-function AssistantMessage({ message, onRetry }: { message: ChatMessage; onRetry: (content: string) => void }) {
+function AssistantMessage({
+  message,
+  onRetry,
+  onLocationPermission,
+}: {
+  message: ChatMessage;
+  onRetry: (content: string) => void;
+  onLocationPermission?: () => void;
+}) {
+  const choiceGroups: Array<{ pattern: RegExp; options: string[] }> = [
+    {
+      pattern: /what type of roof do you have/i,
+      options: ["RCC/Concrete", "Metal Sheet", "Tile", "Other"],
+    },
+    {
+      pattern: /what type of electricity connection do you have/i,
+      options: ["Residential", "Commercial", "Other"],
+    },
+    {
+      pattern: /do you own the property, or do you have permission/i,
+      options: ["Own", "Permission", "No"],
+    },
+    {
+      pattern: /what is your main goal for installing solar/i,
+      options: [
+        "Reduce electricity bill",
+        "Maximum generation",
+        "Cost/subsidy",
+        "Just check feasibility",
+      ],
+    },
+  ];
+
+  const choiceGroup = choiceGroups.find(({ pattern }) =>
+    pattern.test(message.content),
+  );
+  const needsLocationPermission = /i need your location permission/i.test(message.content);
+
   return (
-    <div className="flex items-start">
-        <Image src={LOGO_SRC} alt="" width={100} height={100} className="h-[55px] w-[55px] object-contain " aria-hidden="true" />
-      <div className="min-w-0 max-w-[85%] pt-4 text-[14px] leading-relaxed text-slate-200">
+    <div className="rr-assistant-row rr-msg-in flex items-start">
+      <div className="rr-avatar-wrap shrink-0">
+        <Image
+          src={LOGO_SRC}
+          alt="RoofRay"
+          width={100}
+          height={100}
+          className="h-[44px] w-[44px] object-contain"
+        />
+      </div>
+
+      <div className="rr-assistant-card min-w-0 max-w-[85%] px-4 pb-4 pt-3 text-[14px] leading-relaxed text-slate-200">
         {message.isError ? (
           <div>
             <p className="text-slate-400">{message.content}</p>
-            {message.failedInput && (
+            {message.failedInput ? (
               <button
                 type="button"
-                onClick={() => onRetry(message.failedInput as string)}
-                className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 transition-all duration-200 hover:border-blue-400/30 hover:text-blue-300"
+                onClick={() => onRetry(message.failedInput ?? "")}
+                className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 hover:border-blue-400/30 hover:text-blue-300"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M3 12a9 9 0 1 1 3.2 6.9" /><path d="M3 4v5h5" /></svg>
+                <span aria-hidden="true">↻</span>
                 Try again
               </button>
-            )}
+            ) : null}
           </div>
         ) : (
-          renderAssistantContent(message.content)
+          <>
+            {renderAssistantContent(message.content)}
+
+            {needsLocationPermission ? (
+              <button
+                type="button"
+                onClick={onLocationPermission}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-2.5 text-[13px] font-semibold text-blue-300 transition hover:border-blue-400/50 hover:bg-blue-500/20 hover:text-blue-200"
+              >
+                <span aria-hidden="true">📍</span>
+                Allow Location
+              </button>
+            ) : null}
+
+            {choiceGroup ? (
+              <div className="rr-choice-row mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                {choiceGroup.options.map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => onRetry(label)}
+                    className="rr-choice-button"
+                  >
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </div>
@@ -822,10 +896,16 @@ export default function RoofRayChat() {
   const [locationStatus, setLocationStatus] = useState<"idle" | "detecting" | "ready" | "warning" | "denied" | "unavailable">("idle");
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const locationMessageShownRef = useRef(false);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
+  const [name, setName] = useState<string | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
+  const [roofType, setRoofType] = useState<string | null>(null);
   const [monthlyBill, setMonthlyBill] = useState<number | null>(null);
-  const [shading, setShading] = useState<string | null>(null);
+  const [connectionType, setConnectionType] = useState<string | null>(null);
+  const [ownership, setOwnership] = useState<string | null>(null);
+  const [goal, setGoal] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
@@ -861,6 +941,17 @@ export default function RoofRayChat() {
   void locationLoading;
   void locationStatus;
   void locationAccuracy;
+  void locationLabel;
+
+  async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
+    try {
+      const response = await fetch('/api/reverse-geocode?lat=' + encodeURIComponent(latitude) + '&lon=' + encodeURIComponent(longitude), { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      return response.ok && typeof data.displayName === 'string' ? data.displayName : null;
+    } catch {
+      return null;
+    }
+  }
 
   function hydrateStoredLocation() {
     try {
@@ -870,7 +961,10 @@ export default function RoofRayChat() {
       const latitude = readNumber(value.latitude);
       const longitude = readNumber(value.longitude);
       const accuracy = readNumber(value.accuracy);
-      if (latitude !== null && longitude !== null) setLocationCoords({ latitude, longitude });
+      if (latitude !== null && longitude !== null) {
+        setLocationCoords({ latitude, longitude });
+        void reverseGeocode(latitude, longitude).then((label) => { if (label) setLocationLabel(label); });
+      }
       if (accuracy !== null) setLocationAccuracy(accuracy);
       if (latitude !== null && longitude !== null) setLocationStatus(accuracy !== null && accuracy > 100 ? "warning" : "ready");
     } catch { }
@@ -909,8 +1003,7 @@ export default function RoofRayChat() {
     setOpen(isFullScreenPage);
     setSolarContext(getStoredAnalysis());
     hydrateStoredLocation();
-    // Open the chat immediately. Location is intentionally requested only at the final question.
-    const handleOpen = () => { setOpen(true); };
+    const handleOpen = () => { setOpen(true); if (!getStoredAnalysis()) void loadLocationAnalysis(); };
     window.addEventListener("roofray:open-chat", handleOpen);
     if (sessionStorage.getItem("roofray_pending_chat") === "true") {
       sessionStorage.removeItem("roofray_pending_chat");
@@ -933,8 +1026,22 @@ export default function RoofRayChat() {
             setActiveChatId(latest.id);
             setMessages(latest.messages || []);
             setHasStarted((latest.messages || []).length > 0);
+          } else {
+            setMessages([{
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
+            }]);
+            setHasStarted(true);
           }
         }
+      } else {
+        setMessages([{
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
+        }]);
+        setHasStarted(true);
       }
     } catch { /* ignore malformed local history */ }
   }, []);
@@ -976,6 +1083,13 @@ export default function RoofRayChat() {
       setLocationLoading(false);
       return;
     }
+    // Check the browser permission state first. If it is still "prompt",
+    // getCurrentPosition below will open the native location permission dialog.
+    // If it is "denied", browsers will not show the dialog again until the
+    // user re-enables Location for this site in browser settings.
+    // Do not gate the request behind the Permissions API. Calling
+    // getCurrentPosition() directly is the browser-native way to trigger the
+    // permission prompt when the current state is "ask/prompt".
     setLocationLoading(true);
     setLocationStatus("detecting");
 
@@ -988,6 +1102,13 @@ export default function RoofRayChat() {
         setLocationAccuracy(accuracy);
         setLocationStatus(accuracy > 100 ? "warning" : "ready");
         sessionStorage.setItem("roofray_location", JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }));
+        const resolvedLocation = await reverseGeocode(latitude, longitude);
+        if (resolvedLocation) setLocationLabel(resolvedLocation);
+        if (!locationMessageShownRef.current) {
+          locationMessageShownRef.current = true;
+          setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: resolvedLocation ? "📍 Location detected: " + resolvedLocation : "📍 Location detected: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) }]);
+          setHasStarted(true);
+        }
         try {
           const response = await fetch("/api/solar-analysis", {
             method: "POST",
@@ -1008,6 +1129,10 @@ export default function RoofRayChat() {
       },
       (error) => {
         setLocationLoading(false);
+        console.warn("[RoofRay] Geolocation failed:", {
+          code: error.code,
+          message: error.message,
+        });
         if (error.code === 1) setLocationStatus("denied");
         else setLocationStatus("unavailable");
       },
@@ -1058,17 +1183,36 @@ export default function RoofRayChat() {
     setLoading(true);
 
     const number = readNumber(content.replace(/[^0-9.]/g, ""));
+    let nextName = name;
     let nextRoofArea = roofArea;
+    let nextRoofType = roofType;
     let nextMonthlyBill = monthlyBill;
-    let nextShading = shading;
+    let nextConnectionType = connectionType;
+    let nextOwnership = ownership;
+    let nextGoal = goal;
     let currentSolarContext = solarContext;
 
-    if (roofArea === null && number !== null && number > 0) {
+    const normalized = content.toLowerCase();
+
+    const isGreeting = /^(hi|hii|hello|hey|good morning|good afternoon|good evening)[!.\s]*$/i.test(content.trim());
+
+    if (name === null) {
+      if (!isGreeting) {
+        nextName = content.replace(/\s+/g, " ").trim().slice(0, 80);
+        if (nextName) setName(nextName);
+      }
+    } else if (roofArea === null && number !== null && number > 0) {
       nextRoofArea = number;
       setRoofArea(number);
       const refreshedAnalysis = await refreshAnalysisWithRoofArea(number);
       if (refreshedAnalysis) currentSolarContext = refreshedAnalysis;
-    } else if (roofArea !== null && monthlyBill === null && number !== null && number > 0) {
+    } else if (roofArea !== null && roofType === null) {
+      if (normalized.includes("rcc") || normalized.includes("concrete")) nextRoofType = "RCC/Concrete";
+      else if (normalized.includes("metal") || normalized.includes("sheet")) nextRoofType = "Metal Sheet";
+      else if (normalized.includes("tile")) nextRoofType = "Tile";
+      else if (normalized.includes("other")) nextRoofType = "Other";
+      if (nextRoofType) setRoofType(nextRoofType);
+    } else if (roofArea !== null && roofType !== null && monthlyBill === null && number !== null && number > 0) {
       nextMonthlyBill = number;
       setMonthlyBill(number);
     } else if (roofArea !== null && monthlyBill !== null && shading === null) {
@@ -1076,11 +1220,7 @@ export default function RoofRayChat() {
       if (["no", "none", "no shading"].includes(normalized)) nextShading = "No";
       else if (normalized.includes("partial")) nextShading = "Partial";
       else if (normalized.includes("heavy")) nextShading = "Heavy";
-      if (nextShading) {
-        setShading(nextShading);
-        // Request the user's location only after the final shading question is answered.
-        void loadLocationAnalysis();
-      }
+      if (nextShading) setShading(nextShading);
     }
 
     const validToken = await getValidToken();
@@ -1099,9 +1239,13 @@ export default function RoofRayChat() {
         solarContext: {
           ...(currentSolarContext || {}),
           userInputs: {
+            name: nextName,
             roofAreaSqFt: nextRoofArea,
+            roofType: nextRoofType,
             monthlyBillInr: nextMonthlyBill,
-            shading: nextShading,
+            connectionType: nextConnectionType,
+            ownership: nextOwnership,
+            goal: nextGoal,
           },
         },
       };
@@ -1128,16 +1272,22 @@ export default function RoofRayChat() {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Unable to get a response.");
+        console.error("[RoofRay] Chat request failed:", response.status, data);
+        throw new Error(typeof data.error === "string" ? data.error : "Unable to get a response.");
+      }
+      if (typeof data.message !== "string" || !data.message.trim()) {
+        throw new Error("RoofRay returned an empty response.");
       }
       setMessages((current) => [
         ...current,
         { id: crypto.randomUUID(), role: "assistant", content: data.message },
       ]);
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("[RoofRay] Chat UI error:", error);
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: "RoofRay couldn't complete that request. Please try again.", isError: true, failedInput: content },
+        { id: crypto.randomUUID(), role: "assistant", content: "RoofRay couldn't complete that request. " + errorMessage, isError: true, failedInput: content },
       ]);
     } finally { setLoading(false); }
   }
@@ -1149,14 +1299,25 @@ export default function RoofRayChat() {
       return;
     }
     setOpen(true);
+    if (!solarContext) void loadLocationAnalysis();
   }
   void openChat;
 
   function startNewChat() {
-    setMessages([]);
+    setMessages([{
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
+    }]);
+    setName(null);
     setRoofArea(null);
+    setRoofType(null);
     setMonthlyBill(null);
-    setShading(null);
+    setConnectionType(null);
+    setOwnership(null);
+    setGoal(null);
+    setLocationLabel(null);
+    locationMessageShownRef.current = false;
     setHasStarted(false);
     setAutoScroll(true);
     setAttachments([]);
@@ -1174,9 +1335,15 @@ export default function RoofRayChat() {
     setActiveChatId(id);
     setMessages(chat.messages || []);
     setHasStarted((chat.messages || []).length > 0);
+    setName(null);
     setRoofArea(null);
+    setRoofType(null);
     setMonthlyBill(null);
-    setShading(null);
+    setConnectionType(null);
+    setOwnership(null);
+    setGoal(null);
+    setLocationLabel(null);
+    locationMessageShownRef.current = false;
     setAttachments([]);
     setFileError(null);
     setAutoScroll(true);
@@ -1224,9 +1391,13 @@ export default function RoofRayChat() {
 
   const visibleMessages = messages.filter((m) => m.content.trim());
   const composerPlaceholder =
-    roofArea === null ? "e.g. 1200 sq ft"
+    name === null ? "Enter your name"
+    : roofArea === null ? "e.g. 1200 sq ft"
+    : roofType === null ? "RCC/Concrete, Metal Sheet, Tile, or Other"
     : monthlyBill === null ? "e.g. ₹2500 per month"
-    : shading === null ? "No, Partial, or Heavy"
+    : connectionType === null ? "Residential, Commercial, or Other"
+    : ownership === null ? "Own, Permission, or No"
+    : goal === null ? "Reduce bill, Maximum generation, Cost/subsidy, or Feasibility"
     : "Ask RoofRay anything...";
 
   if (!open) return null;
@@ -1236,6 +1407,22 @@ export default function RoofRayChat() {
       <style>{`
         @keyframes rr-dot { 0%,80%,100%{opacity:.2;transform:scale(.85)} 40%{opacity:1;transform:scale(1)} }
         @keyframes rr-msg-in { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+                @property --rr-border-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+        @keyframes rr-border-spin { to { --rr-border-angle: 360deg; } }
+        .rr-chat-shell { --rr-bg:#080E1C; position:relative; isolation:isolate; background:var(--rr-bg); border:1px solid rgba(74,163,255,.34); }
+        .rr-chat-shell::before { content:""; position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:inherit; padding:1px; background:conic-gradient(from var(--rr-border-angle), transparent 0 300deg, rgba(50,145,255,.12) 324deg, #52a9ff 345deg, transparent 360deg); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude; animation:rr-border-spin 7s linear infinite; filter:drop-shadow(0 0 7px rgba(64,158,255,.55)); }
+        .rr-chat-shell > .rr-chat-main { position:relative; z-index:1; }
+        .rr-grid-surface { background-color:#080E1C; background-image:linear-gradient(rgba(60,130,210,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(60,130,210,.055) 1px,transparent 1px); background-size:26px 26px; }
+        .rr-grid-overlay { position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 50% 45%, transparent 0, rgba(8,14,28,.1) 48%, rgba(8,14,28,.46) 100%); }
+        .rr-user-bubble { position:relative; width:auto; min-height:0; height:auto; aspect-ratio:auto; background:linear-gradient(145deg,#173e73,#102b55); border:1px solid rgba(67,151,255,.58); box-shadow:0 8px 26px rgba(0,0,0,.18); }
+        .rr-message-meta { display:inline-block; margin-left:7px; font-size:10px; line-height:1; color:rgba(125,190,255,.75); vertical-align:middle; }
+        .rr-avatar-wrap { display:flex; align-items:center; justify-content:center; width:44px; height:44px; margin-right:8px; border:1px solid rgba(58,147,255,.34); border-radius:50%; background:rgba(7,17,32,.82); box-shadow:0 0 0 4px rgba(25,102,181,.05),0 0 16px rgba(48,140,255,.1); }
+        .rr-assistant-card { position:relative; border:1px solid rgba(56,137,231,.45); border-radius:14px; background:linear-gradient(145deg,rgba(13,29,50,.92),rgba(8,20,37,.9)); box-shadow:0 10px 28px rgba(0,0,0,.15); }
+        .rr-assistant-card::before { content:""; position:absolute; left:-1px; top:-1px; width:8px; height:8px; border-left:2px solid #48a0ff; border-top:2px solid #48a0ff; box-shadow:-2px -2px 9px rgba(55,157,255,.8); }
+        .rr-assistant-card::after { content:""; position:absolute; right:-1px; bottom:-1px; width:8px; height:8px; border-right:2px solid #48a0ff; border-bottom:2px solid #48a0ff; box-shadow:2px 2px 9px rgba(55,157,255,.75); }
+        .rr-choice-button { min-height:48px; display:flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(66,128,194,.34); border-radius:12px; background:rgba(12,29,50,.62); color:#cbd5e1; font-size:13px; font-weight:500; transition:all .18s ease; }
+        .rr-choice-button:hover { border-color:rgba(71,163,255,.85); background:rgba(28,73,126,.35); color:#fff; box-shadow:0 0 18px rgba(46,144,255,.12); transform:translateY(-1px); }
+        .rr-choice-icon { color:#74b9ff; font-size:19px; line-height:1; }
         .rr-dot { animation: rr-dot 1.1s ease-in-out infinite; }
         .rr-dot-2 { animation-delay: 160ms; }
         .rr-dot-3 { animation-delay: 320ms; }
@@ -1258,8 +1445,8 @@ export default function RoofRayChat() {
         onDrop={handleDrop}
         className={
           isFullScreenPage
-            ? "fixed inset-0 z-[80] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#080E1C] text-white"
-            : "fixed bottom-0 right-0 z-[80] flex h-[min(760px,100dvh)] w-full flex-col overflow-hidden border border-white/[0.07] bg-[#080E1C] text-white shadow-2xl shadow-black/60 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100dvh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl lg:bottom-7 lg:right-7"
+            ? "rr-chat-shell fixed inset-0 z-[80] flex h-[100dvh] w-screen flex-col overflow-hidden text-white"
+            : "rr-chat-shell fixed bottom-0 right-0 z-[80] flex h-[min(760px,100dvh)] w-full flex-col overflow-hidden text-white shadow-2xl shadow-black/60 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100dvh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl lg:bottom-7 lg:right-7"
         }
       >
         <ChatSidebar
@@ -1274,7 +1461,7 @@ export default function RoofRayChat() {
           onOpenSidebar={() => setSidebarOpen(true)}
         />
 
-        <div className={`flex min-h-0 h-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "w-full md:ml-[270px] md:w-[calc(100%-270px)]" : "ml-[56px] w-[calc(100%-56px)] md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
+        <div className={`rr-chat-main flex min-h-0 h-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "w-full md:ml-[270px] md:w-[calc(100%-270px)]" : "ml-[56px] w-[calc(100%-56px)] md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
           <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
             <div className="flex min-w-0 items-center gap-2">
               {/* Desktop compact rail owns the sidebar-open button when the sidebar is collapsed. */}
@@ -1352,8 +1539,9 @@ export default function RoofRayChat() {
           role="log"
           aria-live="polite"
           aria-label="Conversation with RoofRay"
-          className="rr-scroll relative flex-1 overflow-y-auto overscroll-contain"
+          className="rr-scroll rr-grid-surface relative flex-1 overflow-y-auto overscroll-contain"
         >
+          <div className="rr-grid-overlay" aria-hidden="true" />
           <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
             {!hasStarted ? (
               <EmptyState />
@@ -1363,7 +1551,12 @@ export default function RoofRayChat() {
                   message.role === "user" ? (
                     <UserMessage key={message.id} message={message} />
                   ) : (
-                    <AssistantMessage key={message.id} message={message} onRetry={(t) => void sendMessage(t)} />
+                    <AssistantMessage
+                      key={message.id}
+                      message={message}
+                      onRetry={(t) => void sendMessage(t)}
+                      onLocationPermission={() => void loadLocationAnalysis()}
+                    />
                   )
                 )}
                 {loading && <ThinkingIndicator />}
@@ -1377,6 +1570,24 @@ export default function RoofRayChat() {
             onClick={() => { setAutoScroll(true); endRef.current?.scrollIntoView({ behavior: "smooth" }); }}
           />
         </div>
+
+        {(locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
+          <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold text-slate-100">📍 I need your location permission</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadLocationAnalysis()}
+              className="shrink-0 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[11px] font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
+            >
+              {locationStatus === "denied" ? "Enable Location" : "Allow Location"}
+            </button>
+          </div>
+        )}
 
         <ChatComposer
           input={input}
