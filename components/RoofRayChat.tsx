@@ -1314,6 +1314,7 @@ export default function RoofRayChat() {
         ...current,
         { id: crypto.randomUUID(), role: "assistant", content: data.message },
       ]);
+      await persistReportAndDownloadPdf(data.message, analysis, { name, roofAreaSqFt: roofArea, roofType, monthlyBillInr: monthlyBill, applianceDetails, connectionType, ownership, goal });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("[RoofRay] Final report error:", error);
