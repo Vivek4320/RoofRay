@@ -1003,7 +1003,7 @@ export default function RoofRayChat() {
     setOpen(isFullScreenPage);
     setSolarContext(getStoredAnalysis());
     hydrateStoredLocation();
-    const handleOpen = () => { setOpen(true); if (!getStoredAnalysis()) void loadLocationAnalysis(); };
+    const handleOpen = () => { setOpen(true); };
     window.addEventListener("roofray:open-chat", handleOpen);
     if (sessionStorage.getItem("roofray_pending_chat") === "true") {
       sessionStorage.removeItem("roofray_pending_chat");
@@ -1026,22 +1026,8 @@ export default function RoofRayChat() {
             setActiveChatId(latest.id);
             setMessages(latest.messages || []);
             setHasStarted((latest.messages || []).length > 0);
-          } else {
-            setMessages([{
-              id: crypto.randomUUID(),
-              role: "assistant",
-              content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
-            }]);
-            setHasStarted(true);
           }
         }
-      } else {
-        setMessages([{
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
-        }]);
-        setHasStarted(true);
       }
     } catch { /* ignore malformed local history */ }
   }, []);
@@ -1220,7 +1206,10 @@ export default function RoofRayChat() {
       if (["no", "none", "no shading"].includes(normalized)) nextShading = "No";
       else if (normalized.includes("partial")) nextShading = "Partial";
       else if (normalized.includes("heavy")) nextShading = "Heavy";
-      if (nextShading) setShading(nextShading);
+      if (nextShading) {
+        setShading(nextShading);
+        void loadLocationAnalysis();
+      }
     }
 
     const validToken = await getValidToken();
@@ -1299,16 +1288,11 @@ export default function RoofRayChat() {
       return;
     }
     setOpen(true);
-    if (!solarContext) void loadLocationAnalysis();
   }
   void openChat;
 
   function startNewChat() {
-    setMessages([{
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "📍 I need your location permission first. Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.",
-    }]);
+    setMessages([]);
     setName(null);
     setRoofArea(null);
     setRoofType(null);
@@ -1571,7 +1555,7 @@ export default function RoofRayChat() {
           />
         </div>
 
-        {(locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
+        {shading !== null && (locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
           <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
             <div className="min-w-0">
               <p className="text-[12px] font-semibold text-slate-100">📍 I need your location permission</p>
