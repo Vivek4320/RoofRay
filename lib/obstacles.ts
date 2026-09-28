@@ -129,8 +129,11 @@ function directionName(deg: number): string {
 }
 
 export function buildCurrentSunCycle(latitude: number, longitude: number, date = new Date()) {
-  const samples = Array.from({ length: 12 }, (_, index) => {
-    const sampleDate = new Date(date.getTime() + index * 60 * 60 * 1000);
+  const times = SunCalc.getTimes(date, latitude, longitude);
+  const currentSun = getSunPosition(date, latitude, longitude);
+
+  const samples = Array.from({ length: 49 }, (_, index) => {
+    const sampleDate = new Date(date.getTime() + index * 15 * 60 * 1000);
     const sun = getSunPosition(sampleDate, latitude, longitude);
     return {
       timestamp: sampleDate.toISOString(),
@@ -142,18 +145,17 @@ export function buildCurrentSunCycle(latitude: number, longitude: number, date =
   });
 
   return {
+    provider: "SunCalc",
     current: {
       timestamp: date.toISOString(),
-      ...(() => {
-        const sun = getSunPosition(date, latitude, longitude);
-        return {
-          azimuthDeg: Number(sun.azimuthDeg.toFixed(1)),
-          elevationDeg: Number(sun.elevationDeg.toFixed(1)),
-          direction: directionName(sun.azimuthDeg),
-          aboveHorizon: sun.elevationDeg > 0,
-        };
-      })(),
+      azimuthDeg: Number(currentSun.azimuthDeg.toFixed(1)),
+      elevationDeg: Number(currentSun.elevationDeg.toFixed(1)),
+      direction: directionName(currentSun.azimuthDeg),
+      aboveHorizon: currentSun.elevationDeg > 0,
     },
+    sunrise: times.sunrise.toISOString(),
+    sunset: times.sunset.toISOString(),
+    solarNoon: times.solarNoon.toISOString(),
     next12Hours: samples,
   };
 }
