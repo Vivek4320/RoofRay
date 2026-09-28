@@ -1312,9 +1312,11 @@ export default function RoofRayChat() {
               ? "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)"
               : nextMonthlyBill === null
                 ? "What is your average monthly electricity bill in ₹?"
-                : nextConnectionType === null
-                  ? "What type of electricity connection do you have? (Residential, Commercial, or Other)"
-                  : nextOwnership === null
+                : nextApplianceDetails === null
+                  ? "Approximately how many electrical appliances do you have? Please tell me the quantity of bulbs, fans, ACs, refrigerators, TVs, water pumps, etc."
+                  : nextConnectionType === null
+                    ? "What type of electricity connection do you have? (Residential, Commercial, or Other)"
+                    : nextOwnership === null
                     ? "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)"
                     : nextGoal === null
                       ? "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)"
