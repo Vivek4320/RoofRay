@@ -1063,11 +1063,11 @@ export default function RoofRayChat() {
     setAutoScroll(distanceFromBottom < AUTO_SCROLL_THRESHOLD);
   }
 
-  async function loadLocationAnalysis(): Promise<boolean> {
+  async function loadLocationAnalysis(roofAreaSqFt?: number | null): Promise<SolarAnalysis | null> {
     if (!navigator.geolocation) {
       setLocationStatus("unavailable");
       setLocationLoading(false);
-      return false;
+      return null;
     }
     // Check the browser permission state first. If it is still "prompt",
     // getCurrentPosition below will open the native location permission dialog.
@@ -1104,6 +1104,9 @@ export default function RoofRayChat() {
                 latitude,
                 longitude,
                 peakPowerKw: 1,
+                ...(roofAreaSqFt !== null && roofAreaSqFt !== undefined
+                  ? { roofAreaM2: roofAreaSqFt * 0.092903 }
+                  : {}),
                 obstacleRadiusMeters: 500,
               }),
             });
@@ -1111,11 +1114,12 @@ export default function RoofRayChat() {
             if (response.ok && data.ok && data.analysis) {
               sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
               setSolarContext(data.analysis);
+              resolve(data.analysis as SolarAnalysis);
+              return;
             }
-          } catch { } finally {
-            setLocationLoading(false);
-          }
-          resolve(true);
+          } catch { }
+          setLocationLoading(false);
+          resolve(null);
         },
         (error) => {
           setLocationLoading(false);
@@ -1125,7 +1129,7 @@ export default function RoofRayChat() {
           });
           if (error.code === 1) setLocationStatus("denied");
           else setLocationStatus("unavailable");
-          resolve(false);
+          resolve(null);
         },
         { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
       );
@@ -1225,11 +1229,12 @@ export default function RoofRayChat() {
       if (nextGoal) {
         setGoal(nextGoal);
         // Final question answered: request location first, then generate the report.
-        const locationReady = await loadLocationAnalysis();
-        if (!locationReady) {
+        const liveAnalysis = await loadLocationAnalysis(nextRoofArea);
+        if (!liveAnalysis) {
           setLoading(false);
           return;
         }
+        currentSolarContext = liveAnalysis;
       }
     }
 
@@ -1580,7 +1585,7 @@ export default function RoofRayChat() {
                       key={message.id}
                       message={message}
                       onRetry={(t) => void sendMessage(t)}
-                      onLocationPermission={() => void loadLocationAnalysis()}
+                      onLocationPermission={() => void loadLocationAnalysis(roofArea)}
                     />
                   )
                 )}
@@ -1606,7 +1611,7 @@ export default function RoofRayChat() {
             </div>
             <button
               type="button"
-              onClick={() => void loadLocationAnalysis()}
+              onClick={() => void loadLocationAnalysis(roofArea)}
               className="shrink-0 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[11px] font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
             >
               {locationStatus === "denied" ? "Enable Location" : "Allow Location"}
