@@ -1226,12 +1226,36 @@ export default function RoofRayChat() {
     return null;
   }
 
+  function extractReportMetrics(report: string) {
+    const matchNumber = (pattern: RegExp) => {
+      const match = report.match(pattern);
+      return match ? Number(match[1].replace(/,/g, "")) : null;
+    };
+
+    return {
+      systemSizeKw: matchNumber(/Recommended capacity:\s*~?([\d,.]+)\s*kW/i),
+      panelCount: matchNumber(/Panels:\s*([\d,.]+)\s*[×x]/i),
+      monthlyGenerationKwh: matchNumber(/Expected generation:\s*~?([\d,.]+)\s*kWh\/month/i),
+      annualGenerationKwh: matchNumber(/\|\s*~?([\d,.]+)\s*kWh\/year/i),
+      shadingPercent: matchNumber(/Estimated shading:\s*~?([\d,.]+)%/i),
+      billInr: matchNumber(/Current electricity bill:\s*₹?([\d,.]+)\/month/i),
+      roofAreaSqFt: matchNumber(/Roof area:\s*~?([\d,.]+)\s*sq ft/i),
+      householdLoadKw: matchNumber(/Estimated connected load:\s*~?([\d,.]+)\s*kW/i),
+    };
+  }
+
   async function persistReportAndDownloadPdf(
     report: string,
     analysis: SolarAnalysis,
     inputs: Record<string, unknown>,
   ) {
-    const payload = { report, solarContext: analysis, userInputs: inputs, generatedAt: Date.now() };
+    const payload = {
+      report,
+      solarContext: analysis,
+      userInputs: inputs,
+      reportMetrics: extractReportMetrics(report),
+      generatedAt: Date.now(),
+    };
     try {
       sessionStorage.setItem("roofray_report_data", JSON.stringify(payload));
       window.dispatchEvent(new Event("roofray_report_ready"));
@@ -1242,7 +1266,10 @@ export default function RoofRayChat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        console.warn("[RoofRay] PDF endpoint returned:", response.status);
+        return;
+      }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
