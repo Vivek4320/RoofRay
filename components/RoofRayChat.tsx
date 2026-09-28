@@ -1288,9 +1288,29 @@ export default function RoofRayChat() {
       if (typeof data.message !== "string" || !data.message.trim()) {
         throw new Error("RoofRay returned an empty response.");
       }
+
+      // Keep the intake order fixed on the client as well, so an older
+      // deployed API response cannot bring back the previous question flow.
+      const fixedNextQuestion =
+        nextName === null
+          ? "What is your name?"
+          : nextRoofArea === null
+            ? "What is the area of your roof in square feet?"
+            : nextRoofType === null
+              ? "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)"
+              : nextMonthlyBill === null
+                ? "What is your average monthly electricity bill in ₹?"
+                : nextConnectionType === null
+                  ? "What type of electricity connection do you have? (Residential, Commercial, or Other)"
+                  : nextOwnership === null
+                    ? "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)"
+                    : nextGoal === null
+                      ? "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)"
+                      : data.message;
+
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: data.message },
+        { id: crypto.randomUUID(), role: "assistant", content: fixedNextQuestion },
       ]);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
