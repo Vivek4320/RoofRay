@@ -36,6 +36,13 @@ function numberValue(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function reportNumber(report: string, pattern: RegExp): number | null {
+  const match = report.match(pattern);
+  if (!match) return null;
+  const value = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(value) ? value : null;
+}
+
 function buildPdf(lines: string[]): Uint8Array {
   const pageWidth = 612;
   const pageHeight = 792;
@@ -110,6 +117,12 @@ export async function POST(request: Request) {
     const bill = numberValue(inputs.monthlyBillInr);
     const lat = numberValue((planning.location as Record<string, unknown> | undefined)?.latitude);
     const lon = numberValue((planning.location as Record<string, unknown> | undefined)?.longitude);
+    const reportText = String(body.report ?? "");
+    const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
+    const reportPanels = reportNumber(reportText, /Panels:\s*([\d,.]+)\s*[×x]/i);
+    const reportMonthly = reportNumber(reportText, /Expected generation:\s*~?([\d,.]+)\s*kWh\/month/i);
+    const reportAnnual = reportNumber(reportText, /\|\s*~?([\d,.]+)\s*kWh\/year/i);
+    const reportShade = reportNumber(reportText, /Estimated shading:\s*~?([\d,.]+)%/i);
 
     const lines = [
       "Generated from the final RoofRay site analysis.",
@@ -121,10 +134,10 @@ export async function POST(request: Request) {
       ...wrap(`Monthly electricity bill: ${bill !== null ? "Rs. " + Math.round(bill) : "Not provided"}`),
       "",
       "Solar feasibility",
-      ...wrap(`Recommended system size: ${size !== null ? size.toFixed(2) + " kW" : "Unavailable"}`),
-      ...wrap(`Estimated panels: ${panels !== null ? Math.round(panels) : "Unavailable"}`),
-      ...wrap(`Estimated generation: ${monthly !== null ? monthly + " kWh/month" : "Unavailable"}${annual !== null ? " | " + annual + " kWh/year" : ""}`),
-      ...wrap(`Estimated shading: ${shade !== null ? shade.toFixed(1) + "%" : "Unavailable"}`),
+      ...wrap(`Recommended system size: ${(reportSize ?? size) !== null ? (reportSize ?? size)!.toFixed(2) + " kW" : "Unavailable"}`),
+      ...wrap(`Estimated panels: ${(reportPanels ?? panels) !== null ? Math.round(reportPanels ?? panels) : "Unavailable"}`),
+      ...wrap(`Estimated generation: ${(reportMonthly ?? monthly) !== null ? (reportMonthly ?? monthly) + " kWh/month" : "Unavailable"}${(reportAnnual ?? annual) !== null ? " | " + (reportAnnual ?? annual) + " kWh/year" : ""}`),
+      ...wrap(`Estimated shading: ${(reportShade ?? shade) !== null ? (reportShade ?? shade)!.toFixed(1) + "%" : "Unavailable"}`),
       ...wrap(`Solar direction: ${planning.recommendedDirection ?? "Unavailable"}`),
       ...wrap(`Recommended slope: ${numberValue(planning.recommendedSlopeDeg) !== null ? numberValue(planning.recommendedSlopeDeg) + " deg" : "Unavailable"}`),
       "",
@@ -141,7 +154,7 @@ export async function POST(request: Request) {
       ...wrap(body.report ?? "RoofRay report unavailable."),
       "",
       "Planning note: These are location-based planning estimates. Final panel layout, structure, electrical design and shading assessment require a physical site assessment.",
-      "Data sources: OpenStreetMap Overpass, SunCalc, Open-Meteo and PVGIS.",
+      "Data sources: OpenStreetMap Overpass, RoofRay sun-position calculation, Open-Meteo and PVGIS.",
     ];
 
     const pdf = buildPdf(lines);
