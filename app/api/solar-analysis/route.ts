@@ -4,6 +4,7 @@ import { getRoofFootprint } from "@/lib/roofFootprint";
 import { estimatePanelPlacement } from "@/lib/panelPlacement";
 import { getPVGISAnalysis } from "@/lib/pvgis";
 import { analyzeShadowTimeline } from "@/lib/shadowEngine";
+import { getOpenMeteoSolarWeather } from "@/lib/openMeteo";
 
 type SolarAnalysisRequest = {
   latitude?: unknown;
@@ -45,10 +46,11 @@ export async function POST(request: Request) {
     // PVGIS is required for generation. Roof-footprint and mapped-obstacle
     // services are enrichment only: if either one fails, the user's own roof
     // area + PVGIS can still produce a real planning estimate.
-    const [pvgisResult, obstaclesResult, roofResult] = await Promise.allSettled([
+    const [pvgisResult, obstaclesResult, roofResult, weatherResult] = await Promise.allSettled([
       getPVGISAnalysis({ latitude, longitude, peakPowerKw, lossPercent }),
       getNearbyObstacleAnalysis(latitude, longitude, obstacleRadiusMeters),
       getRoofFootprint(latitude, longitude),
+      getOpenMeteoSolarWeather(latitude, longitude),
     ]);
 
     if (pvgisResult.status === "rejected") {
@@ -64,6 +66,11 @@ export async function POST(request: Request) {
     const roof =
       roofResult.status === "fulfilled"
         ? roofResult.value
+        : null;
+
+    const weather =
+      weatherResult.status === "fulfilled"
+        ? weatherResult.value
         : null;
 
     const sunCycle = buildCurrentSunCycle(latitude, longitude);
@@ -107,6 +114,7 @@ export async function POST(request: Request) {
       analysis: {
         ...pvgis,
         sunCycle,
+        weather,
         obstacles,
         roof,
         shadow,
