@@ -638,7 +638,7 @@ function AssistantMessage({
                 onSubmit={(event) => {
                   event.preventDefault();
                   const value = customApplianceValue.trim();
-                  if (/^\\d+$/.test(value)) {
+                  if (/^\d+$/.test(value)) {
                     onRetry(value);
                     setCustomApplianceMode(false);
                     setCustomApplianceValue("");
@@ -659,7 +659,7 @@ function AssistantMessage({
                 />
                 <button
                   type="submit"
-                  disabled={!/^\\d+$/.test(customApplianceValue.trim())}
+                  disabled={!/^\d+$/.test(customApplianceValue.trim())}
                   className="rr-choice-button px-4 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Add
@@ -1337,7 +1337,7 @@ export default function RoofRayChat() {
       const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
       const selectedAppliance = applianceNames[applianceStep];
       const selectedQuantity = content.trim();
-      if (/^(0|1|2|3|4\+|none|\\d+)$/i.test(selectedQuantity)) {
+      if (/^(0|1|2|3|4\+|none|\d+)$/i.test(selectedQuantity)) {
         const entry = `${selectedAppliance}: ${selectedQuantity.toLowerCase() === "none" ? "0" : selectedQuantity}`;
         nextApplianceDetails = [applianceDetails, entry].filter(Boolean).join(", ");
         nextApplianceStep = applianceStep + 1;
