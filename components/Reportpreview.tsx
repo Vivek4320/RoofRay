@@ -54,17 +54,24 @@ export default function ReportPreview() {
   }, []);
 
   const planning = reportData?.solarContext?.planningEstimate ?? {};
+  const reportMetrics = reportData?.reportMetrics ?? {};
+  const metricNumber = (reportValue: unknown, planningValue: unknown) => {
+    const r = Number(reportValue);
+    if (Number.isFinite(r)) return r;
+    const p = Number(planningValue);
+    return Number.isFinite(p) ? p : null;
+  };
   const dynamicMetrics = reportData
     ? [
         {
           label: "System size",
-          value: Number.isFinite(Number(planning.systemSizeKw)) ? Number(planning.systemSizeKw).toFixed(2) + " kW" : "—",
-          sub: Number.isFinite(Number(planning.panelCount)) ? Math.round(Number(planning.panelCount)) + " panels" : "live analysis",
+          value: metricNumber(reportMetrics.systemSizeKw, planning.systemSizeKw) !== null ? metricNumber(reportMetrics.systemSizeKw, planning.systemSizeKw)!.toFixed(2) + " kW" : "—",
+          sub: metricNumber(reportMetrics.panelCount, planning.panelCount) !== null ? Math.round(metricNumber(reportMetrics.panelCount, planning.panelCount)!) + " panels" : "live analysis",
           icon: "⚡",
         },
         {
           label: "Est. generation",
-          value: Number.isFinite(Number(planning.averageMonthlyGenerationKwh)) ? Math.round(Number(planning.averageMonthlyGenerationKwh)) + " units" : "—",
+          value: metricNumber(reportMetrics.monthlyGenerationKwh, planning.averageMonthlyGenerationKwh) !== null ? Math.round(metricNumber(reportMetrics.monthlyGenerationKwh, planning.averageMonthlyGenerationKwh)!) + " units" : "—",
           sub: "per month, avg.",
           icon: "☀️",
         },
