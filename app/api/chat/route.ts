@@ -130,6 +130,23 @@ export async function POST(request: Request) {
     const goalInput = userInputs.goal;
     const latestUserMessage = messages[messages.length - 1];
 
+    const intakeComplete = [
+      nameInput,
+      roofAreaInput,
+      roofTypeInput,
+      monthlyBillInput,
+      applianceDetailsInput,
+      connectionTypeInput,
+      ownershipInput,
+      goalInput,
+    ].every(
+      (value) =>
+        value !== null &&
+        value !== undefined &&
+        String(value).trim() !== "",
+    );
+
+    if (intakeComplete) {
     // Estimate connected household load from the appliance quantities supplied by the user.
     // These are planning assumptions, not measured consumption.
     const applianceLoad = (() => {
