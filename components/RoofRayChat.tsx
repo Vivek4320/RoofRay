@@ -904,6 +904,7 @@ export default function RoofRayChat() {
   const [roofType, setRoofType] = useState<string | null>(null);
   const [monthlyBill, setMonthlyBill] = useState<number | null>(null);
   const [applianceDetails, setApplianceDetails] = useState<string | null>(null);
+  const [applianceStep, setApplianceStep] = useState(0);
   const [connectionType, setConnectionType] = useState<string | null>(null);
   const [ownership, setOwnership] = useState<string | null>(null);
   const [goal, setGoal] = useState<string | null>(null);
@@ -1186,6 +1187,7 @@ export default function RoofRayChat() {
     let nextRoofType = roofType;
     let nextMonthlyBill = monthlyBill;
     let nextApplianceDetails = applianceDetails;
+    let nextApplianceStep = applianceStep;
     let nextConnectionType = connectionType;
     let nextOwnership = ownership;
     let nextGoal = goal;
@@ -1214,10 +1216,18 @@ export default function RoofRayChat() {
     } else if (roofArea !== null && roofType !== null && monthlyBill === null && number !== null && number > 0) {
       nextMonthlyBill = number;
       setMonthlyBill(number);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceDetails === null) {
-      nextApplianceDetails = content.replace(/\s+/g, " ").trim().slice(0, 500);
-      if (nextApplianceDetails) setApplianceDetails(nextApplianceDetails);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceDetails !== null && connectionType === null) {
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceStep < 6) {
+      const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
+      const selectedAppliance = applianceNames[applianceStep];
+      const selectedQuantity = content.trim();
+      if (/^(0|1|2|3|4\+|none)$/i.test(selectedQuantity)) {
+        const entry = `${selectedAppliance}: ${selectedQuantity.toLowerCase() === "none" ? "0" : selectedQuantity}`;
+        nextApplianceDetails = [applianceDetails, entry].filter(Boolean).join(", ");
+        nextApplianceStep = applianceStep + 1;
+        setApplianceDetails(nextApplianceDetails);
+        setApplianceStep(nextApplianceStep);
+      }
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceStep >= 6 && connectionType === null) {
       if (normalized.includes("residential")) nextConnectionType = "Residential";
       else if (normalized.includes("commercial")) nextConnectionType = "Commercial";
       else if (normalized.includes("other")) nextConnectionType = "Other";
@@ -1303,6 +1313,14 @@ export default function RoofRayChat() {
 
       // Keep the intake order fixed on the client as well, so an older
       // deployed API response cannot bring back the previous question flow.
+      const applianceQuestions = [
+        "How many TVs do you have?",
+        "How many fans do you have?",
+        "How many ACs do you have?",
+        "How many refrigerators do you have?",
+        "How many bulbs/lights do you have?",
+        "How many water pumps do you have?",
+      ];
       const fixedNextQuestion =
         nextName === null
           ? "What is your name?"
@@ -1312,15 +1330,15 @@ export default function RoofRayChat() {
               ? "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)"
               : nextMonthlyBill === null
                 ? "What is your average monthly electricity bill in ₹?"
-                : nextApplianceDetails === null
-                  ? "Approximately how many electrical appliances do you have? Please tell me the quantity of bulbs, fans, ACs, refrigerators, TVs, water pumps, etc."
+                : nextApplianceStep < applianceQuestions.length
+                  ? applianceQuestions[nextApplianceStep]
                   : nextConnectionType === null
                     ? "What type of electricity connection do you have? (Residential, Commercial, or Other)"
                     : nextOwnership === null
-                    ? "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)"
-                    : nextGoal === null
-                      ? "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)"
-                      : data.message;
+                      ? "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)"
+                      : nextGoal === null
+                        ? "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)"
+                        : data.message;
 
       setMessages((current) => [
         ...current,
@@ -1353,6 +1371,7 @@ export default function RoofRayChat() {
     setRoofType(null);
     setMonthlyBill(null);
     setApplianceDetails(null);
+    setApplianceStep(0);
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
