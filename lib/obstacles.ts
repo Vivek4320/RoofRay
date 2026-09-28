@@ -1,5 +1,3 @@
-import * as SunCalc from "suncalc";
-
 export type SolarObstacle = {
   id: string;
   type: "building" | "tower" | "mast" | "other";
@@ -116,11 +114,86 @@ export function bearingDegrees(
 // Compact NOAA-style solar-position calculation.
 // Azimuth is clockwise from true north.
 export function getSunPosition(date: Date, latitude: number, longitude: number): SunPosition {
-  const position = SunCalc.getPosition(date, latitude, longitude);
-  return {
-    azimuthDeg: ((toDegrees(position.azimuth) % 360) + 360) % 360,
-    elevationDeg: toDegrees(position.altitude),
-  };
+  const unixDays = date.getTime() / 86400000 + 2440587.5;
+  const julianCentury = (unixDays - 2451545.0) / 36525;
+
+  const geomMeanLongSun =
+    (280.46646 + julianCentury * (36000.76983 + julianCentury * 0.0003032)) % 360;
+  const geomMeanAnomSun =
+    357.52911 + julianCentury * (35999.05029 - 0.0001537 * julianCentury);
+  const eccentricityEarthOrbit =
+    0.016708634 - julianCentury * (0.000042037 + 0.0000001267 * julianCentury);
+
+  const sunEqCenter =
+    Math.sin(toRadians(geomMeanAnomSun)) *
+      (1.914602 - julianCentury * (0.004817 + 0.000014 * julianCentury)) +
+    Math.sin(toRadians(2 * geomMeanAnomSun)) *
+      (0.019993 - 0.000101 * julianCentury) +
+    Math.sin(toRadians(3 * geomMeanAnomSun)) * 0.000289;
+
+  const sunTrueLong = geomMeanLongSun + sunEqCenter;
+  const omega = 125.04 - 1934.136 * julianCentury;
+  const sunAppLong =
+    sunTrueLong - 0.00569 - 0.00478 * Math.sin(toRadians(omega));
+
+  const meanObliq =
+    23 +
+    (26 +
+      ((21.448 -
+        julianCentury *
+          (46.815 + julianCentury * (0.00059 - julianCentury * 0.001813))) /
+        60)) /
+      60;
+  const obliqCorr =
+    meanObliq + 0.00256 * Math.cos(toRadians(omega));
+  const sunDeclination = toDegrees(
+    Math.asin(
+      Math.sin(toRadians(obliqCorr)) * Math.sin(toRadians(sunAppLong)),
+    ),
+  );
+
+  const varY = Math.tan(toRadians(obliqCorr / 2)) ** 2;
+  const eqTime =
+    4 *
+    toDegrees(
+      varY * Math.sin(2 * toRadians(geomMeanLongSun)) -
+        2 * eccentricityEarthOrbit * Math.sin(toRadians(geomMeanAnomSun)) +
+        4 *
+          eccentricityEarthOrbit *
+          varY *
+          Math.sin(toRadians(geomMeanAnomSun)) *
+          Math.cos(2 * toRadians(geomMeanLongSun)) -
+        0.5 * varY ** 2 * Math.sin(4 * toRadians(geomMeanLongSun)) -
+        1.25 * eccentricityEarthOrbit ** 2 *
+          Math.sin(2 * toRadians(geomMeanAnomSun)),
+    );
+
+  const minutesUtc = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60;
+  const trueSolarTime = (minutesUtc + eqTime + 4 * longitude) % 1440;
+  const hourAngle = trueSolarTime < 0 ? trueSolarTime / 4 + 180 : trueSolarTime / 4 - 180;
+
+  const solarZenith = toDegrees(
+    Math.acos(
+      Math.sin(toRadians(latitude)) * Math.sin(toRadians(sunDeclination)) +
+        Math.cos(toRadians(latitude)) *
+          Math.cos(toRadians(sunDeclination)) *
+          Math.cos(toRadians(hourAngle)),
+    ),
+  );
+
+  const elevation = 90 - solarZenith;
+  const azimuth =
+    (toDegrees(
+      Math.atan2(
+        Math.sin(toRadians(hourAngle)),
+        Math.cos(toRadians(hourAngle)) * Math.sin(toRadians(latitude)) -
+          Math.tan(toRadians(sunDeclination)) * Math.cos(toRadians(latitude)),
+      ),
+    ) +
+      180) %
+    360;
+
+  return { azimuthDeg: azimuth, elevationDeg: elevation };
 }
 
 function directionName(deg: number): string {
@@ -129,11 +202,8 @@ function directionName(deg: number): string {
 }
 
 export function buildCurrentSunCycle(latitude: number, longitude: number, date = new Date()) {
-  const times = SunCalc.getTimes(date, latitude, longitude);
-  const currentSun = getSunPosition(date, latitude, longitude);
-
-  const samples = Array.from({ length: 49 }, (_, index) => {
-    const sampleDate = new Date(date.getTime() + index * 15 * 60 * 1000);
+  const samples = Array.from({ length: 12 }, (_, index) => {
+    const sampleDate = new Date(date.getTime() + index * 60 * 60 * 1000);
     const sun = getSunPosition(sampleDate, latitude, longitude);
     return {
       timestamp: sampleDate.toISOString(),
@@ -145,17 +215,18 @@ export function buildCurrentSunCycle(latitude: number, longitude: number, date =
   });
 
   return {
-    provider: "SunCalc",
     current: {
       timestamp: date.toISOString(),
-      azimuthDeg: Number(currentSun.azimuthDeg.toFixed(1)),
-      elevationDeg: Number(currentSun.elevationDeg.toFixed(1)),
-      direction: directionName(currentSun.azimuthDeg),
-      aboveHorizon: currentSun.elevationDeg > 0,
+      ...(() => {
+        const sun = getSunPosition(date, latitude, longitude);
+        return {
+          azimuthDeg: Number(sun.azimuthDeg.toFixed(1)),
+          elevationDeg: Number(sun.elevationDeg.toFixed(1)),
+          direction: directionName(sun.azimuthDeg),
+          aboveHorizon: sun.elevationDeg > 0,
+        };
+      })(),
     },
-    sunrise: times.sunrise.toISOString(),
-    sunset: times.sunset.toISOString(),
-    solarNoon: times.solarNoon.toISOString(),
     next12Hours: samples,
   };
 }
