@@ -196,7 +196,9 @@ export async function POST(request: Request) {
       const count = num(planning.panelCount ?? estimate.panelCount) || fallbackCount;
       const watts = num(planning.panelPowerW ?? panel.assumedPowerW) || panelWatts;
       const shadeFromShadow = Array.isArray(shadow.timeSeries)
-        ? (shadow.timeSeries as Array<Record<string, unknown>>).filter((sample) => sample.risk === "high" || sample.risk === "medium")).length / Math.max(1, (shadow.timeSeries as unknown[]).length) * 15
+        ? (shadow.timeSeries as Array<Record<string, unknown>>)
+            .filter((sample) => sample.risk === "high" || sample.risk === "medium")
+            .length / Math.max(1, (shadow.timeSeries as unknown[]).length) * 15
         : NaN;
       const shade = num(planning.estimatedShadingPercent) || shadeFromShadow;
       const monthly = num(planning.averageMonthlyGenerationKwh) || (Number.isFinite(fallbackAnnual) ? Math.round(fallbackAnnual * (1 - (Number.isFinite(shade) ? shade / 100 : 0)) / 12) : NaN);
