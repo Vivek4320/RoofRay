@@ -557,6 +557,9 @@ function AssistantMessage({
     },
   ];
 
+  const applianceChoiceGroup = /how many (tvs|fans|acs|refrigerators|bulbs\/lights|water pumps) do you have/i.test(message.content)
+    ? { options: ["0", "1", "2", "3", "4+", "None"] }
+    : null;
   const choiceGroup = choiceGroups.find(({ pattern }) =>
     pattern.test(message.content),
   );
@@ -604,9 +607,9 @@ function AssistantMessage({
               </button>
             ) : null}
 
-            {choiceGroup ? (
+            {(choiceGroup || applianceChoiceGroup) ? (
               <div className="rr-choice-row mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                {choiceGroup.options.map((label) => (
+                {(choiceGroup || applianceChoiceGroup)!.options.map((label) => (
                   <button
                     key={label}
                     type="button"
