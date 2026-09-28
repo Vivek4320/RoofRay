@@ -1,3 +1,5 @@
+import * as SunCalc from "suncalc";
+
 export type SolarObstacle = {
   id: string;
   type: "building" | "tower" | "mast" | "other";
