@@ -133,20 +133,22 @@ export async function POST(request: Request) {
     // The final report must never depend on Gemini. Appliance details are
     // optional for report generation; the six core intake fields plus goal are
     // enough to complete the deterministic RoofRay solar analysis.
-    const intakeComplete = [
-      nameInput,
-      roofAreaInput,
-      roofTypeInput,
-      monthlyBillInput,
-      connectionTypeInput,
-      ownershipInput,
-      goalInput,
-    ].every(
-      (value) =>
-        value !== null &&
-        value !== undefined &&
-        String(value).trim() !== "",
-    );
+    // The client reaches this API with all required intake values after the
+    // final goal selection. Never send the completed intake through Gemini.
+    const intakeComplete =
+      goalInput !== null &&
+      goalInput !== undefined &&
+      String(goalInput).trim() !== "" &&
+      roofAreaInput !== null &&
+      roofAreaInput !== undefined &&
+      roofTypeInput !== null &&
+      roofTypeInput !== undefined &&
+      monthlyBillInput !== null &&
+      monthlyBillInput !== undefined &&
+      connectionTypeInput !== null &&
+      connectionTypeInput !== undefined &&
+      ownershipInput !== null &&
+      ownershipInput !== undefined;
 
     if (intakeComplete) {
     // Estimate connected household load from the appliance quantities supplied by the user.
