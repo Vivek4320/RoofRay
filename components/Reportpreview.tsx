@@ -76,8 +76,8 @@ export default function ReportPreview() {
         },
         {
           label: "Monthly savings",
-          value: Number.isFinite(Number(reportData?.userInputs?.monthlyBillInr)) ? "₹" + Math.round(Number(reportData.userInputs.monthlyBillInr)) : "—",
-          sub: "current monthly bill",
+          value: "—",
+          sub: "depends on tariff and net metering",
           icon: "📉",
         },
         {
@@ -219,7 +219,7 @@ export default function ReportPreview() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-emerald-500/10 px-4 py-1.5 font-mono text-[0.72rem] font-semibold text-emerald-400 border border-emerald-500/20">
-                  PROFITABLE ✓
+                  {reportData ? "LIVE REPORT ✓" : "SAMPLE REPORT"}
                 </span>
               </div>
             </div>
