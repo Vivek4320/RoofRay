@@ -1226,6 +1226,37 @@ export default function RoofRayChat() {
     return null;
   }
 
+  async function persistReportAndDownloadPdf(
+    report: string,
+    analysis: SolarAnalysis,
+    inputs: Record<string, unknown>,
+  ) {
+    const payload = { report, solarContext: analysis, userInputs: inputs, generatedAt: Date.now() };
+    try {
+      sessionStorage.setItem("roofray_report_data", JSON.stringify(payload));
+      window.dispatchEvent(new Event("roofray_report_ready"));
+    } catch {}
+    try {
+      const response = await fetch("/api/report-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "RoofRay-Solar-Report.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.warn("[RoofRay] PDF download failed:", error);
+    }
+  }
+
   async function generateFinalReport(analysis: SolarAnalysis) {
     if (loading || goal === null) return;
     setLoading(true);
