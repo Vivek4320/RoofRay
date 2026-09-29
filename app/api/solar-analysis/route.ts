@@ -175,8 +175,14 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("[RoofRay] Solar analysis failed:", error);
+    const detail =
+      error instanceof Error ? error.message : String(error || "Unknown error");
+    console.error("[RoofRay] Solar analysis exact failure:", detail);
     return NextResponse.json(
-      { ok: false, error: "Solar analysis is temporarily unavailable. Please try again in a moment." },
+      {
+        ok: false,
+        error: `Solar analysis failed: ${detail.slice(0, 500)}`,
+      },
       { status: 502 },
     );
   }
