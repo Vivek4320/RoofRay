@@ -1412,7 +1412,18 @@ export default function RoofRayChat() {
 
   async function previewReportPdf() {
     const url = await ensureReportPdf();
-    if (url) setReportPdfPreviewOpen(true);
+    if (!url) return;
+    setReportPdfPreviewOpen(true);
+  }
+
+  async function openReportPdfInNewTab() {
+    const url = await ensureReportPdf();
+    if (!url) return;
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      // Popup blockers may prevent a new tab; the in-app preview remains available.
+      setReportPdfPreviewOpen(true);
+    }
   }
 
   async function downloadReportPdf() {
@@ -2004,7 +2015,23 @@ export default function RoofRayChat() {
                   <button type="button" onClick={() => setReportPdfPreviewOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">Close</button>
                 </div>
               </div>
-              <iframe title="RoofRay Solar Report PDF preview" src={reportPdfUrl} className="min-h-0 flex-1 border-0 bg-white" />
+              <object
+                data={reportPdfUrl}
+                type="application/pdf"
+                aria-label="RoofRay Solar Report PDF preview"
+                className="min-h-0 flex-1 border-0 bg-white"
+              >
+                <div className="flex h-full flex-col items-center justify-center gap-4 bg-white p-8 text-center text-slate-700">
+                  <p className="text-sm font-semibold">PDF preview is not available in this browser.</p>
+                  <button
+                    type="button"
+                    onClick={() => void openReportPdfInNewTab()}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white"
+                  >
+                    Open PDF in new tab
+                  </button>
+                </div>
+              </object>
             </div>
           </div>
         )}
