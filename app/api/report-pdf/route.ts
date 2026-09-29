@@ -43,58 +43,115 @@ function reportNumber(report: string, pattern: RegExp): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-function buildPdf(lines: string[]): Uint8Array {
-  const pageWidth = 612;
-  const pageHeight = 792;
-  const margin = 48;
-  const lineHeight = 16;
-  const linesPerPage = 42;
-  const pages: string[][] = [];
 
-  for (let i = 0; i < lines.length; i += linesPerPage) {
-    pages.push(lines.slice(i, i + linesPerPage));
+function roofVisualCommands({
+  roofAreaSqFt,
+  roofType,
+  panelCount,
+  panelPowerW,
+  direction,
+  slopeDeg,
+}: {
+  roofAreaSqFt: number | null;
+  roofType: string;
+  panelCount: number | null;
+  panelPowerW: number | null;
+  direction: string;
+  slopeDeg: number | null;
+}): string[] {
+  const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
+  const cols = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, safePanels))));
+  const rows = Math.max(1, Math.ceil(safePanels / cols));
+  const roofX = 86, roofY = 300, roofW = 440, roofH = 250, gap = 7;
+  const panelW = Math.max(24, Math.min(70, (roofW - 36 - (cols - 1) * gap) / cols));
+  const panelH = Math.max(24, Math.min(55, (roofH - 36 - (rows - 1) * gap) / rows));
+  const usedW = cols * panelW + (cols - 1) * gap;
+  const usedH = rows * panelH + (rows - 1) * gap;
+  const startX = roofX + (roofW - usedW) / 2;
+  const startY = roofY + (roofH - usedH) / 2;
+  const commands: string[] = [
+    "0.10 0.18 0.30 rg",
+    roofX + " " + roofY + " " + roofW + " " + roofH + " re f",
+    "0.35 0.55 0.90 RG", "2 w",
+    roofX + " " + roofY + " " + roofW + " " + roofH + " re S",
+    "0.18 0.35 0.65 rg",
+  ];
+  for (let i = 0; i < safePanels; i += 1) {
+    const row = Math.floor(i / cols), col = i % cols;
+    const x = startX + col * (panelW + gap);
+    const y = roofY + roofH - startY - (row + 1) * panelH - row * gap;
+    commands.push(x.toFixed(1) + " " + y.toFixed(1) + " " + panelW.toFixed(1) + " " + panelH.toFixed(1) + " re f");
+    commands.push("0.55 0.75 1.0 RG", "0.7 w", x.toFixed(1) + " " + y.toFixed(1) + " " + panelW.toFixed(1) + " " + panelH.toFixed(1) + " re S");
+    commands.push("0.18 0.35 0.65 rg");
   }
-  if (!pages.length) pages.push(["RoofRay Solar Feasibility Report"]);
+  commands.push(
+    "0 0 0 RG", "1 w",
+    "455 620 m 500 680 545 620 590 620 c S",
+    "500 660 m 500 590 l S",
+    "500 660 m 492 648 l S",
+    "500 660 m 508 648 l S",
+    "0.95 0.65 0.10 rg", "495 675 10 10 re f", "0 0 0 RG",
+  );
+  return [
+    ...commands,
+    "BT /F2 11 Tf 86 570 Td (CONCEPTUAL ROOF PLAN) Tj ET",
+    "BT /F1 9 Tf 86 552 Td (Top view based on entered roof area and planning panel count.) Tj ET",
+    "BT /F1 8 Tf 86 538 Td (Planning diagram only - not a satellite-measured roof footprint.) Tj ET",
+    "BT /F2 10 Tf 86 285 Td (Panels) Tj ET",
+    "BT /F1 9 Tf 130 285 Td (" + (safePanels || "Unavailable") + " x " + (panelPowerW ?? 450) + " W) Tj ET",
+    "BT /F2 10 Tf 86 268 Td (Roof) Tj ET",
+    "BT /F1 9 Tf 130 268 Td (" + (roofAreaSqFt !== null ? Math.round(roofAreaSqFt) + " sq ft" : "Unavailable") + " | " + text(roofType || "Roof type unavailable") + ") Tj ET",
+    "BT /F2 10 Tf 86 650 Td (SUN PATH) Tj ET",
+    "BT /F1 9 Tf 86 635 Td (Sun rises East, crosses the southern sky, and sets West.) Tj ET",
+    "BT /F1 9 Tf 86 620 Td (Exact daily path changes with date and location.) Tj ET",
+    "BT /F2 10 Tf 455 555 Td (EAST) Tj ET",
+    "BT /F2 10 Tf 545 555 Td (WEST) Tj ET",
+    "BT /F2 10 Tf 487 695 Td (SOUTH) Tj ET",
+    "BT /F1 9 Tf 455 540 Td (Recommended panel direction) Tj ET",
+    "BT /F2 10 Tf 455 525 Td (" + text(direction || "Unavailable") + ") Tj ET",
+    "BT /F1 9 Tf 455 510 Td (Tilt: " + (slopeDeg !== null ? slopeDeg + " deg" : "Unavailable") + ") Tj ET",
+  ];
+}
 
+function buildPdf(lines: string[], visual: {
+  roofAreaSqFt: number | null;
+  roofType: string;
+  panelCount: number | null;
+  panelPowerW: number | null;
+  direction: string;
+  slopeDeg: number | null;
+}): Uint8Array {
+  const pageWidth = 612, pageHeight = 792, margin = 48, lineHeight = 16, linesPerPage = 42;
+  const pages: string[][] = [];
+  for (let i = 0; i < lines.length; i += linesPerPage) pages.push(lines.slice(i, i + linesPerPage));
+  if (!pages.length) pages.push(["RoofRay Solar Feasibility Report"]);
+  const visualPageIndex = pages.length;
+  const totalPages = pages.length + 1;
   const objects: string[] = [];
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
-  objects.push("<< /Type /Pages /Kids [" + pages.map((_, i) => `${5 + i * 2} 0 R`).join(" ") + "] /Count " + pages.length + " >>");
+  objects.push("<< /Type /Pages /Kids [" + Array.from({ length: totalPages }, (_, i) => (5 + i * 2) + " 0 R").join(" ") + "] /Count " + totalPages + " >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
-
-  for (let i = 0; i < pages.length; i++) {
-    const pageObject = 5 + i * 2;
-    const contentObject = pageObject + 1;
-    const contentLines = [
-      "BT",
-      "/F2 18 Tf",
-      `${margin} ${pageHeight - 58} Td`,
-      "(RoofRay Solar Feasibility Report) Tj",
-      "/F1 10 Tf",
-      "0 -28 Td",
-      ...pages[i].flatMap((line, index) => [
-        `(${text(line)}) Tj`,
-        ...(index === pages[i].length - 1 ? [] : [`0 -${lineHeight} Td`]),
-      ]),
-      "ET",
-    ];
+  for (let i = 0; i < totalPages; i++) {
+    const pageObject = 5 + i * 2, contentObject = pageObject + 1;
+    const contentLines = i === visualPageIndex
+      ? ["BT /F2 18 Tf 48 742 Td (RoofRay Roof + Sun Direction Plan) Tj ET", ...roofVisualCommands(visual)]
+      : ["BT", "/F2 18 Tf", margin + " " + (pageHeight - 58) + " Td", "(RoofRay Solar Feasibility Report) Tj", "/F1 10 Tf", "0 -28 Td",
+        ...pages[i].flatMap((line, index) => ["(" + text(line) + ") Tj", ...(index === pages[i].length - 1 ? [] : ["0 -" + lineHeight + " Td"])]), "ET"];
     const stream = contentLines.join("\n");
-    objects[pageObject - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObject} 0 R >>`;
-    objects[contentObject - 1] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+    objects[pageObject - 1] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentObject + " 0 R >>";
+    objects[contentObject - 1] = "<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream";
   }
-
   let pdf = "%PDF-1.4\n";
   const offsets: number[] = [0];
   for (let i = 0; i < objects.length; i++) {
     offsets[i + 1] = pdf.length;
-    pdf += `${i + 1} 0 obj\n${objects[i]}\nendobj\n`;
+    pdf += (i + 1) + " 0 obj\n" + objects[i] + "\nendobj\n";
   }
   const xref = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i <= objects.length; i++) {
-    pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
-  }
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  pdf += "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n";
+  for (let i = 1; i <= objects.length; i++) pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
+  pdf += "trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF";
   return new TextEncoder().encode(pdf);
 }
 
@@ -176,12 +233,19 @@ export async function POST(request: Request) {
       "Data sources: OpenStreetMap Overpass, RoofRay sun-position calculation, Open-Meteo and PVGIS.",
     ];
 
-    const pdf = buildPdf(lines);
+    const pdf = buildPdf(lines, {
+      roofAreaSqFt: roof,
+      roofType: String(inputs.roofType ?? "Roof type unavailable"),
+      panelCount: panels,
+      panelPowerW: numberValue(planning.panelPowerW),
+      direction: String(planning.recommendedDirection ?? "Unavailable"),
+      slopeDeg: numberValue(planning.recommendedSlopeDeg),
+    });
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": 'attachment; filename="RoofRay-Solar-Report.pdf"',
+        "Content-Disposition": 'inline; filename="RoofRay-Solar-Report.pdf"',
         "Cache-Control": "no-store",
       },
     });
