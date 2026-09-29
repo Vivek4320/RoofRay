@@ -82,6 +82,11 @@ async function fetchSatelliteTiles(
   const startX = centerTileX - 1;
   const startY = centerTileY - 1;
   const tiles: SatelliteTile[] = [];
+  const apiKey =
+    process.env.MAPTILER_API_KEY ??
+    process.env.NEXT_PUBLIC_MAPTILER_API_KEY ??
+    "";
+  if (!apiKey) return tiles;
 
   const jobs: Array<Promise<void>> = [];
   for (let row = 0; row < 3; row += 1) {
@@ -89,12 +94,14 @@ async function fetchSatelliteTiles(
       const tileX = startX + col;
       const tileY = startY + row;
       const url =
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/" +
+        "https://api.maptiler.com/tiles/satellite-v4/" +
         zoom +
         "/" +
-        tileY +
+        tileX +
         "/" +
-        tileX;
+        tileY +
+        "?key=" +
+        encodeURIComponent(apiKey);
       jobs.push(
         fetch(url, {
           cache: "no-store",
@@ -382,7 +389,7 @@ function roofVisualCommands({
     ...buildingLines.flatMap((line, i) => ["BT /F1 8 Tf 125 " + (226 - i * 11) + " Td (" + text(line) + ") Tj ET"]),
     "BT /F1 8 Tf 55 150 Td (North is upward. Sun positions use the detected coordinates and current analysis time.) Tj ET",
     "BT /F1 8 Tf 55 138 Td (Mapped footprint is not a survey-grade roof measurement; unmapped buildings may be absent.) Tj ET",
-    "BT /F1 8 Tf 55 126 Td (Source: " + text(roofFootprint?.attribution ?? "OpenStreetMap contributors") + ".) Tj ET",
+    "BT /F1 8 Tf 55 126 Td (Satellite: MapTiler satellite-v4 | Map data: OpenStreetMap contributors.) Tj ET",
   ];
 }
 
