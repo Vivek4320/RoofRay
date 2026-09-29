@@ -1835,6 +1835,7 @@ export default function RoofRayChat() {
                         if (liveAnalysis) await generateFinalReport(liveAnalysis);
                       }}
                       locationCoords={locationCoords}
+                      locationAccuracy={locationAccuracy}
                     />
                   )
                 )}
