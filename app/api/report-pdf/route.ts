@@ -51,6 +51,9 @@ function roofVisualCommands({
   panelPowerW,
   direction,
   slopeDeg,
+  roofFootprint,
+  obstacles,
+  sunCycle,
 }: {
   roofAreaSqFt: number | null;
   roofType: string;
@@ -58,58 +61,131 @@ function roofVisualCommands({
   panelPowerW: number | null;
   direction: string;
   slopeDeg: number | null;
+  roofFootprint: Record<string, unknown> | null;
+  obstacles: Array<Record<string, unknown>>;
+  sunCycle: Record<string, unknown> | null;
 }): string[] {
   const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
+  const roofPolygon = Array.isArray(roofFootprint?.polygon)
+    ? roofFootprint.polygon as Array<Record<string, unknown>>
+    : [];
+  const roofLat = numberValue(roofFootprint?.latitude);
+  const roofLon = numberValue(roofFootprint?.longitude);
+  const mapX = 55, mapY = 315, mapW = 502, mapH = 360;
+  const centerLat = roofLat ?? numberValue((roofPolygon[0] ?? {}).latitude) ?? 0;
+  const centerLon = roofLon ?? numberValue((roofPolygon[0] ?? {}).longitude) ?? 0;
+  const scale = 3.2;
+  const project = (lat: number, lon: number) => ({
+    x: mapX + mapW / 2 + (lon - centerLon) * 111320 * Math.cos((centerLat * Math.PI) / 180) * scale,
+    y: mapY + mapH / 2 + (lat - centerLat) * 111320 * scale,
+  });
+  const clampPoint = (p: { x: number; y: number }) => ({
+    x: Math.max(mapX + 8, Math.min(mapX + mapW - 8, p.x)),
+    y: Math.max(mapY + 8, Math.min(mapY + mapH - 8, p.y)),
+  });
+  const commands: string[] = [
+    "0.96 0.97 0.98 rg", mapX + " " + mapY + " " + mapW + " " + mapH + " re f",
+    "0.78 0.82 0.86 RG", "1 w", mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
+  ];
+
+  const sortedObstacles = [...obstacles]
+    .filter((item) => numberValue(item.distanceMeters) !== null)
+    .sort((a, b) => (numberValue(a.distanceMeters) ?? 9999) - (numberValue(b.distanceMeters) ?? 9999))
+    .slice(0, 12);
+
+  for (const obstacle of sortedObstacles) {
+    const lat = numberValue(obstacle.latitude);
+    const lon = numberValue(obstacle.longitude);
+    if (lat === null || lon === null) continue;
+    const p = clampPoint(project(lat, lon));
+    const height = numberValue(obstacle.heightMeters) ?? 6;
+    const radius = Math.max(7, Math.min(22, 7 + height * 0.9));
+    commands.push("0.72 0.74 0.78 rg", (p.x - radius).toFixed(1) + " " + (p.y - radius).toFixed(1) + " " + (radius * 2).toFixed(1) + " " + (radius * 2).toFixed(1) + " re f");
+    commands.push("0.45 0.48 0.52 RG", "0.8 w", (p.x - radius).toFixed(1) + " " + (p.y - radius).toFixed(1) + " " + (radius * 2).toFixed(1) + " " + (radius * 2).toFixed(1) + " re S");
+  }
+
+  const roofPoints = roofPolygon
+    .map((point) => {
+      const lat = numberValue(point.latitude);
+      const lon = numberValue(point.longitude);
+      return lat !== null && lon !== null ? project(lat, lon) : null;
+    })
+    .filter((point): point is { x: number; y: number } => Boolean(point));
+
+  if (roofPoints.length >= 3) {
+    commands.push("0.20 0.45 0.75 rg", roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m");
+    for (let i = 1; i < roofPoints.length; i += 1) commands.push(roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l");
+    commands.push("h f", "0.05 0.25 0.55 RG", "2 w", roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m");
+    for (let i = 1; i < roofPoints.length; i += 1) commands.push(roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l");
+    commands.push("h S");
+  }
+
+  const minX = roofPoints.length ? Math.min(...roofPoints.map((p) => p.x)) : mapX + 150;
+  const maxX = roofPoints.length ? Math.max(...roofPoints.map((p) => p.x)) : mapX + 350;
+  const minY = roofPoints.length ? Math.min(...roofPoints.map((p) => p.y)) : mapY + 120;
+  const maxY = roofPoints.length ? Math.max(...roofPoints.map((p) => p.y)) : mapY + 270;
   const cols = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, safePanels))));
   const rows = Math.max(1, Math.ceil(safePanels / cols));
-  const roofX = 86, roofY = 300, roofW = 440, roofH = 250, gap = 7;
-  const panelW = Math.max(24, Math.min(70, (roofW - 36 - (cols - 1) * gap) / cols));
-  const panelH = Math.max(24, Math.min(55, (roofH - 36 - (rows - 1) * gap) / rows));
-  const usedW = cols * panelW + (cols - 1) * gap;
-  const usedH = rows * panelH + (rows - 1) * gap;
-  const startX = roofX + (roofW - usedW) / 2;
-  const startY = roofY + (roofH - usedH) / 2;
-  const commands: string[] = [
-    "0.10 0.18 0.30 rg",
-    roofX + " " + roofY + " " + roofW + " " + roofH + " re f",
-    "0.35 0.55 0.90 RG", "2 w",
-    roofX + " " + roofY + " " + roofW + " " + roofH + " re S",
-    "0.18 0.35 0.65 rg",
-  ];
+  const pad = 10;
+  const pw = Math.max(5, (maxX - minX - pad * 2 - (cols - 1) * 3) / cols);
+  const ph = Math.max(5, (maxY - minY - pad * 2 - (rows - 1) * 3) / rows);
   for (let i = 0; i < safePanels; i += 1) {
     const row = Math.floor(i / cols), col = i % cols;
-    const x = startX + col * (panelW + gap);
-    const y = startY + (rows - row - 1) * (panelH + gap);
-    commands.push(x.toFixed(1) + " " + y.toFixed(1) + " " + panelW.toFixed(1) + " " + panelH.toFixed(1) + " re f");
-    commands.push("0.55 0.75 1.0 RG", "0.7 w", x.toFixed(1) + " " + y.toFixed(1) + " " + panelW.toFixed(1) + " " + panelH.toFixed(1) + " re S");
-    commands.push("0.18 0.35 0.65 rg");
+    const x = minX + pad + col * (pw + 3);
+    const y = maxY - pad - (row + 1) * ph - row * 3;
+    commands.push("0.08 0.25 0.50 rg", x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re f");
+    commands.push("0.65 0.80 0.98 RG", "0.6 w", x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re S");
   }
-  commands.push(
-    "0 0 0 RG", "1 w",
-    "455 620 m 500 680 545 620 590 620 c S",
-    "500 660 m 500 590 l S",
-    "500 660 m 492 648 l S",
-    "500 660 m 508 648 l S",
-    "0.95 0.65 0.10 rg", "495 675 10 10 re f", "0 0 0 RG",
-  );
+
+  const cycle = Array.isArray((sunCycle ?? {}).next12Hours)
+    ? (sunCycle as { next12Hours: Array<Record<string, unknown>> }).next12Hours
+    : [];
+  const houseCenter = roofPoints.length
+    ? { x: roofPoints.reduce((a, p) => a + p.x, 0) / roofPoints.length, y: roofPoints.reduce((a, p) => a + p.y, 0) / roofPoints.length }
+    : { x: mapX + mapW / 2, y: mapY + mapH / 2 };
+  const sunRadius = 95;
+  const sunPoints = cycle
+    .filter((sample) => sample.aboveHorizon !== false && numberValue(sample.azimuthDeg) !== null)
+    .slice(0, 8)
+    .map((sample) => {
+      const az = (numberValue(sample.azimuthDeg) ?? 0) * Math.PI / 180;
+      const el = Math.max(0.15, Math.min(1, (numberValue(sample.elevationDeg) ?? 10) / 90));
+      return { x: houseCenter.x + Math.sin(az) * sunRadius, y: houseCenter.y + Math.cos(az) * sunRadius * el };
+    });
+  if (sunPoints.length >= 2) {
+    commands.push("0.95 0.55 0.05 RG", "2 w", sunPoints[0].x.toFixed(1) + " " + sunPoints[0].y.toFixed(1) + " m");
+    for (let i = 1; i < sunPoints.length; i += 1) commands.push(sunPoints[i].x.toFixed(1) + " " + sunPoints[i].y.toFixed(1) + " l");
+    commands.push("S");
+  }
+  for (const point of sunPoints) commands.push("0.98 0.60 0.05 rg", (point.x - 5).toFixed(1) + " " + (point.y - 5).toFixed(1) + " 10 10 re f");
+
+  commands.push("0 0 0 RG", "1 w",
+    houseCenter.x.toFixed(1) + " " + (houseCenter.y + 20).toFixed(1) + " m " + houseCenter.x.toFixed(1) + " " + (houseCenter.y - 45).toFixed(1) + " l S",
+    houseCenter.x.toFixed(1) + " " + (houseCenter.y - 45).toFixed(1) + " m " + (houseCenter.x - 5).toFixed(1) + " " + (houseCenter.y - 37).toFixed(1) + " l S",
+    houseCenter.x.toFixed(1) + " " + (houseCenter.y - 45).toFixed(1) + " m " + (houseCenter.x + 5).toFixed(1) + " " + (houseCenter.y - 37).toFixed(1) + " l S");
+
+  const buildingLines = sortedObstacles.slice(0, 5).map((o, index) => {
+    const h = numberValue(o.heightMeters), d = numberValue(o.distanceMeters);
+    return "#" + (index + 1) + " " + String(o.type ?? "building") + " ~" + (h !== null ? h.toFixed(1) : "?") + "m, " + (d !== null ? d.toFixed(0) : "?") + "m away";
+  });
+
   return [
     ...commands,
-    "BT /F2 11 Tf 86 570 Td (CONCEPTUAL ROOF PLAN) Tj ET",
-    "BT /F1 9 Tf 86 552 Td (Top view based on entered roof area and planning panel count.) Tj ET",
-    "BT /F1 8 Tf 86 538 Td (Planning diagram only - not a satellite-measured roof footprint.) Tj ET",
-    "BT /F2 10 Tf 86 285 Td (Panels) Tj ET",
-    "BT /F1 9 Tf 130 285 Td (" + (safePanels || "Unavailable") + " x " + (panelPowerW ?? 450) + " W) Tj ET",
-    "BT /F2 10 Tf 86 268 Td (Roof) Tj ET",
-    "BT /F1 9 Tf 130 268 Td (" + (roofAreaSqFt !== null ? Math.round(roofAreaSqFt) + " sq ft" : "Unavailable") + " | " + text(roofType || "Roof type unavailable") + ") Tj ET",
-    "BT /F2 10 Tf 86 650 Td (SUN PATH) Tj ET",
-    "BT /F1 9 Tf 86 635 Td (Sun rises East, crosses the southern sky, and sets West.) Tj ET",
-    "BT /F1 9 Tf 86 620 Td (Exact daily path changes with date and location.) Tj ET",
-    "BT /F2 10 Tf 455 555 Td (EAST) Tj ET",
-    "BT /F2 10 Tf 545 555 Td (WEST) Tj ET",
-    "BT /F2 10 Tf 487 695 Td (SOUTH) Tj ET",
-    "BT /F1 9 Tf 455 540 Td (Recommended panel direction) Tj ET",
-    "BT /F2 10 Tf 455 525 Td (" + text(direction || "Unavailable") + ") Tj ET",
-    "BT /F1 9 Tf 455 510 Td (Tilt: " + (slopeDeg !== null ? slopeDeg + " deg" : "Unavailable") + ") Tj ET",
+    "BT /F2 14 Tf 55 700 Td (REAL LOCATION ROOF + SUN + SHADING MAP) Tj ET",
+    "BT /F1 8 Tf 55 687 Td (Mapped roof footprint and nearby obstacles from OpenStreetMap at the detected coordinates.) Tj ET",
+    "BT /F2 9 Tf 55 295 Td (LEGEND) Tj ET",
+    "BT /F1 8 Tf 55 282 Td (Blue target roof | Dark blue panels | Grey nearby buildings | Orange calculated sun path) Tj ET",
+    "BT /F2 9 Tf 55 268 Td (Panel direction) Tj ET",
+    "BT /F1 8 Tf 125 268 Td (" + text(direction || "Unavailable") + " | Tilt " + (slopeDeg !== null ? slopeDeg + " deg" : "Unavailable") + ") Tj ET",
+    "BT /F2 9 Tf 55 254 Td (Roof input) Tj ET",
+    "BT /F1 8 Tf 125 254 Td (" + (roofAreaSqFt !== null ? Math.round(roofAreaSqFt) + " sq ft" : "Unavailable") + " | " + text(roofType || "Unavailable") + ") Tj ET",
+    "BT /F2 9 Tf 55 240 Td (Panels) Tj ET",
+    "BT /F1 8 Tf 125 240 Td (" + (safePanels || "Unavailable") + " x " + (panelPowerW ?? 450) + " W) Tj ET",
+    "BT /F2 9 Tf 55 226 Td (Nearby mapped buildings) Tj ET",
+    ...buildingLines.flatMap((line, i) => ["BT /F1 8 Tf 125 " + (226 - i * 11) + " Td (" + text(line) + ") Tj ET"]),
+    "BT /F1 8 Tf 55 150 Td (North is upward. Sun positions use the detected coordinates and current analysis time.) Tj ET",
+    "BT /F1 8 Tf 55 138 Td (Mapped footprint is not a survey-grade roof measurement; unmapped buildings may be absent.) Tj ET",
+    "BT /F1 8 Tf 55 126 Td (Source: " + text(roofFootprint?.attribution ?? "OpenStreetMap contributors") + ".) Tj ET",
   ];
 }
 
@@ -120,6 +196,9 @@ function buildPdf(lines: string[], visual: {
   panelPowerW: number | null;
   direction: string;
   slopeDeg: number | null;
+  roofFootprint: Record<string, unknown> | null;
+  obstacles: Array<Record<string, unknown>>;
+  sunCycle: Record<string, unknown> | null;
 }): Uint8Array {
   const pageWidth = 612, pageHeight = 792, margin = 48, lineHeight = 16, linesPerPage = 42;
   const pages: string[][] = [];
@@ -240,6 +319,11 @@ export async function POST(request: Request) {
       panelPowerW: numberValue(planning.panelPowerW),
       direction: String(planning.recommendedDirection ?? "Unavailable"),
       slopeDeg: numberValue(planning.recommendedSlopeDeg),
+      roofFootprint: (context.roof ?? null) as Record<string, unknown> | null,
+      obstacles: Array.isArray((context.obstacles as Record<string, unknown> | undefined)?.obstacles)
+        ? ((context.obstacles as Record<string, unknown>).obstacles as Array<Record<string, unknown>>)
+        : [],
+      sunCycle: (context.sunCycle ?? null) as Record<string, unknown> | null,
     });
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
