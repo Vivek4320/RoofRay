@@ -1204,6 +1204,62 @@ export default function RoofRayChat() {
     setAutoScroll(distanceFromBottom < AUTO_SCROLL_THRESHOLD);
   }
 
+  async function getBestLocationPosition(): Promise<GeolocationPosition> {
+    if (!navigator.geolocation) {
+      throw new Error("Geolocation is not supported by this browser.");
+    }
+
+    return new Promise((resolve, reject) => {
+      let best: GeolocationPosition | null = null;
+      let settled = false;
+      let timer = 0;
+
+      const finish = (position?: GeolocationPosition, error?: GeolocationPositionError) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        if (position) resolve(position);
+        else reject(error ?? new Error("Unable to determine your location."));
+      };
+
+      let watchId: number | null = null;
+
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          if (!best || position.coords.accuracy < best.coords.accuracy) {
+            best = position;
+            setLocationAccuracy(position.coords.accuracy);
+          }
+
+          // Stop early once browser GPS reports a genuinely useful fix.
+          if (position.coords.accuracy <= 25) finish(position);
+        },
+        (error) => {
+          if (!best) finish(undefined, error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 30000,
+          maximumAge: 0,
+        },
+      );
+
+      // Desktop Chrome may only expose Wi-Fi/IP positioning. In that case use
+      // the best fix received instead of waiting forever.
+      timer = window.setTimeout(() => {
+        if (best) finish(best);
+        else {
+          navigator.geolocation.getCurrentPosition(
+            (position) => finish(position),
+            (error) => finish(undefined, error),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+          );
+        }
+      }, 12000);
+    });
+  }
+
   async function loadLocationAnalysis(roofAreaSqFt?: number | null): Promise<SolarAnalysis | null> {
     if (!navigator.geolocation) {
       setLocationStatus("unavailable");
@@ -1221,15 +1277,22 @@ export default function RoofRayChat() {
     setLocationStatus("detecting");
 
     return new Promise<SolarAnalysis | null>((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
+      void getBestLocationPosition()
+        .then(async (position) => {
           const latitude = position.coords.latitude;
           const longitude = position.coords.longitude;
           const accuracy = position.coords.accuracy;
           setLocationCoords({ latitude, longitude });
           setLocationAccuracy(accuracy);
           setLocationStatus(accuracy > 100 ? "warning" : "ready");
-          sessionStorage.setItem("roofray_location", JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }));
+          sessionStorage.setItem(
+            "roofray_location",
+            JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }),
+          );
+          localStorage.setItem(
+            "roofray_location",
+            JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }),
+          );
           const resolvedLocation = await reverseGeocode(latitude, longitude);
           if (resolvedLocation) setLocationLabel(resolvedLocation);
           if (!locationMessageShownRef.current) {
@@ -1292,19 +1355,17 @@ export default function RoofRayChat() {
             },
           ]);
           resolve(null);
-        },
-        (error) => {
+        })
+        .catch((error) => {
           setLocationLoading(false);
           console.warn("[RoofRay] Geolocation failed:", {
-            code: error.code,
-            message: error.message,
+            code: error?.code,
+            message: error?.message,
           });
-          if (error.code === 1) setLocationStatus("denied");
+          if (error?.code === 1) setLocationStatus("denied");
           else setLocationStatus("unavailable");
           resolve(null);
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
-      );
+        });
     });
   }
 
