@@ -140,6 +140,38 @@ export async function POST(request: Request) {
       ownershipInput !== undefined;
 
     if (intakeComplete) {
+      const planning = (solarContextObject.planningEstimate ?? {}) as Record<string, unknown>;
+      const placement = (solarContextObject.panelPlacement ?? {}) as Record<string, unknown>;
+      const estimate = (placement.estimate ?? {}) as Record<string, unknown>;
+      const panel = (placement.panel ?? {}) as Record<string, unknown>;
+      const location = (planning.location ?? solarContextObject.location ?? {}) as Record<string, unknown>;
+      const orientation = (solarContextObject.optimalOrientation ?? {}) as Record<string, unknown>;
+      const shadow = (solarContextObject.shadow ?? {}) as Record<string, unknown>;
+
+      const num = (value: unknown) =>
+        typeof value === "number" && Number.isFinite(value) ? value : Number(value);
+
+      const lat = num(location.latitude);
+      const lon = num(location.longitude);
+      const roofAreaSqFt = num(roofAreaInput);
+      const roofAreaM2 = Number.isFinite(roofAreaSqFt) ? roofAreaSqFt * 0.092903 : null;
+      const specificYield = num(
+        (solarContextObject.annual as Record<string, unknown> | undefined)?.specificYieldKwhPerKwp,
+      );
+      const panelAreaM2 = num(panel.areaM2) || 1.952748;
+      const panelWatts = num(panel.assumedPowerW) || 450;
+      const fallbackCount =
+        roofAreaM2 !== null && Number.isFinite(roofAreaM2)
+          ? Math.max(0, Math.floor((roofAreaM2 * 0.72) / panelAreaM2))
+          : NaN;
+      const fallbackSize = Number.isFinite(fallbackCount)
+        ? Number(((fallbackCount * panelWatts) / 1000).toFixed(2))
+        : NaN;
+      const fallbackAnnual =
+        Number.isFinite(specificYield) && Number.isFinite(fallbackSize)
+          ? Math.round(fallbackSize * specificYield)
+          : NaN;
+
     // Estimate connected household load from the appliance quantities supplied by the user.
     // These are planning assumptions, not measured consumption.
     const applianceLoad = (() => {
