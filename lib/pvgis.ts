@@ -133,6 +133,12 @@ export async function getPVGISAnalysis({
   peakPowerKw?: number;
   lossPercent?: number;
 }): Promise<PVGISAnalysis> {
+  // SARAH3 does not cover longitudes east of 65°E. Jamnagar and much
+  // of western India are east of that boundary, so use the worldwide
+  // ERA5 reanalysis database there instead of sending an invalid SARAH3 query.
+  const radiationDatabase =
+    longitude > 65 || longitude < -65 ? "PVGIS-ERA5" : "PVGIS-SARAH3";
+
   const params = new URLSearchParams({
     lat: String(latitude),
     lon: String(longitude),
@@ -142,7 +148,7 @@ export async function getPVGISAnalysis({
     mountingplace: "building",
     optimalangles: "1",
     usehorizon: "1",
-    raddatabase: "PVGIS-SARAH3",
+    raddatabase: radiationDatabase,
     outputformat: "json",
   });
 
