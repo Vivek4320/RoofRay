@@ -242,6 +242,9 @@ export async function POST(request: Request) {
         : typeof orientation.direction === "string" ? orientation.direction : "";
       const slope = num(planning.recommendedSlopeDeg ?? orientation.slopeDeg);
       const risk = typeof shadow.currentRisk === "string" ? shadow.currentRisk : "";
+      const fmt = (v: number, digits = 0) =>
+        Number.isFinite(v) ? v.toFixed(digits) : "unavailable";
+
       const monthlyGeneration = Array.isArray(planning.monthlyGenerationKwh)
         ? planning.monthlyGenerationKwh as Array<Record<string, unknown>>
         : [];
@@ -273,9 +276,6 @@ export async function POST(request: Request) {
       const daylightHours = weatherNum(dailyWeather.daylightDurationHours);
       const sunshineHours = weatherNum(dailyWeather.sunshineDurationHours);
 
-
-      const fmt = (v: number, digits = 0) =>
-        Number.isFinite(v) ? v.toFixed(digits) : "unavailable";
 
       const locationLine =
         Number.isFinite(lat) && Number.isFinite(lon)
