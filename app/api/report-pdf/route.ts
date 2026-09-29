@@ -150,8 +150,14 @@ function roofVisualCommands({
   const roofLat = numberValue(roofFootprint?.latitude);
   const roofLon = numberValue(roofFootprint?.longitude);
   const mapX = 55, mapY = 315, mapW = 502, mapH = 360;
-  const centerLat = roofLat ?? numberValue((roofPolygon[0] ?? {}).latitude) ?? 0;
-  const centerLon = roofLon ?? numberValue((roofPolygon[0] ?? {}).longitude) ?? 0;
+  const centerLat =
+    roofLat ??
+    numberValue((actualRoofPolygon[0] ?? {}).latitude) ??
+    0;
+  const centerLon =
+    roofLon ??
+    numberValue((actualRoofPolygon[0] ?? {}).longitude) ??
+    0;
   const scale = 3.2;
   const project = (lat: number, lon: number) => ({
     x: mapX + mapW / 2 + (lon - centerLon) * 111320 * Math.cos((centerLat * Math.PI) / 180) * scale,
