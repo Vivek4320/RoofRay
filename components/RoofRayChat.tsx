@@ -1060,6 +1060,18 @@ export default function RoofRayChat() {
   }, [reportPdfUrl]);
 
   useEffect(() => {
+    const handleReportUpdate = () => {
+      setReportPdfUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      setReportPdfError(null);
+    };
+    window.addEventListener("roofray_report_ready", handleReportUpdate);
+    return () => window.removeEventListener("roofray_report_ready", handleReportUpdate);
+  }, []);
+
+  useEffect(() => {
     const saved = localStorage.getItem("roofray_sidebar_open");
     if (saved !== null) setSidebarOpen(saved === "true");
   }, []);
