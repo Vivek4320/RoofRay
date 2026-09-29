@@ -528,10 +528,14 @@ function AssistantMessage({
   message,
   onRetry,
   onLocationPermission,
+  locationCoords,
+  locationAccuracy,
 }: {
   message: ChatMessage;
   onRetry: (content: string) => void;
   onLocationPermission?: () => void;
+  locationCoords?: { latitude: number; longitude: number } | null;
+  locationAccuracy?: number | null;
 }) {
   const choiceGroups: Array<{ pattern: RegExp; options: string[] }> = [
     {
