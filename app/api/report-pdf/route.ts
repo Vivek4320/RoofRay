@@ -79,7 +79,7 @@ function roofVisualCommands({
   for (let i = 0; i < safePanels; i += 1) {
     const row = Math.floor(i / cols), col = i % cols;
     const x = startX + col * (panelW + gap);
-    const y = roofY + roofH - startY - (row + 1) * panelH - row * gap;
+    const y = startY + (rows - row - 1) * (panelH + gap);
     commands.push(x.toFixed(1) + " " + y.toFixed(1) + " " + panelW.toFixed(1) + " " + panelH.toFixed(1) + " re f");
     commands.push("0.55 0.75 1.0 RG", "0.7 w", x.toFixed(1) + " " + y.toFixed(1) + " " + panelW.toFixed(1) + " " + panelH.toFixed(1) + " re S");
     commands.push("0.18 0.35 0.65 rg");
