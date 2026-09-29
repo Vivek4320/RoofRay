@@ -645,6 +645,14 @@ function AssistantMessage({
                   <span aria-hidden="true">↓</span>
                   Download PDF
                 </button>
+                <button
+                  type="button"
+                  onClick={() => window.location.assign("/solar-3d")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-[12px] font-semibold text-cyan-300 hover:bg-cyan-500/20"
+                >
+                  <span aria-hidden="true">🛰</span>
+                  View My Roof in 3D
+                </button>
               </div>
             ) : null}
 
