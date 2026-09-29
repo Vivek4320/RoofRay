@@ -220,24 +220,35 @@ function roofVisualCommands({
     ? roofFootprint.polygon as Array<Record<string, unknown>>
     : [];
   const mappedTarget = mappedBuildings.find((building) => building.containsTarget) ?? null;
-  const actualRoofPolygon = roofPolygon.length >= 3
-    ? roofPolygon
-    : (mappedTarget?.polygon ?? []);
+  const actualRoofPolygon =
+    roofPolygon.length >= 3 ? roofPolygon : (mappedTarget?.polygon ?? []);
+
   const roofLat = numberValue(roofFootprint?.latitude);
   const roofLon = numberValue(roofFootprint?.longitude);
-  const mapX = 55, mapY = 315, mapW = 502, mapH = 360;
   const centerLat =
-    roofLat ??
-    numberValue((actualRoofPolygon[0] ?? {}).latitude) ??
-    0;
+    roofLat ?? numberValue((actualRoofPolygon[0] ?? {}).latitude) ?? 0;
   const centerLon =
-    roofLon ??
-    numberValue((actualRoofPolygon[0] ?? {}).longitude) ??
-    0;
+    roofLon ?? numberValue((actualRoofPolygon[0] ?? {}).longitude) ?? 0;
+
+  // Landscape visual page, deliberately arranged like a professional solar
+  // site-assessment sheet: dark information rail, large real aerial map and
+  // three analysis cards underneath.
+  const pageW = 842;
+  const pageH = 595;
+  const sideX = 18;
+  const sideY = 18;
+  const sideW = 164;
+  const sideH = 559;
+  const mapX = 190;
+  const mapY = 250;
+  const mapW = 634;
+  const mapH = 310;
+
   const satelliteZoom = 18;
   const centerPixel = webMercatorPixel(centerLat, centerLon, satelliteZoom);
   const startTileX = Math.floor(centerPixel.x / 256) - 1;
   const startTileY = Math.floor(centerPixel.y / 256) - 1;
+
   const project = (lat: number, lon: number) => {
     const pixel = webMercatorPixel(lat, lon, satelliteZoom);
     const relativeX = pixel.x - startTileX * 256;
@@ -247,47 +258,6 @@ function roofVisualCommands({
       y: mapY + mapH - (relativeY / 768) * mapH,
     };
   };
-  const clampPoint = (p: { x: number; y: number }) => ({
-    x: Math.max(mapX + 8, Math.min(mapX + mapW - 8, p.x)),
-    y: Math.max(mapY + 8, Math.min(mapY + mapH - 8, p.y)),
-  });
-  const commands: string[] = [
-    "0.96 0.97 0.98 rg", mapX + " " + mapY + " " + mapW + " " + mapH + " re f",
-  ];
-  if (satelliteTiles.length) {
-    commands.push(
-      "q",
-      mapX + " " + mapY + " " + mapW + " " + mapH + " re W n",
-    );
-    for (const tile of satelliteTiles) {
-      commands.push(
-        "q",
-        tile.w.toFixed(1) + " 0 0 " + tile.h.toFixed(1) + " " + (mapX + tile.x).toFixed(1) + " " + (mapY + tile.y).toFixed(1) + " cm",
-        "/" + tile.name + " Do",
-        "Q",
-      );
-    }
-    commands.push("Q");
-  }
-  commands.push(
-    "0.95 0.95 0.95 RG", "1 w", mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
-  );
-
-  const sortedObstacles = [...obstacles]
-    .filter((item) => numberValue(item.distanceMeters) !== null)
-    .sort((a, b) => (numberValue(a.distanceMeters) ?? 9999) - (numberValue(b.distanceMeters) ?? 9999))
-    .slice(0, 12);
-
-  for (const obstacle of sortedObstacles) {
-    const lat = numberValue(obstacle.latitude);
-    const lon = numberValue(obstacle.longitude);
-    if (lat === null || lon === null) continue;
-    const p = clampPoint(project(lat, lon));
-    const height = numberValue(obstacle.heightMeters) ?? 6;
-    const radius = Math.max(7, Math.min(22, 7 + height * 0.9));
-    commands.push("0.72 0.74 0.78 rg", (p.x - radius).toFixed(1) + " " + (p.y - radius).toFixed(1) + " " + (radius * 2).toFixed(1) + " " + (radius * 2).toFixed(1) + " re f");
-    commands.push("0.45 0.48 0.52 RG", "0.8 w", (p.x - radius).toFixed(1) + " " + (p.y - radius).toFixed(1) + " " + (radius * 2).toFixed(1) + " " + (radius * 2).toFixed(1) + " re S");
-  }
 
   const roofPoints = actualRoofPolygon
     .map((point) => {
@@ -297,60 +267,154 @@ function roofVisualCommands({
     })
     .filter((point): point is { x: number; y: number } => Boolean(point));
 
+  const commands: string[] = [
+    "0.025 0.055 0.085 rg",
+    sideX + " " + sideY + " " + sideW + " " + sideH + " re f",
+    "0.035 0.075 0.115 rg",
+    mapX + " " + mapY + " " + mapW + " " + mapH + " re f",
+  ];
+
+  if (satelliteTiles.length) {
+    commands.push(
+      "q",
+      mapX + " " + mapY + " " + mapW + " " + mapH + " re W n",
+    );
+    for (const tile of satelliteTiles) {
+      commands.push(
+        "q",
+        tile.w.toFixed(1) + " 0 0 " + tile.h.toFixed(1) + " " +
+          (mapX + tile.x).toFixed(1) + " " + (mapY + tile.y).toFixed(1) + " cm",
+        "/" + tile.name + " Do",
+        "Q",
+      );
+    }
+    commands.push("Q");
+  }
+
+  commands.push(
+    "0.20 0.85 1.00 RG",
+    "1.5 w",
+    mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
+  );
+
+  // Actual mapped target roof outline + clipped panel placement.
   if (roofPoints.length >= 3) {
     commands.push(
-      "0.10 0.65 1.00 RG",
-      "3 w",
+      "0.20 0.90 1.00 RG",
+      "2.8 w",
       roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m",
     );
     for (let i = 1; i < roofPoints.length; i += 1) {
-      commands.push(roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l");
+      commands.push(
+        roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l",
+      );
     }
     commands.push("h S");
 
     if (safePanels > 0) {
-      const minRoofX = Math.min(...roofPoints.map((p) => p.x));
-      const maxRoofX = Math.max(...roofPoints.map((p) => p.x));
-      const minRoofY = Math.min(...roofPoints.map((p) => p.y));
-      const maxRoofY = Math.max(...roofPoints.map((p) => p.y));
-      const roofW = Math.max(20, maxRoofX - minRoofX);
-      const roofH = Math.max(20, maxRoofY - minRoofY);
-      const panelCols = Math.max(1, Math.min(8, Math.ceil(Math.sqrt(safePanels * roofW / Math.max(roofH, 1)))));
-      const panelRows = Math.max(1, Math.ceil(safePanels / panelCols));
-      const gap = 2.5;
-      const cellW = Math.max(7, (roofW - gap * (panelCols + 1)) / panelCols);
-      const cellH = Math.max(7, (roofH - gap * (panelRows + 1)) / panelRows);
+      const minX = Math.min(...roofPoints.map((p) => p.x));
+      const maxX = Math.max(...roofPoints.map((p) => p.x));
+      const minY = Math.min(...roofPoints.map((p) => p.y));
+      const maxY = Math.max(...roofPoints.map((p) => p.y));
+      const roofW = Math.max(24, maxX - minX);
+      const roofH = Math.max(24, maxY - minY);
+      const cols = Math.max(
+        1,
+        Math.min(8, Math.ceil(Math.sqrt(safePanels * roofW / Math.max(roofH, 1)))),
+      );
+      const rows = Math.max(1, Math.ceil(safePanels / cols));
+      const gap = Math.max(1.5, Math.min(4, Math.min(roofW, roofH) * 0.025));
+      const cellW = Math.max(5, (roofW * 0.76 - gap * (cols - 1)) / cols);
+      const cellH = Math.max(5, (roofH * 0.70 - gap * (rows - 1)) / rows);
 
       commands.push("q");
-      commands.push(roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m");
+      commands.push(
+        roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m",
+      );
       for (let i = 1; i < roofPoints.length; i += 1) {
-        commands.push(roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l");
+        commands.push(
+          roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l",
+        );
       }
       commands.push("h W n");
 
       for (let i = 0; i < safePanels; i += 1) {
-        const row = Math.floor(i / panelCols);
-        const col = i % panelCols;
-        if (row >= panelRows) break;
-        const x = minRoofX + gap + col * (cellW + gap);
-        const y = maxRoofY - gap - (row + 1) * cellH - row * gap;
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        const x = minX + roofW * 0.12 + col * (cellW + gap);
+        const y = maxY - roofH * 0.15 - (row + 1) * cellH - row * gap;
         commands.push(
-          "0.04 0.20 0.42 rg",
-          x.toFixed(1) + " " + y.toFixed(1) + " " + cellW.toFixed(1) + " " + cellH.toFixed(1) + " re f",
-          "0.45 0.78 1.00 RG",
-          "0.7 w",
-          x.toFixed(1) + " " + y.toFixed(1) + " " + cellW.toFixed(1) + " " + cellH.toFixed(1) + " re S",
+          "0.025 0.15 0.32 rg",
+          x.toFixed(1) + " " + y.toFixed(1) + " " +
+            cellW.toFixed(1) + " " + cellH.toFixed(1) + " re f",
+          "0.35 0.75 1.00 RG",
+          "0.55 w",
+          x.toFixed(1) + " " + y.toFixed(1) + " " +
+            cellW.toFixed(1) + " " + cellH.toFixed(1) + " re S",
         );
       }
       commands.push("Q");
     }
+
+    const houseCenter = {
+      x: roofPoints.reduce((sum, p) => sum + p.x, 0) / roofPoints.length,
+      y: roofPoints.reduce((sum, p) => sum + p.y, 0) / roofPoints.length,
+    };
+    commands.push(
+      "0.10 0.55 1.00 rg",
+      (houseCenter.x - 5).toFixed(1) + " " + (houseCenter.y - 5).toFixed(1) + " 10 10 re f",
+      "0.05 0.12 0.20 rg",
+      (houseCenter.x + 5).toFixed(1) + " " + (houseCenter.y + 4).toFixed(1) + " 56 16 re f",
+      "BT /F2 8 Tf 0.98 0.98 0.98 rg " +
+        (houseCenter.x + 9).toFixed(1) + " " + (houseCenter.y + 8).toFixed(1) +
+        " Td (Your mapped roof) Tj ET",
+    );
   }
 
+  // Nearby mapped/analysis obstacles are marked around the real target.
+  const sortedObstacles = [...obstacles]
+    .filter((item) => numberValue(item.distanceMeters) !== null)
+    .sort(
+      (a, b) =>
+        (numberValue(a.distanceMeters) ?? 9999) -
+        (numberValue(b.distanceMeters) ?? 9999),
+    )
+    .slice(0, 5);
+
+  sortedObstacles.forEach((obstacle, index) => {
+    const lat = numberValue(obstacle.latitude);
+    const lon = numberValue(obstacle.longitude);
+    if (lat === null || lon === null) return;
+    const p = project(lat, lon);
+    if (
+      p.x < mapX + 8 || p.x > mapX + mapW - 8 ||
+      p.y < mapY + 8 || p.y > mapY + mapH - 8
+    ) return;
+    const h = numberValue(obstacle.heightMeters) ?? 6;
+    commands.push(
+      "0.04 0.07 0.10 rg",
+      (p.x - 10).toFixed(1) + " " + (p.y - 10).toFixed(1) + " 20 20 re f",
+      "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+        (p.x - 2).toFixed(1) + " " + (p.y - 2).toFixed(1) +
+        " Td (" + (index + 1) + ") Tj ET",
+    );
+    commands.push(
+      "BT /F1 6 Tf 0.98 0.98 0.98 rg " +
+        (p.x + 12).toFixed(1) + " " + (p.y + 2).toFixed(1) +
+        " Td (" + text(String(obstacle.type ?? "building")).slice(0, 16) +
+        " ~" + h.toFixed(0) + "m) Tj ET",
+    );
+  });
+
+  // Sun arc around the real mapped roof.
   const cycle = Array.isArray((sunCycle ?? {}).next12Hours)
     ? (sunCycle as { next12Hours: Array<Record<string, unknown>> }).next12Hours
     : [];
   const houseCenter = roofPoints.length
-    ? { x: roofPoints.reduce((a, p) => a + p.x, 0) / roofPoints.length, y: roofPoints.reduce((a, p) => a + p.y, 0) / roofPoints.length }
+    ? {
+        x: roofPoints.reduce((a, p) => a + p.x, 0) / roofPoints.length,
+        y: roofPoints.reduce((a, p) => a + p.y, 0) / roofPoints.length,
+      }
     : { x: mapX + mapW / 2, y: mapY + mapH / 2 };
 
   const edgeSpace = Math.min(
@@ -359,13 +423,20 @@ function roofVisualCommands({
     houseCenter.y - mapY,
     mapY + mapH - houseCenter.y,
   );
-  const sunRadius = Math.max(28, Math.min(72, edgeSpace - 18));
+  const sunRadius = Math.max(35, Math.min(105, edgeSpace - 14));
   const sunPoints = cycle
-    .filter((sample) => sample.aboveHorizon !== false && numberValue(sample.azimuthDeg) !== null)
+    .filter(
+      (sample) =>
+        sample.aboveHorizon !== false &&
+        numberValue(sample.azimuthDeg) !== null,
+    )
     .slice(0, 8)
     .map((sample) => {
-      const az = (numberValue(sample.azimuthDeg) ?? 0) * Math.PI / 180;
-      const el = Math.max(0.35, Math.min(1, (numberValue(sample.elevationDeg) ?? 10) / 90));
+      const az = ((numberValue(sample.azimuthDeg) ?? 0) * Math.PI) / 180;
+      const el = Math.max(
+        0.38,
+        Math.min(1, (numberValue(sample.elevationDeg) ?? 10) / 90),
+      );
       return {
         x: houseCenter.x + Math.sin(az) * sunRadius,
         y: houseCenter.y + Math.cos(az) * sunRadius * el,
@@ -374,59 +445,259 @@ function roofVisualCommands({
 
   if (sunPoints.length >= 2) {
     commands.push(
-      "0.98 0.58 0.02 RG",
-      "2 w",
+      "1.00 0.57 0.00 RG",
+      "2.2 w",
       sunPoints[0].x.toFixed(1) + " " + sunPoints[0].y.toFixed(1) + " m",
     );
     for (let i = 1; i < sunPoints.length; i += 1) {
-      commands.push(sunPoints[i].x.toFixed(1) + " " + sunPoints[i].y.toFixed(1) + " l");
+      commands.push(
+        sunPoints[i].x.toFixed(1) + " " + sunPoints[i].y.toFixed(1) + " l",
+      );
     }
     commands.push("S");
+    for (const point of sunPoints) {
+      commands.push(
+        "1.00 0.64 0.02 rg",
+        (point.x - 6).toFixed(1) + " " + (point.y - 6).toFixed(1) + " 12 12 re f",
+      );
+    }
   }
 
-  for (const point of sunPoints) {
+  // North compass.
+  const compassX = mapX + mapW - 34;
+  const compassY = mapY + mapH - 28;
+  commands.push(
+    "0.03 0.06 0.10 rg",
+    (compassX - 25).toFixed(1) + " " + (compassY - 25).toFixed(1) + " 50 50 re f",
+    "BT /F2 9 Tf 0.98 0.98 0.98 rg " +
+      (compassX - 3).toFixed(1) + " " + (compassY + 12).toFixed(1) + " Td (N) Tj ET",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+      (compassX + 29).toFixed(1) + " " + (compassY - 3).toFixed(1) + " Td (E) Tj ET",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+      (compassX - 4).toFixed(1) + " " + (compassY - 27).toFixed(1) + " Td (S) Tj ET",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+      (compassX - 32).toFixed(1) + " " + (compassY - 3).toFixed(1) + " Td (W) Tj ET",
+  );
+
+  // Bottom analysis cards.
+  const cardY = 30;
+  const cardH = 198;
+  const cardGap = 10;
+  const cardW = (mapW - cardGap * 2) / 3;
+  const cardXs = [mapX, mapX + cardW + cardGap, mapX + (cardW + cardGap) * 2];
+
+  for (const x of cardXs) {
     commands.push(
-      "0.99 0.62 0.02 rg",
-      (point.x - 4).toFixed(1) + " " + (point.y - 4).toFixed(1) + " 8 8 re f",
+      "0.035 0.075 0.115 rg",
+      x.toFixed(1) + " " + cardY + " " + cardW.toFixed(1) + " " + cardH + " re f",
+      "0.15 0.25 0.32 RG",
+      "0.8 w",
+      x.toFixed(1) + " " + cardY + " " + cardW.toFixed(1) + " " + cardH + " re S",
     );
   }
 
-  const northX = mapX + mapW - 28;
-  const northY = mapY + mapH - 28;
   commands.push(
-    "0.05 0.08 0.12 RG",
-    "1.4 w",
-    northX.toFixed(1) + " " + (northY - 22).toFixed(1) + " m " + northX.toFixed(1) + " " + northY.toFixed(1) + " l S",
-    northX.toFixed(1) + " " + (northY - 22).toFixed(1) + " m " + (northX - 4).toFixed(1) + " " + (northY - 14).toFixed(1) + " l S",
-    northX.toFixed(1) + " " + (northY - 22).toFixed(1) + " m " + (northX + 4).toFixed(1) + " " + (northY - 14).toFixed(1) + " l S",
-  );
-  commands.push(
-    "BT /F2 8 Tf " + (northX - 3).toFixed(1) + " " + (northY + 3).toFixed(1) + " Td (N) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[0] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Sun Path & Shading Analysis) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[1] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Roof Layout - Top View) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[2] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Suggested Installation) Tj ET",
   );
 
-  const buildingLines = sortedObstacles.slice(0, 5).map((o, index) => {
-    const h = numberValue(o.heightMeters), d = numberValue(o.distanceMeters);
-    return "#" + (index + 1) + " " + String(o.type ?? "building") + " ~" + (h !== null ? h.toFixed(1) : "?") + "m, " + (d !== null ? d.toFixed(0) : "?") + "m away";
+  // Card 1: a compact sun/shading diagram.
+  const c1x = cardXs[0] + 14;
+  const c1y = cardY + 30;
+  const c1w = cardW - 28;
+  const c1h = cardH - 55;
+  const c1cx = c1x + c1w / 2;
+  const c1cy = c1y + 45;
+  commands.push(
+    "0.02 0.05 0.08 rg",
+    c1x.toFixed(1) + " " + c1y.toFixed(1) + " " + c1w.toFixed(1) + " " + c1h.toFixed(1) + " re f",
+  );
+  const arcRadius = Math.min(c1w * 0.38, 58);
+  commands.push(
+    "1.00 0.57 0.00 RG",
+    "1.4 w",
+    (c1cx - arcRadius).toFixed(1) + " " + c1cy.toFixed(1) + " m",
+    (c1cx - arcRadius * 0.7).toFixed(1) + " " + (c1cy + arcRadius * 0.75).toFixed(1) + " l",
+    c1cx.toFixed(1) + " " + (c1cy + arcRadius).toFixed(1) + " l",
+    (c1cx + arcRadius * 0.7).toFixed(1) + " " + (c1cy + arcRadius * 0.75).toFixed(1) + " l",
+    (c1cx + arcRadius).toFixed(1) + " " + c1cy.toFixed(1) + " l S",
+    "0.10 0.65 1.00 rg",
+    (c1cx - 28).toFixed(1) + " " + (c1cy - 10).toFixed(1) + " 56 20 re f",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1cx - 15).toFixed(1) + " " + (c1cy - 3).toFixed(1) + " Td (ROOF) Tj ET",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1x + 5).toFixed(1) + " " + (c1y + 5).toFixed(1) + " Td (East) Tj ET",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1x + c1w - 22).toFixed(1) + " " + (c1y + 5).toFixed(1) + " Td (West) Tj ET",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1cx - 3).toFixed(1) + " " + (c1y + c1h - 8).toFixed(1) + " Td (N) Tj ET",
+  );
+
+  // Card 2: true roof footprint top view, not a generic rectangle.
+  const c2x = cardXs[1] + 16;
+  const c2y = cardY + 36;
+  const c2w = cardW - 32;
+  const c2h = cardH - 62;
+  if (roofPoints.length >= 3) {
+    const minX = Math.min(...roofPoints.map((p) => p.x));
+    const maxX = Math.max(...roofPoints.map((p) => p.x));
+    const minY = Math.min(...roofPoints.map((p) => p.y));
+    const maxY = Math.max(...roofPoints.map((p) => p.y));
+    const scale = Math.min(
+      (c2w - 24) / Math.max(1, maxX - minX),
+      (c2h - 24) / Math.max(1, maxY - minY),
+    );
+    const mapped = roofPoints.map((p) => ({
+      x: c2x + 12 + (p.x - minX) * scale,
+      y: c2y + 8 + (p.y - minY) * scale,
+    }));
+    commands.push(
+      "0.11 0.16 0.20 rg",
+      c2x.toFixed(1) + " " + c2y.toFixed(1) + " " + c2w.toFixed(1) + " " + c2h.toFixed(1) + " re f",
+      "0.95 0.70 0.20 RG",
+      "1.3 w",
+      mapped[0].x.toFixed(1) + " " + mapped[0].y.toFixed(1) + " m",
+    );
+    for (let i = 1; i < mapped.length; i += 1) {
+      commands.push(mapped[i].x.toFixed(1) + " " + mapped[i].y.toFixed(1) + " l");
+    }
+    commands.push("h S");
+    const pMinX = Math.min(...mapped.map((p) => p.x));
+    const pMaxX = Math.max(...mapped.map((p) => p.x));
+    const pMinY = Math.min(...mapped.map((p) => p.y));
+    const pMaxY = Math.max(...mapped.map((p) => p.y));
+    const cols = Math.max(1, Math.min(8, Math.ceil(Math.sqrt(safePanels || 1))));
+    const rows = Math.max(1, Math.ceil((safePanels || 1) / cols));
+    const pw = Math.max(5, (pMaxX - pMinX) * 0.72 / cols);
+    const ph = Math.max(5, (pMaxY - pMinY) * 0.70 / rows);
+    commands.push("q");
+    commands.push(mapped[0].x.toFixed(1) + " " + mapped[0].y.toFixed(1) + " m");
+    for (let i = 1; i < mapped.length; i += 1) commands.push(mapped[i].x.toFixed(1) + " " + mapped[i].y.toFixed(1) + " l");
+    commands.push("h W n");
+    for (let i = 0; i < (safePanels || 0); i += 1) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const x = pMinX + (pMaxX - pMinX) * 0.14 + col * (pw + 2);
+      const y = pMaxY - (pMaxY - pMinY) * 0.15 - (row + 1) * ph - row * 2;
+      commands.push(
+        "0.025 0.15 0.32 rg",
+        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re f",
+        "0.35 0.75 1.00 RG",
+        "0.4 w",
+        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re S",
+      );
+    }
+    commands.push("Q");
+    commands.push(
+      "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c2x + c2w - 74).toFixed(1) + " " + (c2y + 7).toFixed(1) +
+        " Td (" + (safePanels || 0) + " panels | " + (panelPowerW ?? 450) + " W) Tj ET",
+    );
+  } else {
+    commands.push(
+      "BT /F1 8 Tf 0.95 0.95 0.95 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 40).toFixed(1) +
+        " Td (Building footprint not mapped.) Tj ET",
+      "BT /F1 7 Tf 0.75 0.78 0.82 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 25).toFixed(1) +
+        " Td (No fake roof geometry is shown.) Tj ET",
+    );
+  }
+
+  // Card 3: 3D-style installation sketch built from the actual mapped roof
+  // footprint. It is a visualization, not a claim that the source imagery is
+  // photogrammetric 3D.
+  const c3x = cardXs[2] + 14;
+  const c3y = cardY + 30;
+  const c3w = cardW - 28;
+  const c3h = cardH - 55;
+  const baseX = c3x + 34;
+  const baseY = c3y + 35;
+  const baseW = c3w * 0.68;
+  const baseH = c3h * 0.42;
+  commands.push(
+    "0.10 0.18 0.22 rg",
+    baseX.toFixed(1) + " " + baseY.toFixed(1) + " " + baseW.toFixed(1) + " " + baseH.toFixed(1) + " re f",
+    "0.75 0.80 0.84 RG",
+    "1 w",
+    baseX.toFixed(1) + " " + baseY.toFixed(1) + " m",
+    (baseX + baseW).toFixed(1) + " " + (baseY + 12).toFixed(1) + " l",
+    (baseX + baseW - 16).toFixed(1) + " " + (baseY + baseH + 30).toFixed(1) + " l",
+    (baseX + 12).toFixed(1) + " " + (baseY + baseH + 18).toFixed(1) + " l h S",
+  );
+
+  const cols3 = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(safePanels || 1))));
+  const rows3 = Math.max(1, Math.ceil((safePanels || 1) / cols3));
+  const pw3 = Math.max(6, (baseW * 0.72) / cols3);
+  const ph3 = Math.max(5, (baseH * 0.55) / rows3);
+  for (let i = 0; i < (safePanels || 0); i += 1) {
+    const row = Math.floor(i / cols3);
+    const col = i % cols3;
+    const x = baseX + 18 + col * (pw3 + 2);
+    const y = baseY + baseH * 0.30 + row * (ph3 + 2);
+    commands.push(
+      "0.025 0.15 0.32 rg",
+      x.toFixed(1) + " " + y.toFixed(1) + " " + pw3.toFixed(1) + " " + ph3.toFixed(1) + " re f",
+      "0.35 0.75 1.00 RG",
+      "0.35 w",
+      x.toFixed(1) + " " + y.toFixed(1) + " " + pw3.toFixed(1) + " " + ph3.toFixed(1) + " re S",
+    );
+  }
+
+  // Left information rail.
+  commands.push(
+    "BT /F2 19 Tf 0.98 0.98 0.98 rg 32 540 Td (RoofRay) Tj ET",
+    "BT /F1 8 Tf 0.55 0.78 0.90 rg 32 525 Td (SOLAR FEASIBILITY REPORT) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg 30 490 Td (Location Details) Tj ET",
+    "BT /F1 8 Tf 0.75 0.82 0.88 rg 30 474 Td (" +
+      text(centerLat.toFixed(5) + " N, " + centerLon.toFixed(5) + " E") + ") Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg 30 438 Td (System Overview) Tj ET",
+    "BT /F1 8 Tf 0.78 0.84 0.90 rg 30 422 Td (Roof area) Tj ET",
+    "BT /F2 11 Tf 0.98 0.98 0.98 rg 30 408 Td (" +
+      text(roofAreaSqFt !== null ? "~" + Math.round(roofAreaSqFt) + " sq ft" : "Unavailable") + ") Tj ET",
+    "BT /F1 8 Tf 0.78 0.84 0.90 rg 30 387 Td (Recommended capacity) Tj ET",
+    "BT /F2 11 Tf 0.98 0.98 0.98 rg 30 373 Td (" +
+      text(planningCapacity(panelCount, panelPowerW)) + ") Tj ET",
+    "BT /F1 8 Tf 0.78 0.84 0.90 rg 30 352 Td (Panels) Tj ET",
+    "BT /F2 11 Tf 0.98 0.98 0.98 rg 30 338 Td (" +
+      text(String(safePanels || "Unavailable") + " x " + String(panelPowerW ?? 450) + " W") + ") Tj ET",
+    "BT /F1 8 Tf 0.78 0.84 0.90 rg 30 317 Td (Direction / tilt) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg 30 303 Td (" +
+      text(String(direction || "Unavailable") + " / " +
+        (slopeDeg !== null ? slopeDeg + " deg" : "Unavailable")) + ") Tj ET",
+    "BT /F1 8 Tf 0.78 0.84 0.90 rg 30 282 Td (Roof type) Tj ET",
+    "BT /F2 9 Tf 0.98 0.98 0.98 rg 30 268 Td (" + text(roofType || "Unavailable") + ") Tj ET",
+    "BT /F2 9 Tf 0.98 0.98 0.98 rg 30 235 Td (Nearby shading) Tj ET",
+  );
+
+  sortedObstacles.slice(0, 4).forEach((o, i) => {
+    const h = numberValue(o.heightMeters);
+    const d = numberValue(o.distanceMeters);
+    commands.push(
+      "BT /F1 7 Tf 0.76 0.82 0.88 rg 30 " + (219 - i * 18) +
+        " Td (" + text(
+          (i + 1) + ". " + String(o.type ?? "building").slice(0, 18) +
+          " | " + (h !== null ? "~" + h.toFixed(0) + "m" : "height ?") +
+          " | " + (d !== null ? "~" + d.toFixed(0) + "m" : "distance ?"),
+        ) + ") Tj ET",
+    );
   });
+
+  const monthlyText = roofAreaSqFt !== null ? "Input roof area used for planning." : "Mapped roof footprint used when available.";
+  commands.push(
+    "BT /F1 7 Tf 0.55 0.65 0.72 rg 30 120 Td (" + text(monthlyText) + ") Tj ET",
+    "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 102 Td (OSM footprint is not survey-grade; imagery availability varies.) Tj ET",
+    "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 88 Td (Satellite: Esri World Imagery | Map: OpenStreetMap.) Tj ET",
+  );
 
   return [
     ...commands,
-    "BT /F2 14 Tf 55 700 Td (REAL LOCATION ROOF + SUN + SHADING MAP) Tj ET",
-    "BT /F1 8 Tf 55 687 Td (Real aerial imagery with the detected building footprint and solar overlays at the requested coordinates.) Tj ET",
-    "BT /F2 9 Tf 55 295 Td (LEGEND) Tj ET",
-    "BT /F1 8 Tf 55 282 Td (Blue outline = mapped roof | Dark blue = panels clipped to roof | Orange = sun path | N = north) Tj ET",
-    "BT /F2 9 Tf 55 268 Td (Panel direction) Tj ET",
-    "BT /F1 8 Tf 125 268 Td (" + text(direction || "Unavailable") + " | Tilt " + (slopeDeg !== null ? slopeDeg + " deg" : "Unavailable") + ") Tj ET",
-    "BT /F2 9 Tf 55 254 Td (Roof input) Tj ET",
-    "BT /F1 8 Tf 125 254 Td (" + (roofAreaSqFt !== null ? Math.round(roofAreaSqFt) + " sq ft" : "Unavailable") + " | " + text(roofType || "Unavailable") + ") Tj ET",
-    "BT /F2 9 Tf 55 240 Td (Panels) Tj ET",
-    "BT /F1 8 Tf 125 240 Td (" + (safePanels || "Unavailable") + " x " + (panelPowerW ?? 450) + " W) Tj ET",
-    "BT /F2 9 Tf 55 226 Td (Nearby mapped buildings) Tj ET",
-    ...buildingLines.flatMap((line, i) => ["BT /F1 8 Tf 125 " + (226 - i * 11) + " Td (" + text(line) + ") Tj ET"]),
-    "BT /F1 8 Tf 55 150 Td (North is upward. Sun positions use the detected coordinates and current analysis time.) Tj ET",
-    "BT /F1 8 Tf 55 138 Td (Mapped footprint is not a survey-grade roof measurement; unmapped buildings may be absent.) Tj ET",
-    "BT /F1 8 Tf 55 126 Td (Satellite imagery: Esri World Imagery | Map data: OpenStreetMap contributors.) Tj ET",
+    "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (RoofRay Solar Site Assessment) Tj ET",
+    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Real aerial imagery + mapped roof + solar panel placement + sun cycle) Tj ET",
+    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Your House / mapped target) Tj ET",
+    "BT /F1 7 Tf 0.95 0.95 0.95 rg 208 522 Td (Blue outline = actual mapped building footprint | Orange = sun path) Tj ET",
   ];
+}
+
+function planningCapacity(panelCount: number | null, panelPowerW: number | null) {
+  const count = numberValue(panelCount);
+  const power = numberValue(panelPowerW);
+  if (count === null || power === null) return "Unavailable";
+  return "~" + (count * power / 1000).toFixed(2) + " kW";
 }
 
 function buildPdf(lines: string[], visual: {
