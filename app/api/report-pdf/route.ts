@@ -590,10 +590,10 @@ function roofVisualCommands({
   });
 
   // Solar movement direction: true azimuths are projected around the house.
-  const cycle = Array.isArray((sunCycle ?? {}).next12Hours)
+  const diagramCycle = Array.isArray((sunCycle ?? {}).next12Hours)
     ? (sunCycle as { next12Hours: Array<Record<string, unknown>> }).next12Hours
     : [];
-  const sunSamples = cycle
+  const sunSamples = diagramCycle
     .filter(
       (sample) =>
         sample.aboveHorizon !== false &&
