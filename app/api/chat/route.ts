@@ -242,6 +242,26 @@ export async function POST(request: Request) {
         : typeof orientation.direction === "string" ? orientation.direction : "";
       const slope = num(planning.recommendedSlopeDeg ?? orientation.slopeDeg);
       const risk = typeof shadow.currentRisk === "string" ? shadow.currentRisk : "";
+      const monthlyGeneration = Array.isArray(planning.monthlyGenerationKwh)
+        ? planning.monthlyGenerationKwh as Array<Record<string, unknown>>
+        : [];
+      const monthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+      ];
+      const monthlyGenerationLines = monthlyGeneration
+        .map((item) => {
+          const month = num(item.month);
+          const expectedKwh = num(item.expectedKwh);
+          const averageDailyKwh = num(item.averageDailyKwh);
+          if (!Number.isFinite(month) || !Number.isFinite(expectedKwh)) return "";
+          const label = monthNames[Math.max(1, Math.min(12, Math.round(month))) - 1];
+          return `• ${label}: ~${fmt(expectedKwh)} kWh/month${Number.isFinite(averageDailyKwh) ? ` (~${fmt(averageDailyKwh, 1)} kWh/day)` : ""}`;
+        })
+        .filter(Boolean);
+
+      const averageDailyGeneration = num(planning.averageDailyGenerationKwh);
+
       const weather = (solarContextObject.weather ?? {}) as Record<string, unknown>;
       const currentWeather = (weather.current ?? {}) as Record<string, unknown>;
       const dailyWeather = (weather.daily ?? {}) as Record<string, unknown>;
@@ -313,6 +333,12 @@ export async function POST(request: Request) {
           ? `Panels: ${Math.round(count)} × ${Math.round(watts || 450)}W`
           : "Panels: unavailable",
         generationLine,
+        Number.isFinite(averageDailyGeneration)
+          ? `☀️ Average expected generation: ~${fmt(averageDailyGeneration, 1)} kWh/day.`
+          : "",
+        monthlyGenerationLines.length
+          ? ["📅 EXPECTED MONTHLY GENERATION", ...monthlyGenerationLines].join("\n")
+          : "",
         "",
         "🌤️ SITE & SUN ANALYSIS",
         shadingLine,
