@@ -127,6 +127,7 @@ function roofVisualCommands({
   roofFootprint,
   obstacles,
   sunCycle,
+  mappedBuildings,
 }: {
   roofAreaSqFt: number | null;
   roofType: string;
@@ -294,6 +295,7 @@ function buildPdf(lines: string[], visual: {
   roofFootprint: Record<string, unknown> | null;
   obstacles: Array<Record<string, unknown>>;
   sunCycle: Record<string, unknown> | null;
+  mappedBuildings: MappedBuilding[];
 }): Uint8Array {
   const pageWidth = 612, pageHeight = 792, margin = 48, lineHeight = 16, linesPerPage = 42;
   const pages: string[][] = [];
