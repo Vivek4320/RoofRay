@@ -713,7 +713,7 @@ function buildPdf(lines: string[], visual: {
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
 }): Uint8Array {
-  const pageWidth = 612, pageHeight = 792, margin = 48, lineHeight = 16, linesPerPage = 42;
+  const pageWidth = 842, pageHeight = 595, margin = 42, lineHeight = 15, linesPerPage = 32;
   const pages: string[][] = [];
   for (let i = 0; i < lines.length; i += linesPerPage) pages.push(lines.slice(i, i + linesPerPage));
   if (!pages.length) pages.push(["RoofRay Solar Feasibility Report"]);
@@ -756,7 +756,7 @@ function buildPdf(lines: string[], visual: {
         " >>"
       : "";
     const contentLines = i === visualPageIndex
-      ? ["BT /F2 18 Tf 48 742 Td (RoofRay Roof + Sun Direction Plan) Tj ET", ...roofVisualCommands(visual)]
+      ? roofVisualCommands(visual)
       : ["BT", "/F2 18 Tf", margin + " " + (pageHeight - 58) + " Td", "(RoofRay Solar Feasibility Report) Tj", "/F1 10 Tf", "0 -28 Td",
         ...pages[i].flatMap((line, index) => ["(" + text(line) + ") Tj", ...(index === pages[i].length - 1 ? [] : ["0 -" + lineHeight + " Td"])]), "ET"];
 
