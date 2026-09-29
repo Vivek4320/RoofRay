@@ -92,7 +92,9 @@ async function getValidToken() {
 function getStoredAnalysis(): SolarAnalysis | null {
   if (typeof window === "undefined") return null;
   try {
-    const value = sessionStorage.getItem("roofray_solar_analysis");
+    const value =
+      sessionStorage.getItem("roofray_solar_analysis") ||
+      localStorage.getItem("roofray_solar_analysis");
     return value ? (JSON.parse(value) as SolarAnalysis) : null;
   } catch { return null; }
 }
@@ -1318,7 +1320,9 @@ export default function RoofRayChat() {
       });
       const data = await response.json();
       if (response.ok && data.ok && data.analysis) {
-        sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
+        const serializedAnalysis = JSON.stringify(data.analysis);
+        sessionStorage.setItem("roofray_solar_analysis", serializedAnalysis);
+        localStorage.setItem("roofray_solar_analysis", serializedAnalysis);
         setSolarContext(data.analysis);
         return data.analysis as SolarAnalysis;
       }
@@ -1402,14 +1406,63 @@ export default function RoofRayChat() {
     }
   }
 
-  async function ensureReportPdf() {
+  async function ensureReportPdf(reportOverride?: string) {
     if (reportPdfUrl) return reportPdfUrl;
     try {
-      const raw =
+      let raw =
         sessionStorage.getItem("roofray_report_data") ||
         localStorage.getItem("roofray_report_data");
+
+      // Older chat records may contain the report message but not the PDF
+      // payload. Rebuild the payload from the saved chat + saved analysis.
+      if (!raw && reportOverride) {
+        let savedAnalysis = solarContext || getStoredAnalysis();
+        let savedLocation: { latitude: number; longitude: number } | null = null;
+        try {
+          const locationRaw =
+            sessionStorage.getItem("roofray_location") ||
+            localStorage.getItem("roofray_location");
+          if (locationRaw) {
+            const parsed = JSON.parse(locationRaw) as Record<string, unknown>;
+            const latitude = readNumber(parsed.latitude);
+            const longitude = readNumber(parsed.longitude);
+            if (latitude !== null && longitude !== null) {
+              savedLocation = { latitude, longitude };
+            }
+          }
+        } catch {}
+
+        if (!savedAnalysis && savedLocation) {
+          savedAnalysis = {
+            location: savedLocation,
+          };
+        }
+
+        const fallbackPayload = {
+          report: reportOverride,
+          solarContext: savedAnalysis || {},
+          userInputs: {
+            name,
+            roofAreaSqFt: roofArea,
+            roofType,
+            monthlyBillInr: monthlyBill,
+            applianceDetails,
+            connectionType,
+            ownership,
+            goal,
+          },
+          reportMetrics: extractReportMetrics(reportOverride),
+          generatedAt: Date.now(),
+        };
+        raw = JSON.stringify(fallbackPayload);
+        try {
+          sessionStorage.setItem("roofray_report_data", raw);
+          localStorage.setItem("roofray_report_data", raw);
+        } catch {}
+      }
+
       if (!raw) {
-        setReportPdfError("No final report data is available yet.");
+        setReportPdfError("No report data found. Please generate the solar report again.");
         return null;
       }
       setReportPdfGenerating(true);
@@ -1447,14 +1500,14 @@ export default function RoofRayChat() {
     }
   }
 
-  async function previewReportPdf() {
-    const url = await ensureReportPdf();
+  async function previewReportPdf(reportOverride?: string) {
+    const url = await ensureReportPdf(reportOverride);
     if (!url) return;
     setReportPdfPreviewOpen(true);
   }
 
-  async function openReportPdfInNewTab() {
-    const url = await ensureReportPdf();
+  async function openReportPdfInNewTab(reportOverride?: string) {
+    const url = await ensureReportPdf(reportOverride);
     if (!url) return;
     const opened = window.open(url, "_blank", "noopener,noreferrer");
     if (!opened) {
@@ -1463,8 +1516,8 @@ export default function RoofRayChat() {
     }
   }
 
-  async function downloadReportPdf() {
-    const url = await ensureReportPdf();
+  async function downloadReportPdf(reportOverride?: string) {
+    const url = await ensureReportPdf(reportOverride);
     if (!url) return;
     const link = document.createElement("a");
     link.href = url;
@@ -2001,8 +2054,8 @@ export default function RoofRayChat() {
                       locationCoords={locationCoords}
                       locationAccuracy={locationAccuracy}
                       reportPdfUrl={reportPdfUrl}
-                      onPreviewPdf={() => void previewReportPdf()}
-                      onDownloadPdf={() => void downloadReportPdf()}
+                      onPreviewPdf={() => void previewReportPdf(message.content)}
+                      onDownloadPdf={() => void downloadReportPdf(message.content)}
                     />
                   )
                 )}
@@ -2060,7 +2113,7 @@ export default function RoofRayChat() {
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <p className="text-sm font-semibold text-white">RoofRay Solar Report Preview</p>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={downloadReportPdf} className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">Download PDF</button>
+                  <button type="button" onClick={() => void downloadReportPdf()} className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">Download PDF</button>
                   <button type="button" onClick={() => setReportPdfPreviewOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">Close</button>
                 </div>
               </div>
