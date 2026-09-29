@@ -1400,7 +1400,6 @@ export default function RoofRayChat() {
 
   async function ensureReportPdf() {
     if (reportPdfUrl) return reportPdfUrl;
-    if (reportPdfUrl) return reportPdfUrl;
     try {
       const raw = sessionStorage.getItem("roofray_report_data");
       if (!raw) {
