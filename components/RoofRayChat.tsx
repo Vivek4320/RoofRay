@@ -1200,12 +1200,9 @@ export default function RoofRayChat() {
             // the user's collected inputs.
           }
           setLocationLoading(false);
-          resolve({
-            location: {
-              latitude,
-              longitude,
-            },
-          } as SolarAnalysis);
+          // Location is still shown on the map, but do not generate a
+          // feasibility report from incomplete live analysis.
+          resolve(null);
         },
         (error) => {
           setLocationLoading(false);
