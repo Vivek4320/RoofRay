@@ -530,12 +530,18 @@ function AssistantMessage({
   onLocationPermission,
   locationCoords,
   locationAccuracy,
+  reportPdfUrl,
+  onPreviewPdf,
+  onDownloadPdf,
 }: {
   message: ChatMessage;
   onRetry: (content: string) => void;
   onLocationPermission?: () => void;
   locationCoords?: { latitude: number; longitude: number } | null;
   locationAccuracy?: number | null;
+  reportPdfUrl?: string | null;
+  onPreviewPdf?: () => void;
+  onDownloadPdf?: () => void;
 }) {
   const choiceGroups: Array<{ pattern: RegExp; options: string[] }> = [
     {
@@ -611,6 +617,27 @@ function AssistantMessage({
         ) : (
           <>
             {renderAssistantContent(message.content)}
+
+            {message.content.startsWith("☀️ ROOFRAY SOLAR FEASIBILITY REPORT") && reportPdfUrl ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={onPreviewPdf}
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[12px] font-semibold text-blue-300 hover:bg-blue-500/20"
+                >
+                  <span aria-hidden="true">👁</span>
+                  Preview PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={onDownloadPdf}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                >
+                  <span aria-hidden="true">↓</span>
+                  Download PDF
+                </button>
+              </div>
+            ) : null}
 
             {message.content.startsWith("📍 Location detected:") && locationCoords ? (
               <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.08] bg-black/20">
@@ -984,6 +1011,9 @@ export default function RoofRayChat() {
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
   const locationMessageShownRef = useRef(false);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
+  const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
+  const [reportPdfPreviewOpen, setReportPdfPreviewOpen] = useState(false);
+  const [reportPdfGenerating, setReportPdfGenerating] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
   const [roofType, setRoofType] = useState<string | null>(null);
@@ -1004,6 +1034,12 @@ export default function RoofRayChat() {
   const [pendingDeleteChat, setPendingDeleteChat] = useState<ChatRecord | null>(null);
   const [pendingRenameChat, setPendingRenameChat] = useState<ChatRecord | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (reportPdfUrl) URL.revokeObjectURL(reportPdfUrl);
+    };
+  }, [reportPdfUrl]);
 
   useEffect(() => {
     const saved = localStorage.getItem("roofray_sidebar_open");
@@ -1316,6 +1352,7 @@ export default function RoofRayChat() {
       sessionStorage.setItem("roofray_report_data", JSON.stringify(payload));
       window.dispatchEvent(new Event("roofray_report_ready"));
     } catch {}
+    setReportPdfGenerating(true);
     try {
       const response = await fetch("/api/report-pdf", {
         method: "POST",
@@ -1328,16 +1365,25 @@ export default function RoofRayChat() {
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "RoofRay-Solar-Report.pdf";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setReportPdfUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous);
+        return url;
+      });
     } catch (error) {
-      console.warn("[RoofRay] PDF download failed:", error);
+      console.warn("[RoofRay] PDF generation failed:", error);
+    } finally {
+      setReportPdfGenerating(false);
     }
+  }
+
+  function downloadReportPdf() {
+    if (!reportPdfUrl) return;
+    const link = document.createElement("a");
+    link.href = reportPdfUrl;
+    link.download = "RoofRay-Solar-Report.pdf";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 
   async function generateFinalReport(analysis: SolarAnalysis) {
@@ -1868,6 +1914,9 @@ export default function RoofRayChat() {
                       }}
                       locationCoords={locationCoords}
                       locationAccuracy={locationAccuracy}
+                      reportPdfUrl={reportPdfUrl}
+                      onPreviewPdf={() => setReportPdfPreviewOpen(true)}
+                      onDownloadPdf={downloadReportPdf}
                     />
                   )
                 )}
@@ -1898,6 +1947,27 @@ export default function RoofRayChat() {
             >
               {locationStatus === "denied" ? "Enable Location" : "Allow Location"}
             </button>
+          </div>
+        )}
+
+        {reportPdfGenerating && (
+          <div className="border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-2 text-[11px] text-blue-300 sm:px-6">
+            Preparing your PDF report...
+          </div>
+        )}
+
+        {reportPdfPreviewOpen && reportPdfUrl && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-3 sm:p-6">
+            <div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0D1424] shadow-2xl">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <p className="text-sm font-semibold text-white">RoofRay Solar Report Preview</p>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={downloadReportPdf} className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">Download PDF</button>
+                  <button type="button" onClick={() => setReportPdfPreviewOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">Close</button>
+                </div>
+              </div>
+              <iframe title="RoofRay Solar Report PDF preview" src={reportPdfUrl} className="min-h-0 flex-1 border-0 bg-white" />
+            </div>
           </div>
         )}
 
