@@ -469,6 +469,7 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
                 const next = JSON.stringify(report);
                 sessionStorage.setItem("roofray_report_data", next);
                 localStorage.setItem("roofray_report_data", next);
+                window.dispatchEvent(new Event("roofray_report_ready"));
               }
             } catch {}
 
