@@ -107,6 +107,34 @@ export async function POST(request: Request) {
         ? Number((panelPlacement.estimate.effectiveGenerationKwh / 12).toFixed(0))
         : null;
 
+    const systemSizeKw = panelPlacement?.estimate.systemSizeKw ?? null;
+    const monthlyGenerationKwh = pvgis.monthly.map((item) => ({
+      month: item.month,
+      expectedKwh: systemSizeKw === null
+        ? null
+        : Math.round(
+            item.energyKwh *
+              (1 - Math.min(Math.max(shadingFactor, 0), 0.8)) *
+              systemSizeKw,
+          ),
+      averageDailyKwh: systemSizeKw === null
+        ? null
+        : Number(
+            (
+              (item.energyKwh *
+                (1 - Math.min(Math.max(shadingFactor, 0), 0.8)) *
+                systemSizeKw) /
+              new Date(2026, item.month, 0).getDate()
+            ).toFixed(2),
+          ),
+    }));
+
+    const averageDailyGenerationKwh =
+      panelPlacement?.estimate.effectiveGenerationKwh !== null &&
+      panelPlacement?.estimate.effectiveGenerationKwh !== undefined
+        ? Number((panelPlacement.estimate.effectiveGenerationKwh / 365).toFixed(2))
+        : null;
+
     const estimatedShadingPercent = Number((shadingFactor * 100).toFixed(1));
 
     return NextResponse.json({
@@ -131,6 +159,8 @@ export async function POST(request: Request) {
               : Number((planningRoofAreaM2 / 0.092903).toFixed(0)),
           estimatedShadingPercent,
           averageMonthlyGenerationKwh,
+          averageDailyGenerationKwh,
+          monthlyGenerationKwh,
           annualGenerationAfterEstimatedShadingKwh:
             panelPlacement?.estimate.effectiveGenerationKwh ?? null,
           systemSizeKw: panelPlacement?.estimate.systemSizeKw ?? null,
