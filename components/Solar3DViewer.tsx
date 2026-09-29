@@ -7,563 +7,430 @@ type Solar3DViewerProps = {
   longitude?: number | null;
 };
 
-type CesiumLike = any;
+type MapLibreLike = any;
 
-type RoofPoint = {
-  latitude: number;
-  longitude: number;
-};
-
-function getStoredLocation(): { latitude: number; longitude: number } | null {
+function readStoredLocation() {
   if (typeof window === "undefined") return null;
   try {
-    const analysis = JSON.parse(
-      sessionStorage.getItem("roofray_solar_analysis") || "null",
-    );
-    const location = analysis?.analysis?.planningEstimate?.location;
-    const latitude = Number(location?.latitude);
-    const longitude = Number(location?.longitude);
-    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-      return { latitude, longitude };
-    }
+    const sources = [
+      sessionStorage.getItem("roofray_solar_analysis"),
+      localStorage.getItem("roofray_solar_analysis"),
+      sessionStorage.getItem("roofray_location"),
+      localStorage.getItem("roofray_location"),
+    ].filter(Boolean);
 
-    const report = JSON.parse(
-      sessionStorage.getItem("roofray_report_data") || "null",
-    );
-    const reportLocation =
-      report?.solarContext?.planningEstimate?.location ??
-      report?.solarContext?.location;
-    const reportLat = Number(reportLocation?.latitude);
-    const reportLon = Number(reportLocation?.longitude);
-    if (Number.isFinite(reportLat) && Number.isFinite(reportLon)) {
-      return { latitude: reportLat, longitude: reportLon };
+    for (const raw of sources) {
+      const parsed = JSON.parse(raw as string);
+      const location =
+        parsed?.analysis?.planningEstimate?.location ??
+        parsed?.planningEstimate?.location ??
+        parsed?.solarContext?.planningEstimate?.location ??
+        parsed?.location ??
+        parsed;
+      const lat = Number(location?.latitude);
+      const lon = Number(location?.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        return { latitude: lat, longitude: lon };
+      }
     }
-  } catch {
-    // Ignore malformed session data.
-  }
+  } catch {}
   return null;
 }
 
-function getStoredPlanningData() {
+function readStoredAnalysis() {
   if (typeof window === "undefined") return null;
   try {
-    const analysis = JSON.parse(
-      sessionStorage.getItem("roofray_solar_analysis") || "null",
-    );
-    return analysis?.analysis ?? null;
+    const raw =
+      sessionStorage.getItem("roofray_solar_analysis") ||
+      localStorage.getItem("roofray_solar_analysis");
+    return raw ? JSON.parse(raw)?.analysis ?? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-function loadCesium(): Promise<CesiumLike> {
-  const win = window as typeof window & { Cesium?: CesiumLike };
-  if (win.Cesium) return Promise.resolve(win.Cesium);
+function loadMapLibre(): Promise<MapLibreLike> {
+  const win = window as typeof window & { maplibregl?: MapLibreLike };
+  if (win.maplibregl) return Promise.resolve(win.maplibregl);
 
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(
-      'script[data-roofray-cesium="true"]',
+      'script[data-roofray-maplibre="true"]',
     ) as HTMLScriptElement | null;
 
     const finish = () => {
-      if (win.Cesium) resolve(win.Cesium);
-      else reject(new Error("CesiumJS loaded but the Cesium global is unavailable."));
+      if (win.maplibregl) resolve(win.maplibregl);
+      else reject(new Error("MapLibre loaded but the map engine is unavailable."));
     };
 
     if (existing) {
       existing.addEventListener("load", finish, { once: true });
       existing.addEventListener(
         "error",
-        () => reject(new Error("CesiumJS could not be loaded.")),
+        () => reject(new Error("MapLibre could not be loaded.")),
         { once: true },
       );
       return;
     }
 
     const script = document.createElement("script");
-    script.src =
-      "https://cesium.com/downloads/cesiumjs/releases/1.145/Build/Cesium/Cesium.js";
+    script.src = "https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.js";
     script.async = true;
-    script.dataset.roofrayCesium = "true";
+    script.dataset.roofrayMaplibre = "true";
     script.onload = finish;
-    script.onerror = () =>
-      reject(new Error("CesiumJS could not be loaded from Cesium."));
+    script.onerror = () => reject(new Error("MapLibre could not be loaded."));
     document.head.appendChild(script);
   });
 }
 
-function ensureCesiumCss() {
-  if (document.querySelector('link[data-roofray-cesium-css="true"]')) return;
+function ensureMapLibreCss() {
+  if (document.querySelector('link[data-roofray-maplibre-css="true"]')) return;
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href =
-    "https://cesium.com/downloads/cesiumjs/releases/1.145/Build/Cesium/Widgets/widgets.css";
-  link.dataset.roofrayCesiumCss = "true";
+  link.href = "https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.css";
+  link.dataset.roofrayMaplibreCss = "true";
   document.head.appendChild(link);
 }
 
-function getRoofPoints(analysis: any): RoofPoint[] {
-  const points = analysis?.roof?.polygon;
-  if (!Array.isArray(points)) return [];
-
-  return points
-    .map((point: any) => ({
-      latitude: Number(point?.latitude),
-      longitude: Number(point?.longitude),
-    }))
-    .filter(
-      (point: RoofPoint) =>
-        Number.isFinite(point.latitude) && Number.isFinite(point.longitude),
-    );
-}
-
-function toLocal(
-  point: RoofPoint,
-  centerLat: number,
-  centerLon: number,
-) {
-  const metersPerLat = 111320;
-  const metersPerLon = Math.max(
-    1,
-    111320 * Math.cos((centerLat * Math.PI) / 180),
+async function getBuildings(latitude: number, longitude: number) {
+  const response = await fetch(
+    "/api/map-buildings?latitude=" +
+      encodeURIComponent(latitude) +
+      "&longitude=" +
+      encodeURIComponent(longitude) +
+      "&radius=180",
+    { cache: "no-store" },
   );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok || !Array.isArray(data.buildings)) {
+    throw new Error(
+      typeof data.error === "string"
+        ? data.error
+        : "Building map data could not be loaded.",
+    );
+  }
+
   return {
-    east: (point.longitude - centerLon) * metersPerLon,
-    north: (point.latitude - centerLat) * metersPerLat,
+    type: "FeatureCollection",
+    features: data.buildings.map((building: any, index: number) => ({
+      type: "Feature",
+      id: index,
+      properties: {
+        height: Math.max(3, Number(building.heightMeters) || 3),
+        target: building.containsTarget === true,
+      },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          building.polygon.map((point: any) => [
+            Number(point.longitude),
+            Number(point.latitude),
+          ]),
+        ],
+      },
+    })),
   };
 }
 
-function pointInsidePolygon(
-  point: { east: number; north: number },
-  polygon: Array<{ east: number; north: number }>,
-) {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].east;
-    const yi = polygon[i].north;
-    const xj = polygon[j].east;
-    const yj = polygon[j].north;
-    const intersects =
-      yi > point.north !== yj > point.north &&
-      point.east < ((xj - xi) * (point.north - yi)) / (yj - yi) + xi;
-    if (intersects) inside = !inside;
-  }
-  return inside;
-}
-
-async function addMapped3DBuildings(
-  Cesium: CesiumLike,
-  viewer: CesiumLike,
-  latitude: number,
-  longitude: number,
-) {
-  try {
-    const response = await fetch(
-      "/api/map-buildings?latitude=" +
-        encodeURIComponent(latitude) +
-        "&longitude=" +
-        encodeURIComponent(longitude) +
-        "&radius=140",
-      { cache: "no-store" },
-    );
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ok || !Array.isArray(data.buildings)) return;
-
-    for (const building of data.buildings) {
-      const polygon = Array.isArray(building.polygon)
-        ? building.polygon
-            .map((point: any) => Cesium.Cartesian3.fromDegrees(
-              Number(point.longitude),
-              Number(point.latitude),
-              0,
-            ))
-            .filter(Boolean)
-        : [];
-      if (polygon.length < 3) continue;
-
-      const height = Math.max(3, Number(building.heightMeters) || 3);
-      const target = building.containsTarget === true;
-
-      viewer.entities.add({
-        name: target ? "Your mapped building" : "Nearby mapped building",
-        polygon: {
-          hierarchy: polygon,
-          material: target
-            ? Cesium.Color.fromCssColorString("#22d3ee").withAlpha(0.28)
-            : Cesium.Color.fromCssColorString("#64748b").withAlpha(0.22),
-          outline: true,
-          outlineColor: target
-            ? Cesium.Color.fromCssColorString("#22d3ee")
-            : Cesium.Color.fromCssColorString("#94a3b8"),
-          height: 0,
-          extrudedHeight: height,
-          closeTop: true,
-          closeBottom: true,
-        },
-        description: target
-          ? "RoofRay mapped target building"
-          : "OpenStreetMap mapped nearby building",
-      });
-    }
-  } catch (error) {
-    console.warn("[RoofRay] Mapped 3D buildings unavailable:", error);
-  }
-}
-
-function addSolarOverlays(
-  Cesium: CesiumLike,
-  viewer: CesiumLike,
-  latitude: number,
-  longitude: number,
-  analysis: any,
-) {
+function addSolarOverlays(map: MapLibreLike, latitude: number, longitude: number, analysis: any) {
   const planning = analysis?.planningEstimate ?? {};
-  const roofPoints = getRoofPoints(analysis);
-  const roofLocal = roofPoints.map((point) => toLocal(point, latitude, longitude));
-  const panelCount = Math.max(1, Math.round(Number(planning.panelCount) || 1));
-  const panelPowerW = Math.round(Number(planning.panelPowerW) || 450);
-  const heightReference =
-    Cesium.HeightReference?.CLAMP_TO_3D_TILE ??
-    Cesium.HeightReference?.CLAMP_TO_GROUND;
+  const roof = analysis?.roof?.polygon;
+  const roofCoordinates =
+    Array.isArray(roof) && roof.length >= 3
+      ? roof.map((point: any) => [Number(point.longitude), Number(point.latitude)])
+      : [];
 
-  const targetPoint = Cesium.Cartesian3.fromDegrees(longitude, latitude, 1);
+  if (map.getSource("roofray-roof")) {
+    map.removeLayer("roofray-roof-fill");
+    map.removeLayer("roofray-roof-line");
+    map.removeSource("roofray-roof");
+  }
 
-  if (roofPoints.length >= 3) {
-    const roofHierarchy = roofPoints.map((point) =>
-      Cesium.Cartesian3.fromDegrees(point.longitude, point.latitude, 0.5),
-    );
-
-    viewer.entities.add({
-      name: "RoofRay mapped building footprint",
-      polygon: {
-        hierarchy: roofHierarchy,
-        material: Cesium.Color.CYAN.withAlpha(0.12),
-        outline: true,
-        outlineColor: Cesium.Color.CYAN,
-        height: 0,
-        heightReference,
-      },
-      label: {
-        text: "Mapped building",
-        font: "600 13px sans-serif",
-        fillColor: Cesium.Color.WHITE,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString("#07111ccc"),
-        pixelOffset: new Cesium.Cartesian2(0, -22),
-        heightReference,
+  if (roofCoordinates.length >= 3) {
+    const closed = [...roofCoordinates, roofCoordinates[0]];
+    map.addSource("roofray-roof", {
+      type: "geojson",
+      data: {
+        type: "Feature",
+        properties: {},
+        geometry: { type: "Polygon", coordinates: [closed] },
       },
     });
-
-    const xs = roofLocal.map((point) => point.east);
-    const ys = roofLocal.map((point) => point.north);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const width = Math.max(3, maxX - minX);
-    const depth = Math.max(3, maxY - minY);
-
-    const columns = Math.min(6, Math.max(1, Math.ceil(Math.sqrt(panelCount))));
-    const rows = Math.max(1, Math.ceil(panelCount / columns));
-    const gap = Math.max(0.18, Math.min(0.55, Math.min(width, depth) * 0.025));
-    const panelWidth = Math.max(
-      0.7,
-      Math.min(2.4, (width * 0.72 - gap * (columns - 1)) / columns),
-    );
-    const panelDepth = Math.max(
-      0.55,
-      Math.min(2.0, (depth * 0.62 - gap * (rows - 1)) / rows),
-    );
-
-    let placed = 0;
-    for (let row = 0; row < rows && placed < panelCount; row += 1) {
-      for (let col = 0; col < columns && placed < panelCount; col += 1) {
-        const east =
-          minX +
-          width * 0.14 +
-          panelWidth / 2 +
-          col * (panelWidth + gap);
-        const north =
-          maxY -
-          depth * 0.19 -
-          panelDepth / 2 -
-          row * (panelDepth + gap);
-
-        const corners = [
-          { east: east - panelWidth / 2, north: north - panelDepth / 2 },
-          { east: east + panelWidth / 2, north: north - panelDepth / 2 },
-          { east: east + panelWidth / 2, north: north + panelDepth / 2 },
-          { east: east - panelWidth / 2, north: north + panelDepth / 2 },
-        ];
-
-        if (!corners.every((corner) => pointInsidePolygon(corner, roofLocal))) {
-          continue;
-        }
-
-        const panelPoints = corners.map((corner) =>
-          Cesium.Cartesian3.fromDegrees(
-            longitude +
-              corner.east /
-                Math.max(1, 111320 * Math.cos((latitude * Math.PI) / 180)),
-            latitude + corner.north / 111320,
-            0.45,
-          ),
-        );
-
-        viewer.entities.add({
-          name: `Solar panel ${placed + 1}`,
-          polygon: {
-            hierarchy: panelPoints,
-            material: Cesium.Color.fromCssColorString("#123d78").withAlpha(0.94),
-            outline: true,
-            outlineColor: Cesium.Color.fromCssColorString("#67c7ff"),
-            height: 0.45,
-            heightReference,
-          },
-          description: `${panelPowerW} W solar panel — placed inside the mapped building footprint`,
-        });
-
-        placed += 1;
-      }
-    }
-
-    viewer.entities.add({
-      position: targetPoint,
-      point: {
-        pixelSize: 9,
-        color: Cesium.Color.fromCssColorString("#38bdf8"),
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-      label: {
-        text: "Your location",
-        font: "600 13px sans-serif",
-        fillColor: Cesium.Color.WHITE,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString("#07111cdd"),
-        pixelOffset: new Cesium.Cartesian2(10, -20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
+    map.addLayer({
+      id: "roofray-roof-fill",
+      type: "fill",
+      source: "roofray-roof",
+      paint: { "fill-color": "#22d3ee", "fill-opacity": 0.18 },
     });
-  } else {
-    viewer.entities.add({
-      position: targetPoint,
-      point: {
-        pixelSize: 12,
-        color: Cesium.Color.fromCssColorString("#38bdf8"),
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-      label: {
-        text: "Building footprint not mapped — exact roof overlay unavailable",
-        font: "600 12px sans-serif",
-        fillColor: Cesium.Color.WHITE,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString("#07111cdd"),
-        pixelOffset: new Cesium.Cartesian2(10, -20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
+    map.addLayer({
+      id: "roofray-roof-line",
+      type: "line",
+      source: "roofray-roof",
+      paint: { "line-color": "#22d3ee", "line-width": 4 },
     });
   }
 
-  const sunSamples = Array.isArray(analysis?.sunCycle?.next12Hours)
+  if (map.getSource("roofray-sun")) {
+    map.removeLayer("roofray-sun-line");
+    map.removeLayer("roofray-sun-points");
+    map.removeSource("roofray-sun");
+  }
+
+  const samples = Array.isArray(analysis?.sunCycle?.next12Hours)
     ? analysis.sunCycle.next12Hours
     : [];
-
-  const sunPositions: any[] = [];
-  for (const sample of sunSamples) {
-    const azimuth = Number(sample.azimuthDeg);
-    const elevation = Number(sample.elevationDeg);
-    if (!Number.isFinite(azimuth) || !Number.isFinite(elevation)) continue;
-
-    const radius = 85;
-    const horizontal = Math.max(
-      18,
-      radius * Math.cos(Cesium.Math.toRadians(elevation)),
-    );
-    const az = Cesium.Math.toRadians(azimuth);
-    const east = Math.sin(az) * horizontal;
-    const north = Math.cos(az) * horizontal;
-    const height = 25 + Math.max(0, elevation) * 4;
-    sunPositions.push(
-      Cesium.Cartesian3.fromDegrees(
-        longitude +
-          east /
-            Math.max(1, 111320 * Math.cos((latitude * Math.PI) / 180)),
-        latitude + north / 111320,
-        height,
-      ),
-    );
-  }
-
-  if (sunPositions.length >= 2) {
-    viewer.entities.add({
-      name: "RoofRay sun path",
-      polyline: {
-        positions: sunPositions,
-        width: 4,
-        material: new Cesium.PolylineDashMaterialProperty({
-          color: Cesium.Color.fromCssColorString("#fbbf24"),
-          dashLength: 14,
-        }),
-        clampToGround: false,
-      },
+  const sunCoordinates = samples
+    .filter(
+      (sample: any) =>
+        Number.isFinite(Number(sample.azimuthDeg)) &&
+        Number.isFinite(Number(sample.elevationDeg)),
+    )
+    .slice(0, 10)
+    .map((sample: any) => {
+      const az = (Number(sample.azimuthDeg) * Math.PI) / 180;
+      const elevation = Math.max(20, Number(sample.elevationDeg) || 20);
+      const radius = 0.0008 * Math.max(0.45, Math.cos((elevation * Math.PI) / 180));
+      const east = Math.sin(az) * radius;
+      const north = Math.cos(az) * radius;
+      return [longitude + east, latitude + north];
     });
 
-    const first = sunPositions[0];
-    const last = sunPositions[sunPositions.length - 1];
-    for (const [position, text] of [
-      [first, "Sun path start"],
-      [last, "Sun path later"],
-    ] as const) {
-      viewer.entities.add({
-        position,
-        point: {
-          pixelSize: 13,
-          color: Cesium.Color.fromCssColorString("#fbbf24"),
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        },
-        label: {
-          text,
-          font: "600 12px sans-serif",
-          fillColor: Cesium.Color.WHITE,
-          showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString("#07111cdd"),
-          pixelOffset: new Cesium.Cartesian2(10, -8),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+  if (sunCoordinates.length >= 2) {
+    map.addSource("roofray-sun", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {},
+            geometry: { type: "LineString", coordinates: sunCoordinates },
+          },
+        ],
+      },
+    });
+    map.addLayer({
+      id: "roofray-sun-line",
+      type: "line",
+      source: "roofray-sun",
+      paint: {
+        "line-color": "#fbbf24",
+        "line-width": 4,
+        "line-dasharray": [2, 2],
+      },
+    });
+    map.addLayer({
+      id: "roofray-sun-points",
+      type: "circle",
+      source: "roofray-sun",
+      paint: {
+        "circle-radius": 7,
+        "circle-color": "#fbbf24",
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+    });
+  }
+
+  const panelCount = Math.max(0, Math.min(40, Math.round(Number(planning.panelCount) || 0)));
+  if (panelCount > 0 && roofCoordinates.length >= 3) {
+    if (map.getSource("roofray-panels")) {
+      if (map.getLayer("roofray-panels-fill")) map.removeLayer("roofray-panels-fill");
+      if (map.getLayer("roofray-panels-line")) map.removeLayer("roofray-panels-line");
+      map.removeSource("roofray-panels");
+    }
+
+    const lons = roofCoordinates.map((p: number[]) => p[0]);
+    const lats = roofCoordinates.map((p: number[]) => p[1]);
+    const minLon = Math.min(...lons);
+    const maxLon = Math.max(...lons);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const cols = Math.min(8, Math.max(1, Math.ceil(Math.sqrt(panelCount))));
+    const rows = Math.ceil(panelCount / cols);
+    const cellLon = (maxLon - minLon) * 0.68 / cols;
+    const cellLat = (maxLat - minLat) * 0.68 / rows;
+    const gapLon = cellLon * 0.08;
+    const gapLat = cellLat * 0.08;
+    const features: any[] = [];
+
+    for (let i = 0; i < panelCount; i += 1) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const centerLon = minLon + (maxLon - minLon) * 0.16 + col * cellLon;
+      const centerLat = maxLat - (maxLat - minLat) * 0.16 - row * cellLat;
+      const w = Math.max(0.00001, cellLon - gapLon);
+      const h = Math.max(0.00001, cellLat - gapLat);
+      features.push({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [centerLon, centerLat],
+            [centerLon + w, centerLat],
+            [centerLon + w, centerLat - h],
+            [centerLon, centerLat - h],
+            [centerLon, centerLat],
+          ]],
         },
       });
     }
+
+    map.addSource("roofray-panels", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features },
+    });
+    map.addLayer({
+      id: "roofray-panels-fill",
+      type: "fill",
+      source: "roofray-panels",
+      paint: { "fill-color": "#164e9a", "fill-opacity": 0.92 },
+    });
+    map.addLayer({
+      id: "roofray-panels-line",
+      type: "line",
+      source: "roofray-panels",
+      paint: { "line-color": "#7dd3fc", "line-width": 1.5 },
+    });
   }
 }
 
-export default function Solar3DViewer({
-  latitude,
-  longitude,
-}: Solar3DViewerProps) {
+export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const viewerRef = useRef<CesiumLike | null>(null);
-  const [status, setStatus] = useState("Loading real satellite + 3D buildings...");
+  const mapRef = useRef<MapLibreLike | null>(null);
+  const pinModeRef = useRef(false);
+  const [status, setStatus] = useState("Loading satellite map...");
   const [error, setError] = useState("");
   const [pinMode, setPinMode] = useState(false);
   const [pinStatus, setPinStatus] = useState("");
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+
+  useEffect(() => {
+    pinModeRef.current = pinMode;
+  }, [pinMode]);
 
   useEffect(() => {
     let cancelled = false;
 
     const start = async () => {
       try {
-        const stored = getStoredLocation();
-        const lat = Number.isFinite(Number(latitude))
-          ? Number(latitude)
-          : stored?.latitude;
-        const lon = Number.isFinite(Number(longitude))
-          ? Number(longitude)
-          : stored?.longitude;
+        const stored = readStoredLocation();
+        const lat = Number.isFinite(Number(latitude)) ? Number(latitude) : stored?.latitude;
+        const lon = Number.isFinite(Number(longitude)) ? Number(longitude) : stored?.longitude;
 
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          throw new Error(
-            "No analyzed location was found. Complete RoofRay location analysis first.",
-          );
+          throw new Error("No location found. Return to RoofRay and complete location analysis first.");
         }
 
-        // The core RoofRay map intentionally does not depend on Cesium ion.
-        // This prevents an invalid/expired ion token from blanking the entire map.
-        ensureCesiumCss();
-        const Cesium = await loadCesium();
+        ensureMapLibreCss();
+        const maplibregl = await loadMapLibre();
         if (cancelled || !containerRef.current) return;
 
-        const viewer = new Cesium.Viewer(containerRef.current, {
-          baseLayer: false,
-          terrain: new Cesium.EllipsoidTerrainProvider(),
-          animation: false,
-          timeline: false,
-          geocoder: false,
-          homeButton: false,
-          sceneModePicker: false,
-          navigationHelpButton: false,
-          fullscreenButton: false,
-          baseLayerPicker: false,
-          infoBox: false,
-          selectionIndicator: false,
-          shadows: true,
-        });
-
-        viewerRef.current = viewer;
-
-        // Real aerial imagery without a Cesium ion dependency.
-        viewer.imageryLayers.addImageryProvider(
-          new Cesium.UrlTemplateImageryProvider({
-            url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            credit: "Esri World Imagery",
-            maximumLevel: 19,
-          }),
-        );
-
-        const analysis = getStoredPlanningData();
-        const roofPoints = getRoofPoints(analysis);
-
-        // Use OpenStreetMap building geometry directly as extruded Cesium
-        // entities. This gives us a real 3D neighborhood without Cesium ion.
-        await addMapped3DBuildings(Cesium, viewer, lat, lon);
-
-        const focusLat =
-          roofPoints.length >= 3
-            ? roofPoints.reduce((sum, point) => sum + point.latitude, 0) /
-              roofPoints.length
-            : lat;
-        const focusLon =
-          roofPoints.length >= 3
-            ? roofPoints.reduce((sum, point) => sum + point.longitude, 0) /
-              roofPoints.length
-            : lon;
-
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(focusLon, focusLat, 180),
-          orientation: {
-            heading: Cesium.Math.toRadians(15),
-            pitch: Cesium.Math.toRadians(-52),
-            roll: 0,
+        const map = new maplibregl.Map({
+          container: containerRef.current,
+          style: {
+            version: 8,
+            sources: {
+              satellite: {
+                type: "raster",
+                tiles: [
+                  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                ],
+                tileSize: 256,
+                maxzoom: 19,
+                attribution: "Esri World Imagery",
+              },
+            },
+            layers: [
+              {
+                id: "satellite",
+                type: "raster",
+                source: "satellite",
+              },
+            ],
           },
-          duration: 2.2,
+          center: [lon, lat],
+          zoom: 18,
+          pitch: 52,
+          bearing: 15,
+          maxZoom: 21,
+          attributionControl: true,
         });
 
-        addSolarOverlays(Cesium, viewer, lat, lon, analysis);
+        mapRef.current = map;
 
-        viewer.scene.globe.enableLighting = true;
-        viewer.scene.globe.dynamicAtmosphereLighting = true;
-        viewer.scene.sunBloom = true;
+        map.on("error", (event: any) => {
+          console.warn("[RoofRay] MapLibre error:", event?.error || event);
+          setError(
+            event?.error?.message
+              ? "Satellite map error: " + event.error.message
+              : "Satellite imagery could not be loaded.",
+          );
+        });
 
-        const clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        clickHandler.setInputAction(async (movement: any) => {
-          if (!pinMode) return;
+        map.on("load", async () => {
+          if (cancelled) return;
 
-          let cartesian = viewer.scene.pickPositionSupported
-            ? viewer.scene.pickPosition(movement.position)
-            : null;
-          if (!cartesian) {
-            cartesian = viewer.camera.pickEllipsoid(
-              movement.position,
-              viewer.scene.globe.ellipsoid,
-            );
+          try {
+            const buildings = await getBuildings(lat, lon);
+            if (!map.getSource("buildings")) {
+              map.addSource("buildings", { type: "geojson", data: buildings });
+              map.addLayer({
+                id: "buildings-3d",
+                type: "fill-extrusion",
+                source: "buildings",
+                paint: {
+                  "fill-extrusion-color": [
+                    "case",
+                    ["get", "target"],
+                    "#22d3ee",
+                    "#64748b",
+                  ],
+                  "fill-extrusion-height": ["get", "height"],
+                  "fill-extrusion-base": 0,
+                  "fill-extrusion-opacity": 0.62,
+                },
+              });
+            }
+
+            const analysis = readStoredAnalysis();
+            addSolarOverlays(map, lat, lon, analysis);
+
+            new maplibregl.Marker({ color: "#22d3ee" })
+              .setLngLat([lon, lat])
+              .setPopup(
+                new maplibregl.Popup({ offset: 20 }).setHTML(
+                  "<strong>RoofRay location</strong><br/>" +
+                    lat.toFixed(6) +
+                    ", " +
+                    lon.toFixed(6),
+                ),
+              )
+              .addTo(map);
+
+            setStatus("Real satellite imagery loaded. Drag, zoom, rotate and tilt.");
+          } catch (buildingError) {
+            console.warn("[RoofRay] Building/overlay load failed:", buildingError);
+            setStatus("Satellite map loaded. Building data is unavailable at this location.");
           }
-          if (!cartesian) {
-            setPinStatus("Tap directly on the roof/map again.");
-            return;
-          }
+        });
 
-          const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
-          const pickedLat = Cesium.Math.toDegrees(cartographic.latitude);
-          const pickedLon = Cesium.Math.toDegrees(cartographic.longitude);
+        map.on("click", async (event: any) => {
+          if (!pinModeRef.current) return;
+
+          const pickedLon = Number(event.lngLat.lng);
+          const pickedLat = Number(event.lngLat.lat);
           setPinStatus(
-            "Pinned " + pickedLat.toFixed(6) + ", " + pickedLon.toFixed(6) + " — analyzing roof...",
+            "Pinned " +
+              pickedLat.toFixed(6) +
+              ", " +
+              pickedLon.toFixed(6) +
+              " — checking this house...",
           );
 
           try {
+            const analysis = readStoredAnalysis();
             const roofAreaSqFt = Number(analysis?.planningEstimate?.roofAreaSqFt);
             const response = await fetch("/api/solar-analysis", {
               method: "POST",
@@ -572,7 +439,9 @@ export default function Solar3DViewer({
                 latitude: pickedLat,
                 longitude: pickedLon,
                 peakPowerKw: 1,
-                ...(Number.isFinite(roofAreaSqFt) ? { roofAreaM2: roofAreaSqFt * 0.092903 } : {}),
+                ...(Number.isFinite(roofAreaSqFt)
+                  ? { roofAreaM2: roofAreaSqFt * 0.092903 }
+                  : {}),
                 obstacleRadiusMeters: 500,
               }),
             });
@@ -581,43 +450,74 @@ export default function Solar3DViewer({
               throw new Error(
                 typeof data.error === "string"
                   ? data.error
-                  : "Solar analysis failed for the pinned location.",
+                  : "Solar analysis failed for the selected house.",
               );
             }
 
             const serialized = JSON.stringify(data.analysis);
             sessionStorage.setItem("roofray_solar_analysis", serialized);
             localStorage.setItem("roofray_solar_analysis", serialized);
-            viewer.entities.removeAll();
-            addSolarOverlays(Cesium, viewer, pickedLat, pickedLon, data.analysis);
-            viewer.camera.flyTo({
-              destination: Cesium.Cartesian3.fromDegrees(pickedLon, pickedLat, 120),
-              orientation: {
-                heading: Cesium.Math.toRadians(15),
-                pitch: Cesium.Math.toRadians(-55),
-                roll: 0,
-              },
-              duration: 1.4,
+
+            try {
+              const raw =
+                sessionStorage.getItem("roofray_report_data") ||
+                localStorage.getItem("roofray_report_data");
+              if (raw) {
+                const report = JSON.parse(raw);
+                report.solarContext = data.analysis;
+                report.generatedAt = Date.now();
+                const next = JSON.stringify(report);
+                sessionStorage.setItem("roofray_report_data", next);
+                localStorage.setItem("roofray_report_data", next);
+              }
+            } catch {}
+
+            map.flyTo({
+              center: [pickedLon, pickedLat],
+              zoom: 19,
+              pitch: 58,
+              bearing: 20,
+              duration: 1200,
             });
+
+            // Reload mapped buildings and all solar overlays at the selected point.
+            if (map.getLayer("buildings-3d")) map.removeLayer("buildings-3d");
+            if (map.getSource("buildings")) map.removeSource("buildings");
+            const buildings = await getBuildings(pickedLat, pickedLon);
+            map.addSource("buildings", { type: "geojson", data: buildings });
+            map.addLayer({
+              id: "buildings-3d",
+              type: "fill-extrusion",
+              source: "buildings",
+              paint: {
+                "fill-extrusion-color": [
+                  "case",
+                  ["get", "target"],
+                  "#22d3ee",
+                  "#64748b",
+                ],
+                "fill-extrusion-height": ["get", "height"],
+                "fill-extrusion-base": 0,
+                "fill-extrusion-opacity": 0.62,
+              },
+            });
+
+            addSolarOverlays(map, pickedLat, pickedLon, data.analysis);
             setPinMode(false);
-            setPinStatus("Exact house point saved. Roof analysis updated.");
+            pinModeRef.current = false;
+            setPinStatus("House selected. Solar analysis updated.");
             setError("");
           } catch (pinError) {
             setPinStatus(
-              pinError instanceof Error ? pinError.message : "Unable to analyze pinned location.",
+              pinError instanceof Error
+                ? pinError.message
+                : "Unable to analyze the selected house.",
             );
           }
-        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-        setStatus(
-          roofPoints.length >= 3
-            ? "Your mapped building is centered — zoom, drag, tilt and rotate the map."
-            : "Aerial map loaded — click “Set house” to select the exact roof.",
-        );
-
+        });
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Unable to load the 3D site.");
+        setError(err instanceof Error ? err.message : "Unable to load the map.");
         setStatus("");
       }
     };
@@ -626,30 +526,24 @@ export default function Solar3DViewer({
 
     return () => {
       cancelled = true;
-      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-        viewerRef.current = viewerRef.current.destroy();
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
       }
-      viewerRef.current = null;
     };
   }, [latitude, longitude]);
 
-  const zoomIn = () => viewerRef.current?.camera.zoomIn(35);
-  const zoomOut = () => viewerRef.current?.camera.zoomOut(35);
+  const zoomIn = () => mapRef.current?.zoomIn();
+  const zoomOut = () => mapRef.current?.zoomOut();
   const resetView = () => {
-    const stored = getStoredLocation();
-    if (!stored || !viewerRef.current) return;
-    viewerRef.current.camera.flyTo({
-      destination: (window as any).Cesium.Cartesian3.fromDegrees(
-        stored.longitude,
-        stored.latitude,
-        180,
-      ),
-      orientation: {
-        heading: (window as any).Cesium.Math.toRadians(15),
-        pitch: (window as any).Cesium.Math.toRadians(-52),
-        roll: 0,
-      },
-      duration: 1.2,
+    const stored = readStoredLocation();
+    if (!stored || !mapRef.current) return;
+    mapRef.current.flyTo({
+      center: [stored.longitude, stored.latitude],
+      zoom: 18,
+      pitch: 52,
+      bearing: 15,
+      duration: 900,
     });
   };
 
@@ -657,79 +551,50 @@ export default function Solar3DViewer({
     <section className="relative h-[calc(100vh-64px)] min-h-[620px] w-full overflow-hidden bg-[#050912]">
       <div ref={containerRef} className="absolute inset-0" />
 
-      <div className="pointer-events-none absolute left-5 top-5 z-10 max-w-sm rounded-2xl border border-white/10 bg-[#07111c]/85 px-5 py-4 text-white shadow-2xl backdrop-blur-xl">
+      <div className="pointer-events-none absolute left-5 top-5 z-10 max-w-sm rounded-2xl border border-white/10 bg-[#07111c]/90 px-5 py-4 text-white shadow-2xl backdrop-blur-xl">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
           RoofRay 3D Roof View
         </p>
-        <h1 className="mt-1 text-lg font-semibold">
-          See your real location like a map
-        </h1>
+        <h1 className="mt-1 text-lg font-semibold">See your actual house on satellite</h1>
         <p className="mt-1 text-xs leading-relaxed text-slate-300">
-          Real aerial imagery with 3D OpenStreetMap buildings. RoofRay only
-          overlays the mapped building footprint, panels and sun path.
+          Real aerial imagery with mapped OpenStreetMap buildings. Click “Set house”
+          and select your exact roof if browser location is inaccurate.
         </p>
       </div>
 
       <div className="absolute right-5 top-5 z-10 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#07111c]/90 shadow-xl backdrop-blur-xl">
-        <button
-          type="button"
-          onClick={zoomIn}
-          className="h-11 w-11 text-lg font-semibold text-white hover:bg-white/10"
-          aria-label="Zoom in"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          onClick={zoomOut}
-          className="h-11 w-11 border-t border-white/10 text-lg font-semibold text-white hover:bg-white/10"
-          aria-label="Zoom out"
-        >
-          −
-        </button>
-        <button
-          type="button"
-          onClick={resetView}
-          className="border-t border-white/10 px-3 py-2 text-[11px] font-semibold text-cyan-200 hover:bg-white/10"
-        >
-          My roof
-        </button>
+        <button type="button" onClick={zoomIn} className="h-11 w-11 text-lg font-semibold text-white hover:bg-white/10">+</button>
+        <button type="button" onClick={zoomOut} className="h-11 w-11 border-t border-white/10 text-lg font-semibold text-white hover:bg-white/10">−</button>
+        <button type="button" onClick={resetView} className="border-t border-white/10 px-3 py-2 text-[11px] font-semibold text-cyan-200 hover:bg-white/10">My roof</button>
         <button
           type="button"
           onClick={() => {
             setPinMode((value) => !value);
             setPinStatus("");
           }}
-          className={"border-t border-white/10 px-3 py-2 text-[10px] font-semibold " +
-            (pinMode ? "bg-cyan-400/20 text-cyan-100" : "text-slate-200 hover:bg-white/10")}
+          className={
+            "border-t border-white/10 px-3 py-2 text-[10px] font-semibold " +
+            (pinMode ? "bg-cyan-400/20 text-cyan-100" : "text-slate-200 hover:bg-white/10")
+          }
         >
-          {pinMode ? "Click house" : "Set house"}
+          {pinMode ? "Click your roof" : "Set house"}
         </button>
       </div>
 
-      <div className="pointer-events-none absolute bottom-5 left-5 z-10 max-w-md rounded-xl border border-white/10 bg-[#07111c]/85 px-4 py-3 text-xs text-slate-200 backdrop-blur-xl">
+      <div className="pointer-events-none absolute bottom-5 left-5 z-10 max-w-lg rounded-xl border border-white/10 bg-[#07111c]/90 px-4 py-3 text-xs text-slate-200 backdrop-blur-xl">
         <div>{pinStatus || status || error}</div>
         {error && (
           <div className="mt-1 text-[10px] text-amber-200">
-            Tip: use “Set house” and click directly on your roof if desktop GPS is inaccurate.
+            If browser location is inaccurate, enable Precise Location or use “Set house”.
           </div>
         )}
       </div>
 
-      <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-2xl border border-white/10 bg-[#07111c]/85 px-4 py-4 text-xs text-slate-200 backdrop-blur-xl">
+      <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-2xl border border-white/10 bg-[#07111c]/90 px-4 py-4 text-xs text-slate-200 backdrop-blur-xl">
         <div className="font-semibold text-white">RoofRay overlay</div>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />
-          Mapped building
-        </div>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-sm bg-blue-500" />
-          Solar panels
-        </div>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-          Sun path
-        </div>
+        <div className="mt-2 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />Mapped building</div>
+        <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-blue-500" />Solar panels</div>
+        <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Sun path</div>
       </div>
     </section>
   );
