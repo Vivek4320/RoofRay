@@ -123,6 +123,14 @@ export async function POST(request: Request) {
     const reportMonthly = reportNumber(reportText, /Expected generation:\s*~?([\d,.]+)\s*kWh\/month/i);
     const reportAnnual = reportNumber(reportText, /\|\s*~?([\d,.]+)\s*kWh\/year/i);
     const reportShade = reportNumber(reportText, /Estimated shading:\s*~?([\d,.]+)%/i);
+    const dailyGeneration = numberValue(planning.averageDailyGenerationKwh);
+    const monthlyGeneration = Array.isArray(planning.monthlyGenerationKwh)
+      ? planning.monthlyGenerationKwh as Array<Record<string, unknown>>
+      : [];
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
 
     const lines = [
       "Generated from the final RoofRay site analysis.",
@@ -137,7 +145,18 @@ export async function POST(request: Request) {
       ...wrap(`Recommended system size: ${(reportSize ?? size) !== null ? (reportSize ?? size)!.toFixed(2) + " kW" : "Unavailable"}`),
       ...wrap(`Estimated panels: ${(reportPanels ?? panels) !== null ? Math.round(reportPanels ?? panels) : "Unavailable"}`),
       ...wrap(`Estimated generation: ${(reportMonthly ?? monthly) !== null ? (reportMonthly ?? monthly) + " kWh/month" : "Unavailable"}${(reportAnnual ?? annual) !== null ? " | " + (reportAnnual ?? annual) + " kWh/year" : ""}`),
+      ...wrap(`Average expected generation: ${dailyGeneration !== null ? dailyGeneration.toFixed(1) + " kWh/day" : "Unavailable"}`),
       ...wrap(`Estimated shading: ${(reportShade ?? shade) !== null ? (reportShade ?? shade)!.toFixed(1) + "%" : "Unavailable"}`),
+      "",
+      "Expected monthly generation",
+      ...monthlyGeneration.map((item) => {
+        const month = numberValue(item.month);
+        const expected = numberValue(item.expectedKwh);
+        const averageDaily = numberValue(item.averageDailyKwh);
+        if (month === null || expected === null) return "";
+        const label = monthNames[Math.max(1, Math.min(12, Math.round(month))) - 1];
+        return `${label}: ~${Math.round(expected)} kWh/month${averageDaily !== null ? ` (~${averageDaily.toFixed(1)} kWh/day)` : ""}`;
+      }).filter(Boolean),
       ...wrap(`Solar direction: ${planning.recommendedDirection ?? "Unavailable"}`),
       ...wrap(`Recommended slope: ${numberValue(planning.recommendedSlopeDeg) !== null ? numberValue(planning.recommendedSlopeDeg) + " deg" : "Unavailable"}`),
       "",
