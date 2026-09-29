@@ -390,6 +390,8 @@ export default function Solar3DViewer({
   const viewerRef = useRef<CesiumLike | null>(null);
   const [status, setStatus] = useState("Loading real satellite + 3D buildings...");
   const [error, setError] = useState("");
+  const [pinMode, setPinMode] = useState(false);
+  const [pinStatus, setPinStatus] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -410,22 +412,19 @@ export default function Solar3DViewer({
           );
         }
 
-        const token = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
-        if (!token) {
-          throw new Error(
-            "Cesium ion token is missing. Add NEXT_PUBLIC_CESIUM_ION_TOKEN to your environment.",
-          );
-        }
+        const token = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN?.trim();
 
         ensureCesiumCss();
         const Cesium = await loadCesium();
         if (cancelled || !containerRef.current) return;
 
-        Cesium.Ion.defaultAccessToken = token;
+        if (token) Cesium.Ion.defaultAccessToken = token;
 
         const viewer = new Cesium.Viewer(containerRef.current, {
           baseLayer: false,
-          terrain: Cesium.Terrain.fromWorldTerrain(),
+          terrain: token
+            ? await Cesium.Terrain.fromWorldTerrain()
+            : new Cesium.EllipsoidTerrainProvider(),
           animation: false,
           timeline: false,
           geocoder: false,
@@ -441,16 +440,47 @@ export default function Solar3DViewer({
 
         viewerRef.current = viewer;
 
-        const imageryProvider = await Cesium.createWorldImageryAsync({
-          style: Cesium.IonWorldImageryStyle.AERIAL,
-        });
-        viewer.imageryLayers.addImageryProvider(imageryProvider);
+        // Use Cesium ion imagery when available, but keep the map working
+        // without a token by falling back to Esri World Imagery.
+        try {
+          if (token) {
+            const imageryProvider = await Cesium.createWorldImageryAsync({
+              style: Cesium.IonWorldImageryStyle.AERIAL,
+            });
+            viewer.imageryLayers.addImageryProvider(imageryProvider);
+          } else {
+            viewer.imageryLayers.addImageryProvider(
+              new Cesium.UrlTemplateImageryProvider({
+                url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                credit: "Esri World Imagery",
+                maximumLevel: 19,
+              }),
+            );
+          }
+        } catch (imageryError) {
+          console.warn("[RoofRay] Cesium imagery failed, using Esri fallback:", imageryError);
+          viewer.imageryLayers.addImageryProvider(
+            new Cesium.UrlTemplateImageryProvider({
+              url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+              credit: "Esri World Imagery",
+              maximumLevel: 19,
+            }),
+          );
+        }
 
-        const buildings = await Cesium.createOsmBuildingsAsync({
-          scene: viewer.scene,
-          showOutline: true,
-        });
-        viewer.scene.primitives.add(buildings);
+        // OSM Buildings are an ion asset. If the token is absent/invalid,
+        // keep the aerial map usable instead of failing the whole 3D viewer.
+        if (token) {
+          try {
+            const buildings = await Cesium.createOsmBuildingsAsync({
+              scene: viewer.scene,
+              showOutline: true,
+            });
+            viewer.scene.primitives.add(buildings);
+          } catch (buildingError) {
+            console.warn("[RoofRay] OSM 3D buildings unavailable:", buildingError);
+          }
+        }
 
         const analysis = getStoredPlanningData();
         const roofPoints = getRoofPoints(analysis);
@@ -481,11 +511,89 @@ export default function Solar3DViewer({
         viewer.scene.globe.dynamicAtmosphereLighting = true;
         viewer.scene.sunBloom = true;
 
+        const clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        clickHandler.setInputAction(async (movement: any) => {
+          if (!pinMode) return;
+
+          let cartesian = viewer.scene.pickPositionSupported
+            ? viewer.scene.pickPosition(movement.position)
+            : null;
+          if (!cartesian) {
+            cartesian = viewer.camera.pickEllipsoid(
+              movement.position,
+              viewer.scene.globe.ellipsoid,
+            );
+          }
+          if (!cartesian) {
+            setPinStatus("Tap directly on the roof/map again.");
+            return;
+          }
+
+          const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+          const pickedLat = Cesium.Math.toDegrees(cartographic.latitude);
+          const pickedLon = Cesium.Math.toDegrees(cartographic.longitude);
+          setPinStatus(
+            "Pinned " + pickedLat.toFixed(6) + ", " + pickedLon.toFixed(6) + " — analyzing roof...",
+          );
+
+          try {
+            const roofAreaSqFt = Number(analysis?.planningEstimate?.roofAreaSqFt);
+            const response = await fetch("/api/solar-analysis", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                latitude: pickedLat,
+                longitude: pickedLon,
+                peakPowerKw: 1,
+                ...(Number.isFinite(roofAreaSqFt) ? { roofAreaM2: roofAreaSqFt * 0.092903 } : {}),
+                obstacleRadiusMeters: 500,
+              }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok || !data.analysis) {
+              throw new Error(
+                typeof data.error === "string"
+                  ? data.error
+                  : "Solar analysis failed for the pinned location.",
+              );
+            }
+
+            const serialized = JSON.stringify(data.analysis);
+            sessionStorage.setItem("roofray_solar_analysis", serialized);
+            localStorage.setItem("roofray_solar_analysis", serialized);
+            viewer.entities.removeAll();
+            addSolarOverlays(Cesium, viewer, pickedLat, pickedLon, data.analysis);
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(pickedLon, pickedLat, 120),
+              orientation: {
+                heading: Cesium.Math.toRadians(15),
+                pitch: Cesium.Math.toRadians(-55),
+                roll: 0,
+              },
+              duration: 1.4,
+            });
+            setPinMode(false);
+            setPinStatus("Exact house point saved. Roof analysis updated.");
+            setError("");
+          } catch (pinError) {
+            setPinStatus(
+              pinError instanceof Error ? pinError.message : "Unable to analyze pinned location.",
+            );
+          }
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
         setStatus(
           roofPoints.length >= 3
             ? "Your mapped building is centered — zoom, drag, tilt and rotate the map."
-            : "Location centered — exact building footprint is not mapped here.",
+            : token
+              ? "Location centered — exact building footprint is not mapped here."
+              : "Aerial map loaded. Add a Cesium ion token for 3D OSM buildings.",
         );
+
+        if (!token) {
+          setError("Cesium ion token not configured: aerial map works, but 3D OSM buildings are unavailable.");
+        }
+
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Unable to load the 3D site.");
@@ -565,10 +673,26 @@ export default function Solar3DViewer({
         >
           My roof
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setPinMode((value) => !value);
+            setPinStatus("");
+          }}
+          className={"border-t border-white/10 px-3 py-2 text-[10px] font-semibold " +
+            (pinMode ? "bg-cyan-400/20 text-cyan-100" : "text-slate-200 hover:bg-white/10")}
+        >
+          {pinMode ? "Click house" : "Set house"}
+        </button>
       </div>
 
-      <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-xl border border-white/10 bg-[#07111c]/85 px-4 py-3 text-xs text-slate-200 backdrop-blur-xl">
-        {status || error}
+      <div className="pointer-events-none absolute bottom-5 left-5 z-10 max-w-md rounded-xl border border-white/10 bg-[#07111c]/85 px-4 py-3 text-xs text-slate-200 backdrop-blur-xl">
+        <div>{pinStatus || status || error}</div>
+        {error && (
+          <div className="mt-1 text-[10px] text-amber-200">
+            Tip: use “Set house” and click directly on your roof if desktop GPS is inaccurate.
+          </div>
+        )}
       </div>
 
       <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-2xl border border-white/10 bg-[#07111c]/85 px-4 py-4 text-xs text-slate-200 backdrop-blur-xl">
