@@ -43,6 +43,79 @@ function reportNumber(report: string, pattern: RegExp): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+type MappedBuilding = {
+  polygon: Array<{ latitude: number; longitude: number }>;
+  areaM2: number;
+  containsTarget: boolean;
+};
+
+function pointInPolygon(
+  point: { x: number; y: number },
+  polygon: Array<{ x: number; y: number }>,
+) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersects =
+      yi > point.y !== yj > point.y &&
+      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+async function fetchMappedBuildings(
+  latitude: number,
+  longitude: number,
+  radiusMeters = 140,
+): Promise<MappedBuilding[]> {
+  const query = `[out:json][timeout:20];
+way["building"](around:${Math.min(Math.max(radiusMeters, 60), 200)},${latitude},${longitude});
+out geom tags qt;`;
+  const response = await fetch("https://overpass-api.de/api/interpreter", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body: "data=" + encodeURIComponent(query),
+    cache: "no-store",
+  });
+  if (!response.ok) return [];
+
+  const data = (await response.json()) as {
+    elements?: Array<{ geometry?: Array<{ lat: number; lon: number }> }>;
+  };
+  const mLat = 111320;
+  const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
+  const area = (points: Array<{ x: number; y: number }>) => {
+    let sum = 0;
+    for (let i = 0; i < points.length; i += 1) {
+      const n = points[(i + 1) % points.length];
+      sum += points[i].x * n.y - n.x * points[i].y;
+    }
+    return Math.abs(sum) / 2;
+  };
+
+  return (data.elements ?? [])
+    .map((element) => {
+      const geo = element.geometry ?? [];
+      const projected = geo.map((p) => ({
+        x: (p.lon - longitude) * mLon,
+        y: (p.lat - latitude) * mLat,
+      }));
+      return {
+        polygon: geo.map((p) => ({ latitude: p.lat, longitude: p.lon })),
+        areaM2: area(projected),
+        containsTarget: projected.length >= 3 && pointInPolygon({ x: 0, y: 0 }, projected),
+      };
+    })
+    .filter((item) => item.polygon.length >= 3 && item.areaM2 >= 12 && item.areaM2 <= 100000)
+    .sort((a, b) => {
+      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+      return a.areaM2 - b.areaM2;
+    })
+    .slice(0, 35);
+}
+
 
 function roofVisualCommands({
   roofAreaSqFt,
@@ -64,11 +137,16 @@ function roofVisualCommands({
   roofFootprint: Record<string, unknown> | null;
   obstacles: Array<Record<string, unknown>>;
   sunCycle: Record<string, unknown> | null;
+  mappedBuildings: MappedBuilding[];
 }): string[] {
   const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
   const roofPolygon = Array.isArray(roofFootprint?.polygon)
     ? roofFootprint.polygon as Array<Record<string, unknown>>
     : [];
+  const mappedTarget = mappedBuildings.find((building) => building.containsTarget) ?? null;
+  const actualRoofPolygon = roofPolygon.length >= 3
+    ? roofPolygon
+    : (mappedTarget?.polygon ?? []);
   const roofLat = numberValue(roofFootprint?.latitude);
   const roofLon = numberValue(roofFootprint?.longitude);
   const mapX = 55, mapY = 315, mapW = 502, mapH = 360;
@@ -88,6 +166,17 @@ function roofVisualCommands({
     "0.78 0.82 0.86 RG", "1 w", mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
   ];
 
+  const mappedNeighborhood = mappedBuildings.filter((building) => building !== mappedTarget);
+  for (const building of mappedNeighborhood) {
+    const points = building.polygon.map((point) => clampPoint(project(point.latitude, point.longitude)));
+    if (points.length < 3) continue;
+    commands.push("0.72 0.74 0.78 rg", points[0].x.toFixed(1) + " " + points[0].y.toFixed(1) + " m");
+    for (let i = 1; i < points.length; i += 1) commands.push(points[i].x.toFixed(1) + " " + points[i].y.toFixed(1) + " l");
+    commands.push("h f", "0.45 0.48 0.52 RG", "0.7 w", points[0].x.toFixed(1) + " " + points[0].y.toFixed(1) + " m");
+    for (let i = 1; i < points.length; i += 1) commands.push(points[i].x.toFixed(1) + " " + points[i].y.toFixed(1) + " l");
+    commands.push("h S");
+  }
+
   const sortedObstacles = [...obstacles]
     .filter((item) => numberValue(item.distanceMeters) !== null)
     .sort((a, b) => (numberValue(a.distanceMeters) ?? 9999) - (numberValue(b.distanceMeters) ?? 9999))
@@ -104,7 +193,7 @@ function roofVisualCommands({
     commands.push("0.45 0.48 0.52 RG", "0.8 w", (p.x - radius).toFixed(1) + " " + (p.y - radius).toFixed(1) + " " + (radius * 2).toFixed(1) + " " + (radius * 2).toFixed(1) + " re S");
   }
 
-  const roofPoints = roofPolygon
+  const roofPoints = actualRoofPolygon
     .map((point) => {
       const lat = numberValue(point.latitude);
       const lon = numberValue(point.longitude);
@@ -253,6 +342,10 @@ export async function POST(request: Request) {
     const bill = numberValue(inputs.monthlyBillInr);
     const lat = numberValue((planning.location as Record<string, unknown> | undefined)?.latitude);
     const lon = numberValue((planning.location as Record<string, unknown> | undefined)?.longitude);
+    const mappedBuildings =
+      lat !== null && lon !== null
+        ? await fetchMappedBuildings(lat, lon)
+        : [];
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
     const reportPanels = reportNumber(reportText, /Panels:\s*([\d,.]+)\s*[×x]/i);
@@ -324,6 +417,7 @@ export async function POST(request: Request) {
         ? ((context.obstacles as Record<string, unknown>).obstacles as Array<Record<string, unknown>>)
         : [],
       sunCycle: (context.sunCycle ?? null) as Record<string, unknown> | null,
+      mappedBuildings,
     });
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
