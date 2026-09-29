@@ -351,7 +351,7 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
             ],
           },
           center: [lon, lat],
-          zoom: 18,
+          zoom: 19,
           pitch: 52,
           bearing: 15,
           maxZoom: 21,
