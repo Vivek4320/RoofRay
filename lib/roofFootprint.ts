@@ -177,11 +177,11 @@ out geom tags center qt;`;
       };
     })
     .filter((candidate) => candidate.areaM2 >= 15 && candidate.areaM2 <= 100000)
-    .sort((a, b) => {
-      if (a.containsUser !== b.containsUser) return a.containsUser ? -1 : 1;
-      return a.areaM2 - b.areaM2;
-    });
+    .filter((candidate) => candidate.containsUser);
 
+  // Never label an arbitrary nearby building as the user's house. If the GPS
+  // point does not fall inside a mapped building footprint, return no footprint
+  // and let the viewer show the exact location marker instead.
   const selected = candidates[0];
   if (!selected) return null;
 
