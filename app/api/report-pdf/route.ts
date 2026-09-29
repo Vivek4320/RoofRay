@@ -74,7 +74,7 @@ function webMercatorPixel(latitude: number, longitude: number, zoom: number) {
 async function fetchSatelliteTiles(
   latitude: number,
   longitude: number,
-  zoom = 18,
+  zoom = 19,
 ): Promise<SatelliteTile[]> {
   const center = webMercatorPixel(latitude, longitude, zoom);
   const centerTileX = Math.floor(center.x / 256);
@@ -244,7 +244,7 @@ function roofVisualCommands({
   const mapW = 634;
   const mapH = 310;
 
-  const satelliteZoom = 18;
+  const satelliteZoom = 19;
   const centerPixel = webMercatorPixel(centerLat, centerLon, satelliteZoom);
   const startTileX = Math.floor(centerPixel.x / 256) - 1;
   const startTileY = Math.floor(centerPixel.y / 256) - 1;
