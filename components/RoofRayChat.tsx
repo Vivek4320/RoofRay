@@ -588,7 +588,16 @@ function AssistantMessage({
         {message.isError ? (
           <div>
             <p className="text-slate-400">{message.content}</p>
-            {message.failedInput ? (
+            {message.failedInput === "__retry_location__" ? (
+              <button
+                type="button"
+                onClick={onLocationPermission}
+                className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-1.5 text-[12px] font-medium text-blue-300 hover:border-blue-400/40 hover:bg-blue-500/15"
+              >
+                <span aria-hidden="true">↻</span>
+                Retry solar analysis
+              </button>
+            ) : message.failedInput ? (
               <button
                 type="button"
                 onClick={() => onRetry(message.failedInput ?? "")}
@@ -1225,7 +1234,7 @@ export default function RoofRayChat() {
               role: "assistant",
               content: `⚠️ Live solar analysis failed: ${lastError}`,
               isError: true,
-              failedInput: "",
+              failedInput: "__retry_location__",
             },
           ]);
           resolve(null);
