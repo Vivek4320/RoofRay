@@ -502,32 +502,149 @@ function roofVisualCommands({
     "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[2] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Suggested Installation) Tj ET",
   );
 
-  // Card 1: a compact sun/shading diagram.
-  const c1x = cardXs[0] + 14;
+  // Card 1: a measured site-geometry diagram. This deliberately does not
+  // invent a 3D house. Every nearby obstacle uses its calculated distance,
+  // bearing and height, while the orange sun path uses the calculated solar
+  // azimuth/elevation samples.
+  const c1x = cardXs[0] + 12;
   const c1y = cardY + 30;
-  const c1w = cardW - 28;
+  const c1w = cardW - 24;
   const c1h = cardH - 55;
   const c1cx = c1x + c1w / 2;
-  const c1cy = c1y + 45;
+  const c1cy = c1y + 70;
+  const diagramRadius = Math.min(70, c1w * 0.34);
+
   commands.push(
     "0.02 0.05 0.08 rg",
     c1x.toFixed(1) + " " + c1y.toFixed(1) + " " + c1w.toFixed(1) + " " + c1h.toFixed(1) + " re f",
+    "0.20 0.24 0.28 RG",
+    "0.6 w",
+    (c1cx - diagramRadius).toFixed(1) + " " + (c1cy - diagramRadius).toFixed(1) +
+      " " + (diagramRadius * 2).toFixed(1) + " " + (diagramRadius * 2).toFixed(1) + " re S",
+    "0.30 0.35 0.40 RG",
+    "0.5 w",
+    (c1cx - diagramRadius * 0.55).toFixed(1) + " " + (c1cy - diagramRadius * 0.55).toFixed(1) +
+      " " + (diagramRadius * 1.1).toFixed(1) + " " + (diagramRadius * 1.1).toFixed(1) + " re S",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1cx - 3).toFixed(1) + " " + (c1cy + diagramRadius + 8).toFixed(1) + " Td (N) Tj ET",
+    "BT /F1 6 Tf 0.72 0.78 0.84 rg " + (c1cx + diagramRadius + 6).toFixed(1) + " " + (c1cy - 2).toFixed(1) + " Td (E) Tj ET",
+    "BT /F1 6 Tf 0.72 0.78 0.84 rg " + (c1cx - 3).toFixed(1) + " " + (c1cy - diagramRadius - 12).toFixed(1) + " Td (S) Tj ET",
+    "BT /F1 6 Tf 0.72 0.78 0.84 rg " + (c1cx - diagramRadius - 12).toFixed(1) + " " + (c1cy - 2).toFixed(1) + " Td (W) Tj ET",
   );
-  const arcRadius = Math.min(c1w * 0.38, 58);
+
+  // Target house at the exact center of the geometry diagram.
   commands.push(
-    "1.00 0.57 0.00 RG",
-    "1.4 w",
-    (c1cx - arcRadius).toFixed(1) + " " + c1cy.toFixed(1) + " m",
-    (c1cx - arcRadius * 0.7).toFixed(1) + " " + (c1cy + arcRadius * 0.75).toFixed(1) + " l",
-    c1cx.toFixed(1) + " " + (c1cy + arcRadius).toFixed(1) + " l",
-    (c1cx + arcRadius * 0.7).toFixed(1) + " " + (c1cy + arcRadius * 0.75).toFixed(1) + " l",
-    (c1cx + arcRadius).toFixed(1) + " " + c1cy.toFixed(1) + " l S",
     "0.10 0.65 1.00 rg",
-    (c1cx - 28).toFixed(1) + " " + (c1cy - 10).toFixed(1) + " 56 20 re f",
-    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1cx - 15).toFixed(1) + " " + (c1cy - 3).toFixed(1) + " Td (ROOF) Tj ET",
-    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1x + 5).toFixed(1) + " " + (c1y + 5).toFixed(1) + " Td (East) Tj ET",
-    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1x + c1w - 22).toFixed(1) + " " + (c1y + 5).toFixed(1) + " Td (West) Tj ET",
-    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1cx - 3).toFixed(1) + " " + (c1y + c1h - 8).toFixed(1) + " Td (N) Tj ET",
+    (c1cx - 22).toFixed(1) + " " + (c1cy - 14).toFixed(1) + " 44 28 re f",
+    "0.70 0.90 1.00 RG",
+    "1 w",
+    (c1cx - 22).toFixed(1) + " " + (c1cy - 14).toFixed(1) + " 44 28 re S",
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1cx - 17).toFixed(1) + " " + (c1cy - 2).toFixed(1) + " Td (YOUR HOUSE) Tj ET",
+  );
+
+  // Nearby buildings: distance controls radial position; bearing controls
+  // direction; height is shown beside each marker.
+  const geometryObstacles = [...obstacles]
+    .filter(
+      (item) =>
+        numberValue(item.distanceMeters) !== null &&
+        numberValue(item.bearingDeg) !== null,
+    )
+    .sort(
+      (a, b) =>
+        (numberValue(a.distanceMeters) ?? 9999) -
+        (numberValue(b.distanceMeters) ?? 9999),
+    )
+    .slice(0, 6);
+
+  geometryObstacles.forEach((obstacle, index) => {
+    const distance = Math.max(1, numberValue(obstacle.distanceMeters) ?? 1);
+    const bearing = numberValue(obstacle.bearingDeg) ?? 0;
+    const radius = Math.min(
+      diagramRadius - 8,
+      20 + Math.sqrt(Math.min(distance, 150) / 150) * (diagramRadius - 28),
+    );
+    const angle = (bearing * Math.PI) / 180;
+    const x = c1cx + Math.sin(angle) * radius;
+    const y = c1cy + Math.cos(angle) * radius;
+    const height = numberValue(obstacle.heightMeters) ?? 6;
+
+    commands.push(
+      "0.95 0.58 0.08 rg",
+      (x - 7).toFixed(1) + " " + (y - 7).toFixed(1) + " 14 14 re f",
+      "0.98 0.98 0.98 RG",
+      "0.7 w",
+      (x - 7).toFixed(1) + " " + (y - 7).toFixed(1) + " 14 14 re S",
+      "BT /F2 6 Tf 0.02 0.05 0.08 rg " + (x - 2).toFixed(1) + " " + (y - 2).toFixed(1) + " Td (" + (index + 1) + ") Tj ET",
+      "BT /F1 5.5 Tf 0.82 0.88 0.92 rg " +
+        (x + 9).toFixed(1) + " " + (y + 4).toFixed(1) +
+        " Td (" + Math.round(distance) + "m / " + height.toFixed(0) + "m) Tj ET",
+    );
+
+    // Thin measurement line from house to the obstacle.
+    commands.push(
+      "0.38 0.48 0.56 RG",
+      "0.45 w",
+      c1cx.toFixed(1) + " " + c1cy.toFixed(1) + " m",
+      x.toFixed(1) + " " + y.toFixed(1) + " l S",
+    );
+  });
+
+  // Solar movement direction: true azimuths are projected around the house.
+  const cycle = Array.isArray((sunCycle ?? {}).next12Hours)
+    ? (sunCycle as { next12Hours: Array<Record<string, unknown>> }).next12Hours
+    : [];
+  const sunSamples = cycle
+    .filter(
+      (sample) =>
+        sample.aboveHorizon !== false &&
+        numberValue(sample.azimuthDeg) !== null,
+    )
+    .slice(0, 10);
+
+  if (sunSamples.length >= 2) {
+    const sunPts = sunSamples.map((sample, index) => {
+      const az = ((numberValue(sample.azimuthDeg) ?? 0) * Math.PI) / 180;
+      const r = diagramRadius + 8 + (index % 2) * 3;
+      return {
+        x: c1cx + Math.sin(az) * r,
+        y: c1cy + Math.cos(az) * r,
+        timestamp: String(sample.timestamp ?? ""),
+      };
+    });
+
+    commands.push(
+      "1.00 0.62 0.00 RG",
+      "1.6 w",
+      sunPts[0].x.toFixed(1) + " " + sunPts[0].y.toFixed(1) + " m",
+    );
+    for (let i = 1; i < sunPts.length; i += 1) {
+      commands.push(
+        sunPts[i].x.toFixed(1) + " " + sunPts[i].y.toFixed(1) + " l",
+      );
+    }
+    commands.push("S");
+
+    sunPts.forEach((point, index) => {
+      commands.push(
+        "1.00 0.62 0.00 rg",
+        (point.x - 4).toFixed(1) + " " + (point.y - 4).toFixed(1) + " 8 8 re f",
+      );
+      if (index === 0 || index === Math.floor(sunPts.length / 2) || index === sunPts.length - 1) {
+        const rawTime = point.timestamp;
+        const timeLabel =
+          rawTime.length >= 16 ? rawTime.slice(11, 16) : "sun";
+        commands.push(
+          "BT /F1 5.5 Tf 1.00 0.78 0.18 rg " +
+            (point.x + 5).toFixed(1) + " " + (point.y + 2).toFixed(1) +
+            " Td (" + text(timeLabel) + ") Tj ET",
+        );
+      }
+    });
+  }
+
+  commands.push(
+    "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1x + 8).toFixed(1) + " " + (c1y + c1h - 12).toFixed(1) + " Td (SUN + SURROUNDING BUILDING GEOMETRY) Tj ET",
+    "BT /F1 5.5 Tf 0.65 0.72 0.78 rg " + (c1x + 8).toFixed(1) + " " + (c1y + 6).toFixed(1) + " Td (Orange = building | label = distance / height | yellow path = calculated sun azimuth) Tj ET",
   );
 
   // Card 2: true roof footprint top view, not a generic rectangle.
