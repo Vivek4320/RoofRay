@@ -5,16 +5,9 @@ type ChatMessage = {
   content: string;
 };
 
-function extractGeminiText(data: any): string {
-  const parts = Array.isArray(data?.candidates?.[0]?.content?.parts)
-    ? data.candidates[0].content.parts
-    : [];
-
-  return parts
-    .map((part: any) => (typeof part?.text === "string" ? part.text : ""))
-    .filter(Boolean)
-    .join("\n")
-    .trim();
+function extractGroqText(data: any): string {
+  const content = data?.choices?.[0]?.message?.content;
+  return typeof content === "string" ? content.trim() : "";
 }
 
 async function verifyAccessToken(token: string): Promise<boolean> {
@@ -54,18 +47,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = (
-      process.env.GEMINI_API_KEY ||
-      process.env.Gemini_KEY ||
-      process.env.GOOGLE_API_KEY
-    )?.trim();
+    const apiKey = process.env.GROQ_API_KEY?.trim();
 
     if (!apiKey) {
       return NextResponse.json(
         {
           ok: false,
           error:
-            "RoofRay AI is not configured yet. Add GEMINI_API_KEY (or Gemini_KEY) to the server environment.",
+            "RoofRay AI is not configured yet. Add GROQ_API_KEY to the server environment.",
         },
         { status: 503 }
       );
@@ -106,9 +95,9 @@ export async function POST(request: Request) {
       ? solarContextObject.userInputs as Record<string, unknown>
       : {};
 
-    // Keep the installer-style project intake questions fixed so Gemini cannot
+    // Keep the installer-style project intake questions fixed so the AI model cannot
     // rewrite or vary them. Location is captured automatically by the website.
-    // Gemini is used only after the complete intake is collected.
+    // The AI model is used only after the complete intake is collected.
     const fixedQuestions = {
       name: "What is your name?",
       roofArea: "What is the area of your roof in square feet?",
@@ -323,6 +312,7 @@ export async function POST(request: Request) {
       "Help the user understand rooftop solar feasibility using the live RoofRay analysis supplied below.",
       "Be friendly, concise, practical, and easy to understand.",
       "Keep every reply short: normally 1-3 sentences or at most 3 short bullet points.",
+      "Respond quickly and avoid unnecessary reasoning or long explanations.",
       "Answer only what the user asked. Do not add unnecessary background, explanations, summaries, repeated information, or follow-up offers.",
       "For greetings or simple conversational messages, reply naturally in one short sentence.",
       "During input collection, ask for missing project inputs ONE AT A TIME, using one short question only.",
@@ -361,35 +351,85 @@ export async function POST(request: Request) {
       solarContext,
     ].join("\n");
 
-    // Keep the model configurable, but default to a currently supported
-    // Gemini model so an outdated model ID cannot silently break chat.
-    const configuredModel = process.env.ROOFRAY_GEMINI_MODEL?.trim();
+    // Groq is used only for normal conversational responses.
+    // The final solar report above remains deterministic and never depends on an LLM.
+    const configuredModel = process.env.ROOFRAY_GROQ_MODEL?.trim();
     const model =
-      configuredModel && configuredModel !== "your_supported_model_id"
-        ? configuredModel
-        : "gemini-3.8-flash";
+      configuredModel || "openai/gpt-oss-120b";
 
-    // Gemini conversation history must begin with a user turn and must
-    // alternate user/model turns. Normalize locally saved chats before sending.
-    const contents: Array<{ role: "user" | "model"; parts: [{ text: string }] }> = messages.reduce(
-      (turns, message) => {
-        const turn = {
-          role: message.role === "assistant" ? "model" : "user",
-          parts: [{ text: message.content }] as [{ text: string }],
-        } as { role: "user" | "model"; parts: [{ text: string }] };
+    // Groq uses OpenAI-compatible chat messages.
+    const groqMessages: Array<{
+      role: "system" | "user" | "assistant";
+      content: string;
+    }> = [
+      { role: "system", content: systemPrompt },
+      ...messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+    ];
 
-        if (turns.length === 0 && turn.role !== "user") return turns;
-        const previous = turns[turns.length - 1];
-        if (previous?.role === turn.role) {
-          previous.parts[0].text += "\n" + turn.parts[0].text;
-          return turns;
-        }
-        turns.push(turn);
-        return turns;
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: groqMessages,
+          max_completion_tokens: 1200,
+          temperature: 0.3,
+        }),
+        cache: "no-store",
       },
-      [] as Array<{ role: "user" | "model"; parts: [{ text: string }] }>
     );
 
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      console.error("[RoofRay] Groq request failed:", response.status, data);
+
+      const providerMessage =
+        typeof data?.error?.message === "string"
+          ? data.error.message
+          : "";
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: providerMessage
+            ? `RoofRay AI could not answer right now: ${providerMessage}`
+            : `RoofRay AI request failed (HTTP ${response.status}). Please try again.`,
+        },
+        {
+          status:
+            response.status === 429 || response.status === 503
+              ? response.status
+              : 502,
+        },
+      );
+    }
+
+    const answer = extractGroqText(data);
+
+    if (!answer) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "RoofRay AI returned an empty response. Please try again.",
+        },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      message: answer,
+    });
     if (!contents.length) {
       return NextResponse.json(
         { ok: false, error: "A user message is required." },
