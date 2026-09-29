@@ -1174,38 +1174,60 @@ export default function RoofRayChat() {
             setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: resolvedLocation ? "📍 Location detected: " + resolvedLocation : "📍 Location detected: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) }]);
             setHasStarted(true);
           }
-          try {
-            const response = await fetch("/api/solar-analysis", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                latitude,
-                longitude,
-                peakPowerKw: 1,
-                ...(roofAreaSqFt !== null && roofAreaSqFt !== undefined
-                  ? { roofAreaM2: roofAreaSqFt * 0.092903 }
-                  : {}),
-                obstacleRadiusMeters: 500,
-              }),
-            });
-            const data = await response.json();
-            if (response.ok && data.ok && data.analysis) {
-              sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
-              setSolarContext(data.analysis);
-              setLocationLoading(false);
-              resolve(data.analysis as SolarAnalysis);
-              return;
+          let lastError = "Live solar analysis could not be completed.";
+          for (let attempt = 1; attempt <= 2; attempt += 1) {
+            try {
+              const response = await fetch("/api/solar-analysis", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  latitude,
+                  longitude,
+                  peakPowerKw: 1,
+                  ...(roofAreaSqFt !== null && roofAreaSqFt !== undefined
+                    ? { roofAreaM2: roofAreaSqFt * 0.092903 }
+                    : {}),
+                  obstacleRadiusMeters: 500,
+                }),
+              });
+              const data = await response.json().catch(() => ({}));
+              if (response.ok && data.ok && data.analysis) {
+                sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
+                setSolarContext(data.analysis);
+                setLocationLoading(false);
+                resolve(data.analysis as SolarAnalysis);
+                return;
+              }
+              lastError =
+                typeof data.error === "string"
+                  ? data.error
+                  : `Solar analysis failed (HTTP ${response.status}).`;
+              console.warn("[RoofRay] Solar analysis attempt failed:", {
+                attempt,
+                status: response.status,
+                error: lastError,
+              });
+            } catch (error) {
+              lastError = error instanceof Error ? error.message : lastError;
+              console.warn("[RoofRay] Solar analysis request failed:", error);
             }
-          } catch (error) {
-            console.warn("[RoofRay] Live solar analysis failed after location detection:", error);
-            // Do not stop the intake/report flow just because the optional
-            // live-analysis service failed. The final report route has its own
-            // fallback handling and can still report the detected location and
-            // the user's collected inputs.
+            if (attempt === 1) {
+              await new Promise((retryResolve) => window.setTimeout(retryResolve, 1000));
+            }
           }
+
           setLocationLoading(false);
-          // Location is still shown on the map, but do not generate a
-          // feasibility report from incomplete live analysis.
+          setLocationStatus("unavailable");
+          setMessages((current) => [
+            ...current,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: `⚠️ Live solar analysis failed: ${lastError}`,
+              isError: true,
+              failedInput: "",
+            },
+          ]);
           resolve(null);
         },
         (error) => {
