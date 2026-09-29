@@ -1021,7 +1021,6 @@ export default function RoofRayChat() {
   const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
   const [reportPdfPreviewOpen, setReportPdfPreviewOpen] = useState(false);
   const [reportPdfGenerating, setReportPdfGenerating] = useState(false);
-  const [reportPdfReady, setReportPdfReady] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
   const [roofType, setRoofType] = useState<string | null>(null);
