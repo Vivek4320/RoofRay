@@ -156,6 +156,13 @@ export async function getPVGISAnalysis({
 
   const text = await response.text();
 
+  if (!response.ok) {
+    const compact = text.replace(/\s+/g, " ").trim().slice(0, 500);
+    throw new Error(
+      `PVGIS HTTP ${response.status}: ${compact || response.statusText || "empty response"}`,
+    );
+  }
+
   let data: PVGISResponse;
   try {
     data = JSON.parse(text) as PVGISResponse;
@@ -163,7 +170,7 @@ export async function getPVGISAnalysis({
     throw new Error(`PVGIS returned an invalid response (HTTP ${response.status}).`);
   }
 
-  if (!response.ok || data.error || data.message) {
+  if (data.error || data.message) {
     throw new Error(data.error || data.message || `PVGIS request failed (HTTP ${response.status}).`);
   }
 
