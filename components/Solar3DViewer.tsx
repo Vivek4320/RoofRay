@@ -151,6 +151,65 @@ function pointInsidePolygon(
   return inside;
 }
 
+async function addMapped3DBuildings(
+  Cesium: CesiumLike,
+  viewer: CesiumLike,
+  latitude: number,
+  longitude: number,
+) {
+  try {
+    const response = await fetch(
+      "/api/map-buildings?latitude=" +
+        encodeURIComponent(latitude) +
+        "&longitude=" +
+        encodeURIComponent(longitude) +
+        "&radius=140",
+      { cache: "no-store" },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok || !Array.isArray(data.buildings)) return;
+
+    for (const building of data.buildings) {
+      const polygon = Array.isArray(building.polygon)
+        ? building.polygon
+            .map((point: any) => Cesium.Cartesian3.fromDegrees(
+              Number(point.longitude),
+              Number(point.latitude),
+              0,
+            ))
+            .filter(Boolean)
+        : [];
+      if (polygon.length < 3) continue;
+
+      const height = Math.max(3, Number(building.heightMeters) || 3);
+      const target = building.containsTarget === true;
+
+      viewer.entities.add({
+        name: target ? "Your mapped building" : "Nearby mapped building",
+        polygon: {
+          hierarchy: polygon,
+          material: target
+            ? Cesium.Color.fromCssColorString("#22d3ee").withAlpha(0.28)
+            : Cesium.Color.fromCssColorString("#64748b").withAlpha(0.22),
+          outline: true,
+          outlineColor: target
+            ? Cesium.Color.fromCssColorString("#22d3ee")
+            : Cesium.Color.fromCssColorString("#94a3b8"),
+          height: 0,
+          extrudedHeight: height,
+          closeTop: true,
+          closeBottom: true,
+        },
+        description: target
+          ? "RoofRay mapped target building"
+          : "OpenStreetMap mapped nearby building",
+      });
+    }
+  } catch (error) {
+    console.warn("[RoofRay] Mapped 3D buildings unavailable:", error);
+  }
+}
+
 function addSolarOverlays(
   Cesium: CesiumLike,
   viewer: CesiumLike,
@@ -412,19 +471,17 @@ export default function Solar3DViewer({
           );
         }
 
+        // The core RoofRay map intentionally does not depend on Cesium ion.
+        // This prevents an invalid/expired ion token from blanking the entire map.
         const token = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN?.trim();
 
         ensureCesiumCss();
         const Cesium = await loadCesium();
         if (cancelled || !containerRef.current) return;
 
-        if (token) Cesium.Ion.defaultAccessToken = token;
-
         const viewer = new Cesium.Viewer(containerRef.current, {
           baseLayer: false,
-          terrain: token
-            ? await Cesium.Terrain.fromWorldTerrain()
-            : new Cesium.EllipsoidTerrainProvider(),
+          terrain: new Cesium.EllipsoidTerrainProvider(),
           animation: false,
           timeline: false,
           geocoder: false,
@@ -440,50 +497,22 @@ export default function Solar3DViewer({
 
         viewerRef.current = viewer;
 
-        // Use Cesium ion imagery when available, but keep the map working
-        // without a token by falling back to Esri World Imagery.
-        try {
-          if (token) {
-            const imageryProvider = await Cesium.createWorldImageryAsync({
-              style: Cesium.IonWorldImageryStyle.AERIAL,
-            });
-            viewer.imageryLayers.addImageryProvider(imageryProvider);
-          } else {
-            viewer.imageryLayers.addImageryProvider(
-              new Cesium.UrlTemplateImageryProvider({
-                url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-                credit: "Esri World Imagery",
-                maximumLevel: 19,
-              }),
-            );
-          }
-        } catch (imageryError) {
-          console.warn("[RoofRay] Cesium imagery failed, using Esri fallback:", imageryError);
-          viewer.imageryLayers.addImageryProvider(
-            new Cesium.UrlTemplateImageryProvider({
-              url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-              credit: "Esri World Imagery",
-              maximumLevel: 19,
-            }),
-          );
-        }
-
-        // OSM Buildings are an ion asset. If the token is absent/invalid,
-        // keep the aerial map usable instead of failing the whole 3D viewer.
-        if (token) {
-          try {
-            const buildings = await Cesium.createOsmBuildingsAsync({
-              scene: viewer.scene,
-              showOutline: true,
-            });
-            viewer.scene.primitives.add(buildings);
-          } catch (buildingError) {
-            console.warn("[RoofRay] OSM 3D buildings unavailable:", buildingError);
-          }
-        }
+        // Real aerial imagery without a Cesium ion dependency.
+        viewer.imageryLayers.addImageryProvider(
+          new Cesium.UrlTemplateImageryProvider({
+            url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            credit: "Esri World Imagery",
+            maximumLevel: 19,
+          }),
+        );
 
         const analysis = getStoredPlanningData();
         const roofPoints = getRoofPoints(analysis);
+
+        // Use OpenStreetMap building geometry directly as extruded Cesium
+        // entities. This gives us a real 3D neighborhood without Cesium ion.
+        await addMapped3DBuildings(Cesium, viewer, lat, lon);
+
         const focusLat =
           roofPoints.length >= 3
             ? roofPoints.reduce((sum, point) => sum + point.latitude, 0) /
@@ -585,14 +614,8 @@ export default function Solar3DViewer({
         setStatus(
           roofPoints.length >= 3
             ? "Your mapped building is centered — zoom, drag, tilt and rotate the map."
-            : token
-              ? "Location centered — exact building footprint is not mapped here."
-              : "Aerial map loaded. Add a Cesium ion token for 3D OSM buildings.",
+            : "Aerial map loaded — click “Set house” to select the exact roof.",
         );
-
-        if (!token) {
-          setError("Cesium ion token not configured: aerial map works, but 3D OSM buildings are unavailable.");
-        }
 
       } catch (err) {
         if (cancelled) return;
