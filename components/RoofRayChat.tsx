@@ -1357,7 +1357,11 @@ export default function RoofRayChat() {
       generatedAt: Date.now(),
     };
     try {
-      sessionStorage.setItem("roofray_report_data", JSON.stringify(payload));
+      const serialized = JSON.stringify(payload);
+      sessionStorage.setItem("roofray_report_data", serialized);
+      // Keep a persistent copy because the chat history itself is stored in
+      // localStorage and can outlive the current browser session.
+      localStorage.setItem("roofray_report_data", serialized);
       window.dispatchEvent(new Event("roofray_report_ready"));
     } catch {}
     setReportPdfGenerating(true);
@@ -1401,7 +1405,9 @@ export default function RoofRayChat() {
   async function ensureReportPdf() {
     if (reportPdfUrl) return reportPdfUrl;
     try {
-      const raw = sessionStorage.getItem("roofray_report_data");
+      const raw =
+        sessionStorage.getItem("roofray_report_data") ||
+        localStorage.getItem("roofray_report_data");
       if (!raw) {
         setReportPdfError("No final report data is available yet.");
         return null;
