@@ -1021,6 +1021,7 @@ export default function RoofRayChat() {
   const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
   const [reportPdfPreviewOpen, setReportPdfPreviewOpen] = useState(false);
   const [reportPdfGenerating, setReportPdfGenerating] = useState(false);
+  const [reportPdfError, setReportPdfError] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
   const [roofType, setRoofType] = useState<string | null>(null);
@@ -1360,6 +1361,7 @@ export default function RoofRayChat() {
       window.dispatchEvent(new Event("roofray_report_ready"));
     } catch {}
     setReportPdfGenerating(true);
+    setReportPdfError(null);
     try {
       const response = await fetch("/api/report-pdf", {
         method: "POST",
@@ -1367,17 +1369,30 @@ export default function RoofRayChat() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        console.warn("[RoofRay] PDF endpoint returned:", response.status);
-        return;
+        const errorData = await response.json().catch(() => ({}));
+        const message =
+          typeof errorData.error === "string"
+            ? errorData.error
+            : `PDF generation failed (HTTP ${response.status}).`;
+        throw new Error(message);
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      if (blob.type && blob.type !== "application/pdf") {
+        throw new Error("The PDF server returned an invalid file.");
+      }
+      const url = URL.createObjectURL(
+        new Blob([blob], { type: "application/pdf" }),
+      );
       setReportPdfUrl((previous) => {
         if (previous) URL.revokeObjectURL(previous);
         return url;
       });
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to generate PDF.";
       console.warn("[RoofRay] PDF generation failed:", error);
+      setReportPdfError(message);
+      return;
     } finally {
       setReportPdfGenerating(false);
     }
@@ -1385,25 +1400,42 @@ export default function RoofRayChat() {
 
   async function ensureReportPdf() {
     if (reportPdfUrl) return reportPdfUrl;
+    if (reportPdfUrl) return reportPdfUrl;
     try {
       const raw = sessionStorage.getItem("roofray_report_data");
-      if (!raw) return null;
+      if (!raw) {
+        setReportPdfError("No final report data is available yet.");
+        return null;
+      }
       setReportPdfGenerating(true);
+      setReportPdfError(null);
       const response = await fetch("/api/report-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: raw,
       });
       if (!response.ok) {
-        console.warn("[RoofRay] PDF endpoint returned:", response.status);
-        return null;
+        const errorData = await response.json().catch(() => ({}));
+        const message =
+          typeof errorData.error === "string"
+            ? errorData.error
+            : `PDF generation failed (HTTP ${response.status}).`;
+        throw new Error(message);
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      if (blob.type && blob.type !== "application/pdf") {
+        throw new Error("The PDF server returned an invalid file.");
+      }
+      const url = URL.createObjectURL(
+        new Blob([blob], { type: "application/pdf" }),
+      );
       setReportPdfUrl(url);
       return url;
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to generate PDF.";
       console.warn("[RoofRay] PDF generation failed:", error);
+      setReportPdfError(message);
       return null;
     } finally {
       setReportPdfGenerating(false);
@@ -2002,6 +2034,18 @@ export default function RoofRayChat() {
         {reportPdfGenerating && (
           <div className="border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-2 text-[11px] text-blue-300 sm:px-6">
             Preparing your PDF report...
+          </div>
+        )}
+        {reportPdfError && !reportPdfGenerating && (
+          <div className="flex items-center justify-between gap-3 border-t border-red-400/10 bg-[#0A1020]/95 px-4 py-2 text-[11px] text-red-300 sm:px-6">
+            <span>{reportPdfError}</span>
+            <button
+              type="button"
+              onClick={() => setReportPdfError(null)}
+              className="shrink-0 text-slate-500 hover:text-slate-300"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
