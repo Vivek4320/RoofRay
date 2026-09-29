@@ -616,9 +616,16 @@ function AssistantMessage({
           </div>
         ) : (
           <>
-            {renderAssistantContent(message.content)}
+            {message.content.startsWith("☀️ ROOFRAY SOLAR FEASIBILITY REPORT") ? (
+              <div className="mt-1">
+                <p className="text-sm font-semibold text-slate-200">☀️ Solar feasibility report is ready</p>
+                <p className="mt-1 text-xs text-slate-500">Open the PDF preview to see the roof layout, panel placement and sun-direction diagram.</p>
+              </div>
+            ) : (
+              renderAssistantContent(message.content)
+            )}
 
-            {message.content.startsWith("☀️ ROOFRAY SOLAR FEASIBILITY REPORT") && reportPdfUrl ? (
+            {message.content.startsWith("☀️ ROOFRAY SOLAR FEASIBILITY REPORT") ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -1014,6 +1021,7 @@ export default function RoofRayChat() {
   const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
   const [reportPdfPreviewOpen, setReportPdfPreviewOpen] = useState(false);
   const [reportPdfGenerating, setReportPdfGenerating] = useState(false);
+  const [reportPdfReady, setReportPdfReady] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const [roofArea, setRoofArea] = useState<number | null>(null);
   const [roofType, setRoofType] = useState<string | null>(null);
@@ -1376,10 +1384,43 @@ export default function RoofRayChat() {
     }
   }
 
-  function downloadReportPdf() {
-    if (!reportPdfUrl) return;
+  async function ensureReportPdf() {
+    if (reportPdfUrl) return reportPdfUrl;
+    try {
+      const raw = sessionStorage.getItem("roofray_report_data");
+      if (!raw) return null;
+      setReportPdfGenerating(true);
+      const response = await fetch("/api/report-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: raw,
+      });
+      if (!response.ok) {
+        console.warn("[RoofRay] PDF endpoint returned:", response.status);
+        return null;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setReportPdfUrl(url);
+      return url;
+    } catch (error) {
+      console.warn("[RoofRay] PDF generation failed:", error);
+      return null;
+    } finally {
+      setReportPdfGenerating(false);
+    }
+  }
+
+  async function previewReportPdf() {
+    const url = await ensureReportPdf();
+    if (url) setReportPdfPreviewOpen(true);
+  }
+
+  async function downloadReportPdf() {
+    const url = await ensureReportPdf();
+    if (!url) return;
     const link = document.createElement("a");
-    link.href = reportPdfUrl;
+    link.href = url;
     link.download = "RoofRay-Solar-Report.pdf";
     document.body.appendChild(link);
     link.click();
@@ -1913,8 +1954,8 @@ export default function RoofRayChat() {
                       locationCoords={locationCoords}
                       locationAccuracy={locationAccuracy}
                       reportPdfUrl={reportPdfUrl}
-                      onPreviewPdf={() => setReportPdfPreviewOpen(true)}
-                      onDownloadPdf={downloadReportPdf}
+                      onPreviewPdf={() => void previewReportPdf()}
+                      onDownloadPdf={() => void downloadReportPdf()}
                     />
                   )
                 )}
