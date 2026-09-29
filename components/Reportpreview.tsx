@@ -71,8 +71,12 @@ export default function ReportPreview() {
         },
         {
           label: "Est. generation",
-          value: metricNumber(reportMetrics.monthlyGenerationKwh, planning.averageMonthlyGenerationKwh) !== null ? Math.round(metricNumber(reportMetrics.monthlyGenerationKwh, planning.averageMonthlyGenerationKwh)!) + " units" : "—",
-          sub: "per month, avg.",
+          value: Number.isFinite(Number(planning.averageDailyGenerationKwh))
+            ? Number(planning.averageDailyGenerationKwh).toFixed(1) + " units"
+            : metricNumber(reportMetrics.monthlyGenerationKwh, planning.averageMonthlyGenerationKwh) !== null
+              ? Math.round(metricNumber(reportMetrics.monthlyGenerationKwh, planning.averageMonthlyGenerationKwh)!) + " units"
+              : "—",
+          sub: "per day, avg.",
           icon: "☀️",
         },
         {
