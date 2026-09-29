@@ -407,7 +407,7 @@ function roofVisualCommands({
   });
 
   // Sun arc around the real mapped roof.
-  const cycle = Array.isArray((sunCycle ?? {}).next12Hours)
+  const baseSunCycle = Array.isArray((sunCycle ?? {}).next12Hours)
     ? (sunCycle as { next12Hours: Array<Record<string, unknown>> }).next12Hours
     : [];
   const houseCenter = roofPoints.length
@@ -424,7 +424,7 @@ function roofVisualCommands({
     mapY + mapH - houseCenter.y,
   );
   const sunRadius = Math.max(35, Math.min(105, edgeSpace - 14));
-  const sunPoints = cycle
+  const sunPoints = baseSunCycle
     .filter(
       (sample) =>
         sample.aboveHorizon !== false &&
