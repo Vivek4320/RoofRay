@@ -47,19 +47,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.GROQ_API_KEY?.trim();
-
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "RoofRay AI is not configured yet. Add GROQ_API_KEY to the server environment.",
-        },
-        { status: 503 }
-      );
-    }
-
     const body = (await request.json()) as {
       messages?: ChatMessage[];
       solarContext?: Record<string, unknown> | null;
@@ -363,6 +350,53 @@ export async function POST(request: Request) {
       ].filter(Boolean).join("\n");
 
       return NextResponse.json({ ok: true, message: answer });
+    }
+
+    // Intake questions are deterministic. Do not send the growing chat history to Groq
+    // while the user is still answering the fixed form. This also avoids TPM errors.
+    if (!intakeComplete) {
+      const applianceText = String(applianceDetailsInput ?? "");
+      const applianceCount = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"]
+        .filter((label) => new RegExp(label.replace(" ", "\\s*") + "\\s*:", "i").test(applianceText))
+        .length;
+
+      const nextQuestion =
+        nameInput === null || nameInput === undefined || String(nameInput).trim() === ""
+          ? fixedQuestions.name
+          : roofAreaInput === null || roofAreaInput === undefined
+            ? fixedQuestions.roofArea
+            : roofTypeInput === null || roofTypeInput === undefined
+              ? fixedQuestions.roofType
+              : monthlyBillInput === null || monthlyBillInput === undefined
+                ? fixedQuestions.monthlyBill
+                : applianceCount < 6
+                  ? [
+                      "How many TVs do you have?",
+                      "How many fans do you have?",
+                      "How many ACs do you have?",
+                      "How many refrigerators do you have?",
+                      "How many bulbs/lights do you have?",
+                      "How many water pumps do you have?",
+                    ][applianceCount]
+                  : connectionTypeInput === null || connectionTypeInput === undefined
+                    ? fixedQuestions.connectionType
+                    : ownershipInput === null || ownershipInput === undefined
+                      ? fixedQuestions.ownership
+                      : fixedQuestions.goal;
+
+      return NextResponse.json({ ok: true, message: nextQuestion });
+    }
+
+    const apiKey = process.env.GROQ_API_KEY?.trim();
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "RoofRay AI is not configured yet. Add GROQ_API_KEY to the server environment.",
+        },
+        { status: 503 }
+      );
     }
 
     const systemPrompt = [
