@@ -473,8 +473,6 @@ export default function Solar3DViewer({
 
         // The core RoofRay map intentionally does not depend on Cesium ion.
         // This prevents an invalid/expired ion token from blanking the entire map.
-        const token = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN?.trim();
-
         ensureCesiumCss();
         const Cesium = await loadCesium();
         if (cancelled || !containerRef.current) return;
