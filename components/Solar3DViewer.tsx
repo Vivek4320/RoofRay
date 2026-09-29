@@ -9,6 +9,11 @@ type Solar3DViewerProps = {
 
 type CesiumLike = any;
 
+type RoofPoint = {
+  latitude: number;
+  longitude: number;
+};
+
 function getStoredLocation(): { latitude: number; longitude: number } | null {
   if (typeof window === "undefined") return null;
   try {
@@ -97,6 +102,55 @@ function ensureCesiumCss() {
   document.head.appendChild(link);
 }
 
+function getRoofPoints(analysis: any): RoofPoint[] {
+  const points = analysis?.roof?.polygon;
+  if (!Array.isArray(points)) return [];
+
+  return points
+    .map((point: any) => ({
+      latitude: Number(point?.latitude),
+      longitude: Number(point?.longitude),
+    }))
+    .filter(
+      (point: RoofPoint) =>
+        Number.isFinite(point.latitude) && Number.isFinite(point.longitude),
+    );
+}
+
+function toLocal(
+  point: RoofPoint,
+  centerLat: number,
+  centerLon: number,
+) {
+  const metersPerLat = 111320;
+  const metersPerLon = Math.max(
+    1,
+    111320 * Math.cos((centerLat * Math.PI) / 180),
+  );
+  return {
+    east: (point.longitude - centerLon) * metersPerLon,
+    north: (point.latitude - centerLat) * metersPerLat,
+  };
+}
+
+function pointInsidePolygon(
+  point: { east: number; north: number },
+  polygon: Array<{ east: number; north: number }>,
+) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].east;
+    const yi = polygon[i].north;
+    const xj = polygon[j].east;
+    const yj = polygon[j].north;
+    const intersects =
+      yi > point.north !== yj > point.north &&
+      point.east < ((xj - xi) * (point.north - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
 function addSolarOverlays(
   Cesium: CesiumLike,
   viewer: CesiumLike,
@@ -105,127 +159,155 @@ function addSolarOverlays(
   analysis: any,
 ) {
   const planning = analysis?.planningEstimate ?? {};
-  const roofAreaM2 = Number(planning.roofAreaM2);
+  const roofPoints = getRoofPoints(analysis);
+  const roofLocal = roofPoints.map((point) => toLocal(point, latitude, longitude));
   const panelCount = Math.max(1, Math.round(Number(planning.panelCount) || 1));
   const panelPowerW = Math.round(Number(planning.panelPowerW) || 450);
+  const heightReference =
+    Cesium.HeightReference?.CLAMP_TO_3D_TILE ??
+    Cesium.HeightReference?.CLAMP_TO_GROUND;
 
-  const metersPerLat = 111320;
-  const metersPerLon = Math.max(1, 111320 * Math.cos(Cesium.Math.toRadians(latitude)));
-  const roofArea = Number.isFinite(roofAreaM2) && roofAreaM2 > 0 ? roofAreaM2 : 40;
-  const roofWidth = Math.max(4, Math.sqrt(roofArea) * 1.35);
-  const roofDepth = Math.max(3, roofArea / roofWidth);
+  const targetPoint = Cesium.Cartesian3.fromDegrees(longitude, latitude, 1);
 
-  const halfWidth = roofWidth / 2;
-  const halfDepth = roofDepth / 2;
-
-  const offsetPosition = (east: number, north: number, height: number) =>
-    Cesium.Cartesian3.fromDegrees(
-      longitude + east / metersPerLon,
-      latitude + north / metersPerLat,
-      height,
-    );
-
-  const roofCorners = [
-    offsetPosition(-halfWidth, -halfDepth, 8),
-    offsetPosition(halfWidth, -halfDepth, 8),
-    offsetPosition(halfWidth, halfDepth, 8),
-    offsetPosition(-halfWidth, halfDepth, 8),
-  ];
-
-  viewer.entities.add({
-    name: "RoofRay detected roof area",
-    polygon: {
-      hierarchy: roofCorners,
-      material: Cesium.Color.CYAN.withAlpha(0.18),
-      outline: true,
-      outlineColor: Cesium.Color.CYAN,
-      height: 8,
-    },
-    label: {
-      text: "Your roof",
-      font: "600 14px sans-serif",
-      fillColor: Cesium.Color.WHITE,
-      showBackground: true,
-      backgroundColor: Cesium.Color.fromCssColorString("#07111ccc"),
-      pixelOffset: new Cesium.Cartesian2(0, -24),
-    },
-  });
-
-  const columns = Math.min(5, Math.max(1, Math.ceil(Math.sqrt(panelCount))));
-  const rows = Math.ceil(panelCount / columns);
-  const gap = 0.22;
-  const panelWidth = Math.max(
-    1.25,
-    (roofWidth * 0.78 - gap * (columns - 1)) / columns,
-  );
-  const panelDepth = Math.max(
-    0.75,
-    (roofDepth * 0.7 - gap * (rows - 1)) / rows,
-  );
-
-  for (let index = 0; index < panelCount; index += 1) {
-    const row = Math.floor(index / columns);
-    const col = index % columns;
-    const east =
-      -((columns - 1) * (panelWidth + gap)) / 2 +
-      col * (panelWidth + gap);
-    const north =
-      ((rows - 1) * (panelDepth + gap)) / 2 -
-      row * (panelDepth + gap);
-
-    const p1 = offsetPosition(
-      east - panelWidth / 2,
-      north - panelDepth / 2,
-      8.35,
-    );
-    const p2 = offsetPosition(
-      east + panelWidth / 2,
-      north - panelDepth / 2,
-      8.35,
-    );
-    const p3 = offsetPosition(
-      east + panelWidth / 2,
-      north + panelDepth / 2,
-      8.35,
-    );
-    const p4 = offsetPosition(
-      east - panelWidth / 2,
-      north + panelDepth / 2,
-      8.35,
+  if (roofPoints.length >= 3) {
+    const roofHierarchy = roofPoints.map((point) =>
+      Cesium.Cartesian3.fromDegrees(point.longitude, point.latitude, 0.5),
     );
 
     viewer.entities.add({
-      name: `Solar panel ${index + 1}`,
+      name: "RoofRay mapped building footprint",
       polygon: {
-        hierarchy: [p1, p2, p3, p4],
-        material: Cesium.Color.fromCssColorString("#123d78").withAlpha(0.95),
+        hierarchy: roofHierarchy,
+        material: Cesium.Color.CYAN.withAlpha(0.12),
         outline: true,
-        outlineColor: Cesium.Color.fromCssColorString("#67c7ff"),
-        height: 8.35,
+        outlineColor: Cesium.Color.CYAN,
+        height: 0,
+        heightReference,
       },
-      description: `${panelPowerW} W solar panel — RoofRay planning overlay`,
+      label: {
+        text: "Mapped building",
+        font: "600 13px sans-serif",
+        fillColor: Cesium.Color.WHITE,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString("#07111ccc"),
+        pixelOffset: new Cesium.Cartesian2(0, -22),
+        heightReference,
+      },
+    });
+
+    const xs = roofLocal.map((point) => point.east);
+    const ys = roofLocal.map((point) => point.north);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const width = Math.max(3, maxX - minX);
+    const depth = Math.max(3, maxY - minY);
+
+    const columns = Math.min(6, Math.max(1, Math.ceil(Math.sqrt(panelCount))));
+    const rows = Math.max(1, Math.ceil(panelCount / columns));
+    const gap = Math.max(0.18, Math.min(0.55, Math.min(width, depth) * 0.025));
+    const panelWidth = Math.max(
+      0.7,
+      Math.min(2.4, (width * 0.72 - gap * (columns - 1)) / columns),
+    );
+    const panelDepth = Math.max(
+      0.55,
+      Math.min(2.0, (depth * 0.62 - gap * (rows - 1)) / rows),
+    );
+
+    let placed = 0;
+    for (let row = 0; row < rows && placed < panelCount; row += 1) {
+      for (let col = 0; col < columns && placed < panelCount; col += 1) {
+        const east =
+          minX +
+          width * 0.14 +
+          panelWidth / 2 +
+          col * (panelWidth + gap);
+        const north =
+          maxY -
+          depth * 0.19 -
+          panelDepth / 2 -
+          row * (panelDepth + gap);
+
+        const corners = [
+          { east: east - panelWidth / 2, north: north - panelDepth / 2 },
+          { east: east + panelWidth / 2, north: north - panelDepth / 2 },
+          { east: east + panelWidth / 2, north: north + panelDepth / 2 },
+          { east: east - panelWidth / 2, north: north + panelDepth / 2 },
+        ];
+
+        if (!corners.every((corner) => pointInsidePolygon(corner, roofLocal))) {
+          continue;
+        }
+
+        const panelPoints = corners.map((corner) =>
+          Cesium.Cartesian3.fromDegrees(
+            longitude +
+              corner.east /
+                Math.max(1, 111320 * Math.cos((latitude * Math.PI) / 180)),
+            latitude + corner.north / 111320,
+            0.45,
+          ),
+        );
+
+        viewer.entities.add({
+          name: `Solar panel ${placed + 1}`,
+          polygon: {
+            hierarchy: panelPoints,
+            material: Cesium.Color.fromCssColorString("#123d78").withAlpha(0.94),
+            outline: true,
+            outlineColor: Cesium.Color.fromCssColorString("#67c7ff"),
+            height: 0.45,
+            heightReference,
+          },
+          description: `${panelPowerW} W solar panel — placed inside the mapped building footprint`,
+        });
+
+        placed += 1;
+      }
+    }
+
+    viewer.entities.add({
+      position: targetPoint,
+      point: {
+        pixelSize: 9,
+        color: Cesium.Color.fromCssColorString("#38bdf8"),
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+      label: {
+        text: "Your location",
+        font: "600 13px sans-serif",
+        fillColor: Cesium.Color.WHITE,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString("#07111cdd"),
+        pixelOffset: new Cesium.Cartesian2(10, -20),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+  } else {
+    viewer.entities.add({
+      position: targetPoint,
+      point: {
+        pixelSize: 12,
+        color: Cesium.Color.fromCssColorString("#38bdf8"),
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+      label: {
+        text: "Building footprint not mapped — exact roof overlay unavailable",
+        font: "600 12px sans-serif",
+        fillColor: Cesium.Color.WHITE,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString("#07111cdd"),
+        pixelOffset: new Cesium.Cartesian2(10, -20),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     });
   }
-
-  viewer.entities.add({
-    position: offsetPosition(0, 0, 13),
-    point: {
-      pixelSize: 12,
-      color: Cesium.Color.fromCssColorString("#38bdf8"),
-      outlineColor: Cesium.Color.WHITE,
-      outlineWidth: 2,
-      disableDepthTestDistance: Number.POSITIVE_INFINITY,
-    },
-    label: {
-      text: "RoofRay • target location",
-      font: "600 13px sans-serif",
-      fillColor: Cesium.Color.WHITE,
-      showBackground: true,
-      backgroundColor: Cesium.Color.fromCssColorString("#07111cdd"),
-      pixelOffset: new Cesium.Cartesian2(0, -20),
-      disableDepthTestDistance: Number.POSITIVE_INFINITY,
-    },
-  });
 
   const sunSamples = Array.isArray(analysis?.sunCycle?.next12Hours)
     ? analysis.sunCycle.next12Hours
@@ -237,13 +319,24 @@ function addSolarOverlays(
     const elevation = Number(sample.elevationDeg);
     if (!Number.isFinite(azimuth) || !Number.isFinite(elevation)) continue;
 
-    const radius = 110;
-    const horizontal = Math.max(20, radius * Math.cos(Cesium.Math.toRadians(elevation)));
+    const radius = 85;
+    const horizontal = Math.max(
+      18,
+      radius * Math.cos(Cesium.Math.toRadians(elevation)),
+    );
     const az = Cesium.Math.toRadians(azimuth);
     const east = Math.sin(az) * horizontal;
     const north = Math.cos(az) * horizontal;
-    const height = 35 + Math.max(0, elevation) * 5;
-    sunPositions.push(offsetPosition(east, north, height));
+    const height = 25 + Math.max(0, elevation) * 4;
+    sunPositions.push(
+      Cesium.Cartesian3.fromDegrees(
+        longitude +
+          east /
+            Math.max(1, 111320 * Math.cos((latitude * Math.PI) / 180)),
+        latitude + north / 111320,
+        height,
+      ),
+    );
   }
 
   if (sunPositions.length >= 2) {
@@ -264,12 +357,12 @@ function addSolarOverlays(
     const last = sunPositions[sunPositions.length - 1];
     for (const [position, text] of [
       [first, "Sun path start"],
-      [last, "Sun path / later"],
+      [last, "Sun path later"],
     ] as const) {
       viewer.entities.add({
         position,
         point: {
-          pixelSize: 14,
+          pixelSize: 13,
           color: Cesium.Color.fromCssColorString("#fbbf24"),
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: 2,
@@ -295,7 +388,7 @@ export default function Solar3DViewer({
 }: Solar3DViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<CesiumLike | null>(null);
-  const [status, setStatus] = useState("Loading 3D solar site...");
+  const [status, setStatus] = useState("Loading real satellite + 3D buildings...");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -331,6 +424,7 @@ export default function Solar3DViewer({
         Cesium.Ion.defaultAccessToken = token;
 
         const viewer = new Cesium.Viewer(containerRef.current, {
+          baseLayer: false,
           terrain: Cesium.Terrain.fromWorldTerrain(),
           animation: false,
           timeline: false,
@@ -358,24 +452,40 @@ export default function Solar3DViewer({
         });
         viewer.scene.primitives.add(buildings);
 
+        const analysis = getStoredPlanningData();
+        const roofPoints = getRoofPoints(analysis);
+        const focusLat =
+          roofPoints.length >= 3
+            ? roofPoints.reduce((sum, point) => sum + point.latitude, 0) /
+              roofPoints.length
+            : lat;
+        const focusLon =
+          roofPoints.length >= 3
+            ? roofPoints.reduce((sum, point) => sum + point.longitude, 0) /
+              roofPoints.length
+            : lon;
+
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(lon, lat, 360),
+          destination: Cesium.Cartesian3.fromDegrees(focusLon, focusLat, 180),
           orientation: {
-            heading: Cesium.Math.toRadians(25),
-            pitch: Cesium.Math.toRadians(-48),
+            heading: Cesium.Math.toRadians(15),
+            pitch: Cesium.Math.toRadians(-52),
             roll: 0,
           },
           duration: 2.2,
         });
 
-        const analysis = getStoredPlanningData();
         addSolarOverlays(Cesium, viewer, lat, lon, analysis);
 
         viewer.scene.globe.enableLighting = true;
         viewer.scene.globe.dynamicAtmosphereLighting = true;
         viewer.scene.sunBloom = true;
 
-        setStatus("3D solar site ready");
+        setStatus(
+          roofPoints.length >= 3
+            ? "Your mapped building is centered — zoom, drag, tilt and rotate the map."
+            : "Location centered — exact building footprint is not mapped here.",
+        );
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Unable to load the 3D site.");
@@ -394,36 +504,82 @@ export default function Solar3DViewer({
     };
   }, [latitude, longitude]);
 
+  const zoomIn = () => viewerRef.current?.camera.zoomIn(35);
+  const zoomOut = () => viewerRef.current?.camera.zoomOut(35);
+  const resetView = () => {
+    const stored = getStoredLocation();
+    if (!stored || !viewerRef.current) return;
+    viewerRef.current.camera.flyTo({
+      destination: (window as any).Cesium.Cartesian3.fromDegrees(
+        stored.longitude,
+        stored.latitude,
+        180,
+      ),
+      orientation: {
+        heading: (window as any).Cesium.Math.toRadians(15),
+        pitch: (window as any).Cesium.Math.toRadians(-52),
+        roll: 0,
+      },
+      duration: 1.2,
+    });
+  };
+
   return (
     <section className="relative h-[calc(100vh-64px)] min-h-[620px] w-full overflow-hidden bg-[#050912]">
       <div ref={containerRef} className="absolute inset-0" />
 
       <div className="pointer-events-none absolute left-5 top-5 z-10 max-w-sm rounded-2xl border border-white/10 bg-[#07111c]/85 px-5 py-4 text-white shadow-2xl backdrop-blur-xl">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
-          RoofRay 3D Solar Site
+          RoofRay 3D Roof View
         </p>
         <h1 className="mt-1 text-lg font-semibold">
-          Real aerial imagery + 3D buildings
+          See your real location like a map
         </h1>
         <p className="mt-1 text-xs leading-relaxed text-slate-300">
-          Cesium 3D terrain, OSM building geometry and RoofRay solar overlays.
-          The blue panels and yellow sun path are analysis overlays, not source imagery.
+          Real aerial imagery with 3D OpenStreetMap buildings. RoofRay only
+          overlays the mapped building footprint, panels and sun path.
         </p>
+      </div>
+
+      <div className="absolute right-5 top-5 z-10 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#07111c]/90 shadow-xl backdrop-blur-xl">
+        <button
+          type="button"
+          onClick={zoomIn}
+          className="h-11 w-11 text-lg font-semibold text-white hover:bg-white/10"
+          aria-label="Zoom in"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={zoomOut}
+          className="h-11 w-11 border-t border-white/10 text-lg font-semibold text-white hover:bg-white/10"
+          aria-label="Zoom out"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={resetView}
+          className="border-t border-white/10 px-3 py-2 text-[11px] font-semibold text-cyan-200 hover:bg-white/10"
+        >
+          My roof
+        </button>
       </div>
 
       <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-xl border border-white/10 bg-[#07111c]/85 px-4 py-3 text-xs text-slate-200 backdrop-blur-xl">
         {status || error}
       </div>
 
-      <div className="pointer-events-none absolute right-5 top-5 z-10 rounded-2xl border border-white/10 bg-[#07111c]/85 px-4 py-4 text-xs text-slate-200 backdrop-blur-xl">
-        <div className="font-semibold text-white">Solar overlay</div>
+      <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-2xl border border-white/10 bg-[#07111c]/85 px-4 py-4 text-xs text-slate-200 backdrop-blur-xl">
+        <div className="font-semibold text-white">RoofRay overlay</div>
         <div className="mt-2 flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />
-          Target roof
+          Mapped building
         </div>
         <div className="mt-1 flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-sm bg-blue-500" />
-          PV panels
+          Solar panels
         </div>
         <div className="mt-1 flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
