@@ -49,6 +49,80 @@ type MappedBuilding = {
   containsTarget: boolean;
 };
 
+type SatelliteTile = {
+  name: string;
+  bytes: Uint8Array;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+function webMercatorPixel(latitude: number, longitude: number, zoom: number) {
+  const size = 256 * 2 ** zoom;
+  const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, latitude));
+  const x = ((longitude + 180) / 360) * size;
+  const sinLat = Math.sin((clampedLat * Math.PI) / 180);
+  const y =
+    (0.5 -
+      Math.log((1 + sinLat) / Math.max(1e-12, 1 - sinLat)) /
+        (4 * Math.PI)) *
+    size;
+  return { x, y, size };
+}
+
+async function fetchSatelliteTiles(
+  latitude: number,
+  longitude: number,
+  zoom = 18,
+): Promise<SatelliteTile[]> {
+  const center = webMercatorPixel(latitude, longitude, zoom);
+  const centerTileX = Math.floor(center.x / 256);
+  const centerTileY = Math.floor(center.y / 256);
+  const startX = centerTileX - 1;
+  const startY = centerTileY - 1;
+  const tiles: SatelliteTile[] = [];
+
+  const jobs: Array<Promise<void>> = [];
+  for (let row = 0; row < 3; row += 1) {
+    for (let col = 0; col < 4; col += 1) {
+      const tileX = startX + col;
+      const tileY = startY + row;
+      const url =
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/" +
+        zoom +
+        "/" +
+        tileY +
+        "/" +
+        tileX;
+      jobs.push(
+        fetch(url, {
+          cache: "no-store",
+          headers: { Accept: "image/jpeg,image/*" },
+          signal: AbortSignal.timeout(8000),
+        })
+          .then(async (response) => {
+            if (!response.ok) return;
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            if (bytes.length < 1000) return;
+            tiles.push({
+              name: "ImSat" + row + "_" + col,
+              bytes,
+              x: col * 128,
+              y: (2 - row) * 120,
+              w: 128,
+              h: 120,
+            });
+          })
+          .catch(() => undefined),
+      );
+    }
+  }
+
+  await Promise.all(jobs);
+  return tiles.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function pointInPolygon(
   point: { x: number; y: number },
   polygon: Array<{ x: number; y: number }>,
@@ -128,6 +202,7 @@ function roofVisualCommands({
   obstacles,
   sunCycle,
   mappedBuildings,
+  satelliteTiles,
 }: {
   roofAreaSqFt: number | null;
   roofType: string;
@@ -139,6 +214,7 @@ function roofVisualCommands({
   obstacles: Array<Record<string, unknown>>;
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
+  satelliteTiles: SatelliteTile[];
 }): string[] {
   const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
   const roofPolygon = Array.isArray(roofFootprint?.polygon)
@@ -159,19 +235,44 @@ function roofVisualCommands({
     roofLon ??
     numberValue((actualRoofPolygon[0] ?? {}).longitude) ??
     0;
-  const scale = 3.2;
-  const project = (lat: number, lon: number) => ({
-    x: mapX + mapW / 2 + (lon - centerLon) * 111320 * Math.cos((centerLat * Math.PI) / 180) * scale,
-    y: mapY + mapH / 2 + (lat - centerLat) * 111320 * scale,
-  });
+  const satelliteZoom = 18;
+  const centerPixel = webMercatorPixel(centerLat, centerLon, satelliteZoom);
+  const startTileX = Math.floor(centerPixel.x / 256) - 1;
+  const startTileY = Math.floor(centerPixel.y / 256) - 1;
+  const project = (lat: number, lon: number) => {
+    const pixel = webMercatorPixel(lat, lon, satelliteZoom);
+    const relativeX = pixel.x - startTileX * 256;
+    const relativeY = pixel.y - startTileY * 256;
+    return {
+      x: mapX + (relativeX / 1024) * mapW,
+      y: mapY + mapH - (relativeY / 768) * mapH,
+    };
+  };
   const clampPoint = (p: { x: number; y: number }) => ({
     x: Math.max(mapX + 8, Math.min(mapX + mapW - 8, p.x)),
     y: Math.max(mapY + 8, Math.min(mapY + mapH - 8, p.y)),
   });
   const commands: string[] = [
     "0.96 0.97 0.98 rg", mapX + " " + mapY + " " + mapW + " " + mapH + " re f",
-    "0.78 0.82 0.86 RG", "1 w", mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
   ];
+  if (satelliteTiles.length) {
+    commands.push(
+      "q",
+      mapX + " " + mapY + " " + mapW + " " + mapH + " re W n",
+    );
+    for (const tile of satelliteTiles) {
+      commands.push(
+        "q",
+        tile.w.toFixed(1) + " 0 0 " + tile.h.toFixed(1) + " " + (mapX + tile.x).toFixed(1) + " " + (mapY + tile.y).toFixed(1) + " cm",
+        "/" + tile.name + " Do",
+        "Q",
+      );
+    }
+    commands.push("Q");
+  }
+  commands.push(
+    "0.95 0.95 0.95 RG", "1 w", mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
+  );
 
   const mappedNeighborhood = mappedBuildings.filter((building) => building !== mappedTarget);
   for (const building of mappedNeighborhood) {
@@ -209,9 +310,9 @@ function roofVisualCommands({
     .filter((point): point is { x: number; y: number } => Boolean(point));
 
   if (roofPoints.length >= 3) {
-    commands.push("0.20 0.45 0.75 rg", roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m");
+    commands.push("0.10 0.55 0.95 RG", "3 w", roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m");
     for (let i = 1; i < roofPoints.length; i += 1) commands.push(roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l");
-    commands.push("h f", "0.05 0.25 0.55 RG", "2 w", roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m");
+    commands.push("h S");
     for (let i = 1; i < roofPoints.length; i += 1) commands.push(roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l");
     commands.push("h S");
   }
@@ -296,39 +397,100 @@ function buildPdf(lines: string[], visual: {
   obstacles: Array<Record<string, unknown>>;
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
+  satelliteTiles: SatelliteTile[];
 }): Uint8Array {
   const pageWidth = 612, pageHeight = 792, margin = 48, lineHeight = 16, linesPerPage = 42;
   const pages: string[][] = [];
   for (let i = 0; i < lines.length; i += linesPerPage) pages.push(lines.slice(i, i + linesPerPage));
   if (!pages.length) pages.push(["RoofRay Solar Feasibility Report"]);
+
   const visualPageIndex = pages.length;
   const totalPages = pages.length + 1;
-  const objects: string[] = [];
+  const imageObjects = visual.satelliteTiles.map((_, index) => 5 + index);
+  const pageObjectStart = 5 + visual.satelliteTiles.length;
+  const objects: Array<string | Buffer> = [];
+
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
-  objects.push("<< /Type /Pages /Kids [" + Array.from({ length: totalPages }, (_, i) => (5 + i * 2) + " 0 R").join(" ") + "] /Count " + totalPages + " >>");
+  objects.push("<< /Type /Pages /Kids [" +
+    Array.from({ length: totalPages }, (_, i) => (pageObjectStart + i * 2) + " 0 R").join(" ") +
+    "] /Count " + totalPages + " >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
-  for (let i = 0; i < totalPages; i++) {
-    const pageObject = 5 + i * 2, contentObject = pageObject + 1;
+
+  for (let i = 0; i < visual.satelliteTiles.length; i += 1) {
+    const tile = visual.satelliteTiles[i];
+    objects.push(
+      Buffer.concat([
+        Buffer.from(
+          "<< /Type /XObject /Subtype /Image /Width 256 /Height 256 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
+          tile.bytes.length +
+          " >>\nstream\n",
+          "ascii",
+        ),
+        Buffer.from(tile.bytes),
+        Buffer.from("\nendstream", "ascii"),
+      ]),
+    );
+  }
+
+  for (let i = 0; i < totalPages; i += 1) {
+    const pageObject = pageObjectStart + i * 2;
+    const contentObject = pageObject + 1;
+    const xObjectEntries = i === visualPageIndex && visual.satelliteTiles.length
+      ? " /XObject << " +
+        visual.satelliteTiles.map((tile) => "/" + tile.name + " " + (5 + visual.satelliteTiles.indexOf(tile)) + " 0 R").join(" ") +
+        " >>"
+      : "";
     const contentLines = i === visualPageIndex
       ? ["BT /F2 18 Tf 48 742 Td (RoofRay Roof + Sun Direction Plan) Tj ET", ...roofVisualCommands(visual)]
       : ["BT", "/F2 18 Tf", margin + " " + (pageHeight - 58) + " Td", "(RoofRay Solar Feasibility Report) Tj", "/F1 10 Tf", "0 -28 Td",
         ...pages[i].flatMap((line, index) => ["(" + text(line) + ") Tj", ...(index === pages[i].length - 1 ? [] : ["0 -" + lineHeight + " Td"])]), "ET"];
+
     const stream = contentLines.join("\n");
-    objects[pageObject - 1] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentObject + " 0 R >>";
-    objects[contentObject - 1] = "<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream";
+    objects[pageObject - 1] =
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight +
+      "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>" + xObjectEntries +
+      " >> /Contents " + contentObject + " 0 R >>";
+    objects[contentObject - 1] = Buffer.from(
+      "<< /Length " + Buffer.byteLength(stream, "utf8") + " >>\nstream\n" +
+      stream + "\nendstream",
+      "utf8",
+    );
   }
-  let pdf = "%PDF-1.4\n";
+
+  const chunks: Buffer[] = [Buffer.from("%PDF-1.4\n", "ascii")];
   const offsets: number[] = [0];
-  for (let i = 0; i < objects.length; i++) {
-    offsets[i + 1] = pdf.length;
-    pdf += (i + 1) + " 0 obj\n" + objects[i] + "\nendobj\n";
+  let byteOffset = chunks[0].length;
+
+  for (let i = 0; i < objects.length; i += 1) {
+    offsets[i + 1] = byteOffset;
+    const objectHeader = Buffer.from((i + 1) + " 0 obj\n", "ascii");
+    const objectBody = typeof objects[i] === "string"
+      ? Buffer.from(objects[i] as string, "utf8")
+      : objects[i] as Buffer;
+    const objectEnd = Buffer.from("\nendobj\n", "ascii");
+    chunks.push(objectHeader, objectBody, objectEnd);
+    byteOffset += objectHeader.length + objectBody.length + objectEnd.length;
   }
-  const xref = pdf.length;
-  pdf += "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n";
-  for (let i = 1; i <= objects.length; i++) pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
-  pdf += "trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF";
-  return new TextEncoder().encode(pdf);
+
+  const xrefOffset = byteOffset;
+  const xrefParts: string[] = [
+    "xref",
+    "0 " + (objects.length + 1),
+    "0000000000 65535 f ",
+  ];
+  for (let i = 1; i <= objects.length; i += 1) {
+    xrefParts.push(String(offsets[i]).padStart(10, "0") + " 00000 n ");
+  }
+  xrefParts.push(
+    "trailer",
+    "<< /Size " + (objects.length + 1) + " /Root 1 0 R >>",
+    "startxref",
+    String(xrefOffset),
+    "%%EOF",
+  );
+  chunks.push(Buffer.from(xrefParts.join("\n") + "\n", "ascii"));
+  return new Uint8Array(Buffer.concat(chunks));
 }
 
 export async function POST(request: Request) {
@@ -353,6 +515,10 @@ export async function POST(request: Request) {
     const mappedBuildings =
       lat !== null && lon !== null
         ? await fetchMappedBuildings(lat, lon)
+        : [];
+    const satelliteTiles =
+      lat !== null && lon !== null
+        ? await fetchSatelliteTiles(lat, lon)
         : [];
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
@@ -426,6 +592,7 @@ export async function POST(request: Request) {
         : [],
       sunCycle: (context.sunCycle ?? null) as Record<string, unknown> | null,
       mappedBuildings,
+      satelliteTiles,
     });
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
