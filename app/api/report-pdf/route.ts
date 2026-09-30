@@ -366,11 +366,20 @@ function roofVisualCommands({
       "q",
       mapX + " " + mapY + " " + mapW + " " + mapH + " re W n",
     );
+    // The fetched tiles are 4 columns x 3 rows (1024 x 768 source pixels).
+    // Scale that complete mosaic into the actual map frame. Previously the
+    // raw 256px tiles were drawn at 1:1, so most of the imagery landed outside
+    // the 634 x 310pt map viewport and the report looked like an empty grey map.
+    const mosaicW = 256 * 4;
+    const mosaicH = 256 * 3;
+    const tileW = mapW / 4;
+    const tileH = mapH / 3;
     for (const tile of satelliteTiles) {
       commands.push(
         "q",
-        tile.w.toFixed(1) + " 0 0 " + tile.h.toFixed(1) + " " +
-          (mapX + tile.x).toFixed(1) + " " + (mapY + tile.y).toFixed(1) + " cm",
+        tileW.toFixed(2) + " 0 0 " + tileH.toFixed(2) + " " +
+          (mapX + (tile.x / 256) * tileW).toFixed(2) + " " +
+          (mapY + (tile.y / 256) * tileH).toFixed(2) + " cm",
         "/" + tile.name + " Do",
         "Q",
       );
