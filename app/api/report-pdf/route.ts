@@ -47,6 +47,8 @@ type MappedBuilding = {
   polygon: Array<{ latitude: number; longitude: number }>;
   areaM2: number;
   containsTarget: boolean;
+  heightMeters: number;
+  levels: number;
 };
 
 type SatelliteTile = {
@@ -155,7 +157,10 @@ out geom tags qt;`;
   if (!response.ok) return [];
 
   const data = (await response.json()) as {
-    elements?: Array<{ geometry?: Array<{ lat: number; lon: number }> }>;
+    elements?: Array<{
+      geometry?: Array<{ lat: number; lon: number }>;
+      tags?: Record<string, string>;
+    }>;
   };
   const mLat = 111320;
   const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
@@ -175,10 +180,18 @@ out geom tags qt;`;
         x: (p.lon - longitude) * mLon,
         y: (p.lat - latitude) * mLat,
       }));
+      const tags = element.tags ?? {};
+      const levels = Math.max(1, Number(tags["building:levels"]) || 1);
+      const taggedHeight = Number.parseFloat(tags.height ?? "");
+      const heightMeters = Number.isFinite(taggedHeight)
+        ? Math.max(3, taggedHeight)
+        : levels * 3;
       return {
         polygon: geo.map((p) => ({ latitude: p.lat, longitude: p.lon })),
         areaM2: area(projected),
         containsTarget: projected.length >= 3 && pointInPolygon({ x: 0, y: 0 }, projected),
+        heightMeters,
+        levels,
       };
     })
     .filter((item) => item.polygon.length >= 3 && item.areaM2 >= 12 && item.areaM2 <= 100000)
@@ -296,6 +309,72 @@ function roofVisualCommands({
     "1.5 w",
     mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
   );
+
+  // Real-location 3D site model: every mapped OSM building is extruded from
+  // its actual footprint. Height comes from OSM height/building:levels, with
+  // 3m per level as the documented fallback. This is a map-based 3D
+  // visualization, not a photogrammetric claim.
+  const sceneBuildings = mappedBuildings
+    .filter((building) => building.polygon.length >= 3)
+    .slice(0, 28);
+
+  const projectGround = (point: { latitude: number; longitude: number }) =>
+    project(point.latitude, point.longitude);
+
+  for (const building of sceneBuildings) {
+    const ground = building.polygon
+      .map(projectGround)
+      .filter((p): p is { x: number; y: number } => Boolean(p));
+    if (ground.length < 3) continue;
+
+    const height = Math.max(3, Math.min(30, building.heightMeters || 3));
+    const liftX = -height * 1.15;
+    const liftY = height * 0.72;
+    const roof = ground.map((p) => ({ x: p.x + liftX, y: p.y - liftY }));
+
+    // Building side faces, ordered around the footprint.
+    for (let i = 0; i < ground.length; i += 1) {
+      const j = (i + 1) % ground.length;
+      const face = [
+        ground[i],
+        ground[j],
+        roof[j],
+        roof[i],
+      ];
+      commands.push(
+        building.containsTarget ? "0.03 0.32 0.44 rg" : "0.16 0.22 0.28 rg",
+        face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
+        face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
+        face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
+        face[3].x.toFixed(1) + " " + face[3].y.toFixed(1) + " l h f",
+      );
+    }
+
+    // Roof surface follows the real mapped polygon.
+    commands.push(
+      building.containsTarget ? "0.08 0.68 0.82 rg" : "0.40 0.46 0.52 rg",
+      building.containsTarget ? "0.55 0.95 1.00 RG" : "0.70 0.76 0.80 RG",
+      "1 w",
+      roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
+    );
+    for (let i = 1; i < roof.length; i += 1) {
+      commands.push(roof[i].x.toFixed(1) + " " + roof[i].y.toFixed(1) + " l");
+    }
+    commands.push("h f S");
+
+    if (building.containsTarget) {
+      const cx = roof.reduce((sum, p) => sum + p.x, 0) / roof.length;
+      const cy = roof.reduce((sum, p) => sum + p.y, 0) / roof.length;
+      commands.push(
+        "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+          (cx - 25).toFixed(1) + " " + (cy + 5).toFixed(1) +
+          " Td (YOUR HOUSE) Tj ET",
+        "BT /F1 5.5 Tf 0.80 0.92 0.98 rg " +
+          (cx - 20).toFixed(1) + " " + (cy - 5).toFixed(1) +
+          " Td (" + height.toFixed(0) + "m / " + String(building.levels) + " levels) Tj ET",
+      );
+    }
+  }
 
   // Actual mapped target roof outline + clipped panel placement.
   if (roofPoints.length >= 3) {
@@ -804,9 +883,9 @@ function roofVisualCommands({
   return [
     ...commands,
     "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (RoofRay Solar Site Assessment) Tj ET",
-    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Real aerial imagery + mapped roof + solar panel placement + sun cycle) Tj ET",
+    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Real aerial imagery + 3D mapped buildings + roof panels + calculated sun path) Tj ET",
     "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Your House / mapped target) Tj ET",
-    "BT /F1 7 Tf 0.95 0.95 0.95 rg 208 522 Td (Blue outline = actual mapped building footprint | Orange = sun path) Tj ET",
+    "BT /F1 7 Tf 0.95 0.95 0.95 rg 208 522 Td (Cyan = target building | Grey = nearby mapped buildings | Yellow = sun path) Tj ET",
   ];
 }
 
