@@ -497,6 +497,7 @@ function roofVisualCommands({
   satelliteTiles,
   roofAerialImage,
   roofPhoto,
+  reportLocation,
 }: {
   roofAreaSqFt: number | null;
   roofType: string;
@@ -511,6 +512,7 @@ function roofVisualCommands({
   satelliteTiles: SatelliteTile[];
   roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
+  reportLocation: { latitude: number; longitude: number };
 }): string[] {
   const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
   const roofPolygon = Array.isArray(roofFootprint?.polygon)
@@ -527,12 +529,10 @@ function roofVisualCommands({
   const actualRoofPolygon =
     roofPolygon.length >= 3 ? roofPolygon : (mappedTarget?.polygon ?? []);
 
-  const roofLat = numberValue(roofFootprint?.latitude);
-  const roofLon = numberValue(roofFootprint?.longitude);
-  const centerLat =
-    roofLat ?? numberValue((actualRoofPolygon[0] ?? {}).latitude) ?? 0;
-  const centerLon =
-    roofLon ?? numberValue((actualRoofPolygon[0] ?? {}).longitude) ?? 0;
+  // The resolved report GPS is authoritative for every visual layer.
+  // Never let a stale/legacy roof object containing 0,0 recenter the PDF.
+  const centerLat = reportLocation.latitude;
+  const centerLon = reportLocation.longitude;
 
   // Landscape visual page, deliberately arranged like a professional solar
   // site-assessment sheet: dark information rail, large real aerial map and
@@ -1408,6 +1408,7 @@ function buildPdf(lines: string[], visual: {
   satelliteTiles: SatelliteTile[];
   roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
+  reportLocation: { latitude: number; longitude: number };
 }): Uint8Array {
   const pageWidth = 842, pageHeight = 595, margin = 42, lineHeight = 15, linesPerPage = 32;
   const pages: string[][] = [];
@@ -1577,20 +1578,24 @@ export async function POST(request: Request) {
     }
 
     const mappedBuildings = await fetchMappedBuildings(lat, lon);
-    const roofAerialImage = await fetchMapplsStillImage(lat, lon);
 
-    // Prefer the highest-resolution real aerial imagery available. This is
-    // intentionally a real imagery fetch, not a generated roof illustration.
+    // Use verified satellite imagery first. Mappls Still Map is a map-image
+    // API and can return a styled/vector basemap; using it as the first
+    // source made the PDF look like an empty dark map even though the request
+    // succeeded. Esri World Imagery is the explicit satellite fallback.
     let satelliteTiles: SatelliteTile[] = [];
-    if (!roofAerialImage) {
-      for (const zoom of [20, 19, 18]) {
-        const candidate = await fetchSatelliteTiles(lat, lon, zoom);
-        if (candidate.length >= 8) {
-          satelliteTiles = candidate;
-          break;
-        }
+    for (const zoom of [20, 19, 18]) {
+      const candidate = await fetchSatelliteTiles(lat, lon, zoom);
+      if (candidate.length >= 8) {
+        satelliteTiles = candidate;
+        break;
       }
     }
+
+    // Mappls remains the secondary imagery source when satellite tiles are
+    // unavailable. The exact GPS is still drawn independently on top.
+    const roofAerialImage =
+      satelliteTiles.length >= 8 ? null : await fetchMapplsStillImage(lat, lon);
     const roofPhoto = decodeJpegDataUrl(
       body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
     );
@@ -1602,6 +1607,7 @@ export async function POST(request: Request) {
       satelliteTiles: satelliteTiles.length,
       roofAerialImage: Boolean(roofAerialImage),
       roofPhoto: Boolean(roofPhoto),
+      reportCenter: { latitude: lat, longitude: lon },
     });
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
@@ -1678,6 +1684,7 @@ export async function POST(request: Request) {
       satelliteTiles,
       roofAerialImage,
       roofPhoto,
+      reportLocation: { latitude: lat, longitude: lon },
     });
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
