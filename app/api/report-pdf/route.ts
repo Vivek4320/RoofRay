@@ -88,6 +88,13 @@ type SatelliteTile = {
   h: number;
 };
 
+type RoofAerialImage = {
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+  source: "mappls" | "esri";
+};
+
 type RoofPhoto = {
   bytes: Uint8Array;
   width: number;
@@ -135,6 +142,48 @@ function webMercatorPixel(latitude: number, longitude: number, zoom: number) {
         (4 * Math.PI)) *
     size;
   return { x, y, size };
+}
+
+async function fetchMapplsStillImage(
+  latitude: number,
+  longitude: number,
+): Promise<RoofAerialImage | null> {
+  const restKey = process.env.MAPPLS_REST_KEY;
+  if (!restKey) return null;
+
+  const urls = [
+    "https://apis.mapmyindia.com/advancedmaps/v1/" +
+      encodeURIComponent(restKey) +
+      "/still_image?center=" +
+      encodeURIComponent(latitude + "," + longitude) +
+      "&zoom=18&size=1000x700&ssf=1&markers=" +
+      encodeURIComponent(latitude + "," + longitude),
+    "https://apis.mappls.com/advancedmaps/v1/" +
+      encodeURIComponent(restKey) +
+      "/still_image?center=" +
+      encodeURIComponent(latitude + "," + longitude) +
+      "&zoom=18&size=1000x700&ssf=1&markers=" +
+      encodeURIComponent(latitude + "," + longitude),
+  ];
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "image/*" },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) continue;
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("image")) continue;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length < 1000) continue;
+      return { bytes, width: 1000, height: 700, source: "mappls" };
+    } catch {
+      // Try the next Mappls host, then fall back to Esri imagery.
+    }
+  }
+  return null;
 }
 
 async function fetchSatelliteTiles(
@@ -193,6 +242,23 @@ async function fetchSatelliteTiles(
 
   await Promise.all(jobs);
   return tiles.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function fetchRoofAerialImage(
+  latitude: number,
+  longitude: number,
+): Promise<RoofAerialImage | null> {
+  const mappls = await fetchMapplsStillImage(latitude, longitude);
+  if (mappls) return mappls;
+
+  for (const zoom of [20, 19, 18, 17]) {
+    const tiles = await fetchSatelliteTiles(latitude, longitude, zoom);
+    if (tiles.length >= 4) {
+      // Keep the existing tile renderer as the fallback path.
+      return null;
+    }
+  }
+  return null;
 }
 
 function pointInPolygon(
@@ -345,6 +411,7 @@ function roofVisualCommands({
   sunCycle,
   mappedBuildings,
   satelliteTiles,
+  roofAerialImage,
   roofPhoto,
 }: {
   roofAreaSqFt: number | null;
@@ -358,6 +425,7 @@ function roofVisualCommands({
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
+  roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
 }): string[] {
   const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
@@ -426,7 +494,25 @@ function roofVisualCommands({
     mapX + " " + mapY + " " + mapW + " " + mapH + " re f",
   ];
 
-  if (roofPhoto) {
+  if (roofAerialImage) {
+    const imageW = mapW - 24;
+    const imageH = Math.min(mapH - 24, imageW * (roofAerialImage.height / Math.max(1, roofAerialImage.width)));
+    const imageX = mapX + 12;
+    const imageY = mapY + (mapH - imageH) / 2;
+    commands.push(
+      "q",
+      imageW.toFixed(2) + " 0 0 " + imageH.toFixed(2) + " " +
+        imageX.toFixed(2) + " " + imageY.toFixed(2) + " cm",
+      "/RoofAerial Do",
+      "Q",
+      "0.20 0.90 1.00 RG",
+      "2.2 w",
+      imageX.toFixed(2) + " " + imageY.toFixed(2) + " " + imageW.toFixed(2) + " " + imageH.toFixed(2) + " re S",
+      "BT /F2 8 Tf 0.98 0.98 0.98 rg " +
+        (imageX + 10).toFixed(1) + " " + (imageY + imageH - 18).toFixed(1) +
+        " Td (YOUR ROOFTOP - MAPPLS AERIAL VIEW) Tj ET",
+    );
+  } else if (roofPhoto) {
     const photoW = mapW - 28;
     const photoH = Math.min(mapH - 28, photoW * (roofPhoto.height / Math.max(1, roofPhoto.width)));
     const photoX = mapX + 14;
@@ -945,7 +1031,7 @@ function roofVisualCommands({
 
   commands.push(
     "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[0] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Sun Path & Shading Analysis) Tj ET",
-    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[1] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Roof Layout - Top View) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[1] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (YOUR ROOFTOP - SOLAR PANEL PLACEMENT) Tj ET",
     "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[2] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Suggested Installation) Tj ET",
   );
 
@@ -1255,7 +1341,7 @@ function roofVisualCommands({
   return [
     ...commands,
     "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (RoofRay Solar Site Assessment) Tj ET",
-    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Real aerial imagery + 3D mapped buildings + roof panels + calculated sun path) Tj ET",
+    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Real rooftop aerial view + mapped 3D buildings + panel placement + calculated sun path) Tj ET",
     "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Your House / mapped target) Tj ET",
     "BT /F1 7 Tf 0.95 0.95 0.95 rg 208 522 Td (Blue = your house / GPS | Red = nearby shading risk | Yellow = sun rays) Tj ET",
   ];
@@ -1280,6 +1366,7 @@ function buildPdf(lines: string[], visual: {
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
+  roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
 }): Uint8Array {
   const pageWidth = 842, pageHeight = 595, margin = 42, lineHeight = 15, linesPerPage = 32;
@@ -1290,7 +1377,8 @@ function buildPdf(lines: string[], visual: {
   const visualPageIndex = pages.length;
   const totalPages = pages.length + 1;
   const roofPhotoObject = 5 + visual.satelliteTiles.length;
-  const pageObjectStart = 5 + visual.satelliteTiles.length + (visual.roofPhoto ? 1 : 0);
+  const aerialObject = roofPhotoObject + (visual.roofPhoto ? 1 : 0);
+  const pageObjectStart = 5 + visual.satelliteTiles.length + (visual.roofPhoto ? 1 : 0) + (visual.roofAerialImage ? 1 : 0);
   const objects: Array<string | Buffer> = [];
 
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
@@ -1336,13 +1424,31 @@ function buildPdf(lines: string[], visual: {
     );
   }
 
+  if (visual.roofAerialImage) {
+    const aerial = visual.roofAerialImage;
+    objects.push(
+      Buffer.concat([
+        Buffer.from(
+          "<< /Type /XObject /Subtype /Image /Width " + aerial.width +
+          " /Height " + aerial.height +
+          " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
+          aerial.bytes.length + " >>\nstream\n",
+          "ascii",
+        ),
+        Buffer.from(aerial.bytes),
+        Buffer.from("\nendstream", "ascii"),
+      ]),
+    );
+  }
+
   for (let i = 0; i < totalPages; i += 1) {
     const pageObject = pageObjectStart + i * 2;
     const contentObject = pageObject + 1;
-    const xObjectEntries = i === visualPageIndex && (visual.satelliteTiles.length || visual.roofPhoto)
+    const xObjectEntries = i === visualPageIndex && (visual.satelliteTiles.length || visual.roofPhoto || visual.roofAerialImage)
       ? " /XObject << " +
         visual.satelliteTiles.map((tile) => "/" + tile.name + " " + (5 + visual.satelliteTiles.indexOf(tile)) + " 0 R").join(" ") +
         (visual.roofPhoto ? " /RoofPhoto " + roofPhotoObject + " 0 R" : "") +
+        (visual.roofAerialImage ? " /RoofAerial " + aerialObject + " 0 R" : "") +
         " >>"
       : "";
     const contentLines = i === visualPageIndex
@@ -1431,7 +1537,8 @@ export async function POST(request: Request) {
     }
 
     const mappedBuildings = await fetchMappedBuildings(lat, lon);
-    const satelliteTiles = await fetchSatelliteTiles(lat, lon);
+    const roofAerialImage = await fetchMapplsStillImage(lat, lon);
+    const satelliteTiles = roofAerialImage ? [] : await fetchSatelliteTiles(lat, lon);
     const roofPhoto = decodeJpegDataUrl(
       body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
     );
@@ -1441,6 +1548,7 @@ export async function POST(request: Request) {
       mappedBuildings: mappedBuildings.length,
       targetBuildingMapped: mappedBuildings.some((building) => building.containsTarget),
       satelliteTiles: satelliteTiles.length,
+      roofAerialImage: Boolean(roofAerialImage),
       roofPhoto: Boolean(roofPhoto),
     });
     const reportText = String(body.report ?? "");
@@ -1516,6 +1624,7 @@ export async function POST(request: Request) {
       sunCycle: (context.sunCycle ?? null) as Record<string, unknown> | null,
       mappedBuildings,
       satelliteTiles,
+      roofAerialImage,
       roofPhoto,
     });
     return new NextResponse(Buffer.from(pdf), {
