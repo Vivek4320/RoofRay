@@ -172,10 +172,10 @@ function pointInPolygon(
 async function fetchMappedBuildings(
   latitude: number,
   longitude: number,
-  radiusMeters = 140,
+  radiusMeters = 260,
 ): Promise<MappedBuilding[]> {
   const query = `[out:json][timeout:20];
-way["building"](around:${Math.min(Math.max(radiusMeters, 60), 200)},${latitude},${longitude});
+way["building"](around:${Math.min(Math.max(radiusMeters, 80), 300)},${latitude},${longitude});
 out geom tags qt;`;
   const response = await fetch("https://overpass-api.de/api/interpreter", {
     method: "POST",
@@ -226,9 +226,11 @@ out geom tags qt;`;
     .filter((item) => item.polygon.length >= 3 && item.areaM2 >= 12 && item.areaM2 <= 100000)
     .sort((a, b) => {
       if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
-      return a.areaM2 - b.areaM2;
+      // Keep tall buildings in the scene because they are the most important
+      // nearby obstruction for solar production.
+      return (b.heightMeters - a.heightMeters) || (a.areaM2 - b.areaM2);
     })
-    .slice(0, 35);
+    .slice(0, 40);
 }
 
 
@@ -345,7 +347,11 @@ function roofVisualCommands({
   // visualization, not a photogrammetric claim.
   const sceneBuildings = mappedBuildings
     .filter((building) => building.polygon.length >= 3)
-    .slice(0, 28);
+    .sort((a, b) => {
+      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+      return b.heightMeters - a.heightMeters;
+    })
+    .slice(0, 32);
 
   const projectGround = (point: { latitude: number; longitude: number }) =>
     project(point.latitude, point.longitude);
@@ -403,6 +409,21 @@ function roofVisualCommands({
           " Td (" + height.toFixed(0) + "m / " + String(building.levels) + " levels) Tj ET",
       );
     }
+  }
+
+  // If the exact GPS point is not inside an OSM building, show the
+  // real location marker instead of drawing a fake house footprint.
+  if (!mappedBuildings.some((building) => building.containsTarget)) {
+    const target = project(centerLat, centerLon);
+    commands.push(
+      "0.10 0.75 1.00 rg",
+      (target.x - 6).toFixed(1) + " " + (target.y - 6).toFixed(1) + " 12 12 re f",
+      "0.05 0.12 0.20 rg",
+      (target.x + 8).toFixed(1) + " " + (target.y + 6).toFixed(1) + " 72 14 re f",
+      "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
+        (target.x + 11).toFixed(1) + " " + (target.y + 10).toFixed(1) +
+        " Td (LOCATION - ROOF FOOTPRINT NOT MAPPED) Tj ET",
+    );
   }
 
   // Actual mapped target roof outline + clipped panel placement.
@@ -550,6 +571,73 @@ function roofVisualCommands({
         y: houseCenter.y + Math.cos(az) * sunRadius * el,
       };
     });
+
+  // Building shadow footprints: the shadow points away from the sun.
+  // Height comes from OSM height/levels, so taller neighboring buildings create
+  // longer shadow reaches and visibly identify lower-production zones.
+  const shadowSamples = baseSunCycle
+    .filter(
+      (sample) =>
+        sample.aboveHorizon !== false &&
+        numberValue(sample.azimuthDeg) !== null &&
+        numberValue(sample.elevationDeg) !== null &&
+        (numberValue(sample.elevationDeg) ?? 0) > 8,
+    )
+    .filter((_, index, arr) => index === 0 || index === Math.floor(arr.length / 2) || index === arr.length - 1)
+    .slice(0, 3);
+
+  for (const sample of shadowSamples) {
+    const sunAzimuth = numberValue(sample.azimuthDeg) ?? 0;
+    const sunElevation = numberValue(sample.elevationDeg) ?? 20;
+    const shadowLengthScale = Math.min(
+      120,
+      Math.max(12, 1 / Math.tan((sunElevation * Math.PI) / 180) * 18),
+    );
+    const shadowBearing = ((sunAzimuth + 180) * Math.PI) / 180;
+    const dxMeters = Math.sin(shadowBearing) * shadowLengthScale;
+    const dyMeters = Math.cos(shadowBearing) * shadowLengthScale;
+
+    for (const building of sceneBuildings) {
+      if (building.containsTarget) continue;
+      const base = building.polygon
+        .map(projectGround)
+        .filter((p): p is { x: number; y: number } => Boolean(p));
+      if (base.length < 3) continue;
+
+      const center = building.polygon.reduce(
+        (acc, point) => ({
+          latitude: acc.latitude + point.latitude / building.polygon.length,
+          longitude: acc.longitude + point.longitude / building.polygon.length,
+        }),
+        { latitude: 0, longitude: 0 },
+      );
+      const end = {
+        latitude: center.latitude + dyMeters / 111320,
+        longitude:
+          center.longitude +
+          dxMeters / (111320 * Math.max(0.2, Math.cos((center.latitude * Math.PI) / 180))),
+      };
+      const endPoint = projectGround(end);
+      const cx = base.reduce((sum, p) => sum + p.x, 0) / base.length;
+      const cy = base.reduce((sum, p) => sum + p.y, 0) / base.length;
+      const tx = endPoint.x - cx;
+      const ty = endPoint.y - cy;
+
+      commands.push(
+        "0.55 0.08 0.08 rg",
+        base[0].x.toFixed(1) + " " + base[0].y.toFixed(1) + " m",
+      );
+      for (let i = 1; i < base.length; i += 1) {
+        commands.push(base[i].x.toFixed(1) + " " + base[i].y.toFixed(1) + " l");
+      }
+      for (let i = base.length - 1; i >= 0; i -= 1) {
+        commands.push(
+          (base[i].x + tx).toFixed(1) + " " + (base[i].y + ty).toFixed(1) + " l",
+        );
+      }
+      commands.push("h f");
+    }
+  }
 
   if (sunPoints.length >= 2) {
     commands.push(
