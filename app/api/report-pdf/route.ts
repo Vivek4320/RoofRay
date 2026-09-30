@@ -108,94 +108,48 @@ async function fetchSatelliteTiles(
   const center = webMercatorPixel(latitude, longitude, zoom);
   const centerTileX = Math.floor(center.x / 256);
   const centerTileY = Math.floor(center.y / 256);
-  const startTileX = centerTileX - 1;
-  const startTileY = centerTileY - 1;
-
-  // Prefer one server-rendered World Imagery export for the exact PDF extent.
-  // This avoids blank PDFs when one or more individual tiles fail upstream.
-  const worldSizeMeters = 2 * Math.PI * 6378137;
-  const pixelsToMeters = worldSizeMeters / center.size;
-  const minX3857 = startTileX * 256 * pixelsToMeters - worldSizeMeters / 2;
-  const maxX3857 = (startTileX + 4) * 256 * pixelsToMeters - worldSizeMeters / 2;
-  const maxY3857 = worldSizeMeters / 2 - startTileY * 256 * pixelsToMeters;
-  const minY3857 = worldSizeMeters / 2 - (startTileY + 3) * 256 * pixelsToMeters;
-
-  const exportUrl =
-    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?" +
-    new URLSearchParams({
-      bbox: [
-        minX3857.toFixed(2),
-        minY3857.toFixed(2),
-        maxX3857.toFixed(2),
-        maxY3857.toFixed(2),
-      ].join(","),
-      bboxSR: "3857",
-      imageSR: "3857",
-      size: "1024,768",
-      imageFormat: "jpg",
-      format: "jpg",
-      transparent: "false",
-      f: "image",
-    }).toString();
-
-  try {
-    const response = await fetch(exportUrl, {
-      cache: "no-store",
-      headers: { Accept: "image/jpeg,image/*" },
-      signal: AbortSignal.timeout(12000),
-    });
-    if (response.ok) {
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.length > 5000) {
-        return [{
-          name: "ImSatExport",
-          bytes,
-          x: 0,
-          y: 0,
-          w: 1024,
-          h: 768,
-        }];
-      }
-    }
-  } catch {
-    // Fall through to individual tiles below.
-  }
-
-  // Fallback: fetch the same 4 x 3 World Imagery tile mosaic used by the
-  // PDF projection. If some tiles fail, keep the successful ones.
+  const startX = centerTileX - 1;
+  const startY = centerTileY - 1;
+  const hosts = [
+    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile",
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile",
+  ];
   const tiles: SatelliteTile[] = [];
   const jobs: Array<Promise<void>> = [];
+
   for (let row = 0; row < 3; row += 1) {
     for (let col = 0; col < 4; col += 1) {
-      const tileX = startTileX + col;
-      const tileY = startTileY + row;
-      const url =
-        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/" +
-        zoom +
-        "/" +
-        tileY +
-        "/" +
-        tileX;
+      const tileX = startX + col;
+      const tileY = startY + row;
       jobs.push(
-        fetch(url, {
-          cache: "no-store",
-          headers: { Accept: "image/jpeg,image/*" },
-          signal: AbortSignal.timeout(8000),
-        })
-          .then(async (response) => {
-            if (!response.ok) return;
-            const bytes = new Uint8Array(await response.arrayBuffer());
-            if (bytes.length < 1000) return;
-            tiles.push({
-              name: "ImSat" + row + "_" + col,
-              bytes,
-              x: col * 256,
-              y: (2 - row) * 256,
-              w: 256,
-              h: 256,
-            });
-          })
-          .catch(() => undefined),
+        (async () => {
+          for (const host of hosts) {
+            const url = host + "/" + zoom + "/" + tileY + "/" + tileX;
+            try {
+              const response = await fetch(url, {
+                cache: "no-store",
+                headers: { Accept: "image/jpeg,image/*" },
+                signal: AbortSignal.timeout(10000),
+              });
+              if (!response.ok) continue;
+              const bytes = new Uint8Array(await response.arrayBuffer());
+              if (bytes.length < 1000) continue;
+              tiles.push({
+                name: "ImSat" + row + "_" + col,
+                bytes,
+                // PDF coordinates grow upward, so the northern/top tile row
+                // is placed at the top of the 3-row mosaic.
+                x: col * 256,
+                y: (2 - row) * 256,
+                w: 256,
+                h: 256,
+              });
+              return;
+            } catch {
+              // Try the next ArcGIS host.
+            }
+          }
+        })(),
       );
     }
   }
@@ -225,23 +179,53 @@ async function fetchMappedBuildings(
   longitude: number,
   radiusMeters = 260,
 ): Promise<MappedBuilding[]> {
-  const query = `[out:json][timeout:20];
-way["building"](around:${Math.min(Math.max(radiusMeters, 80), 300)},${latitude},${longitude});
+  const safeRadius = Math.min(Math.max(radiusMeters, 80), 300);
+  const query = `[out:json][timeout:25];
+way["building"](around:${safeRadius},${latitude},${longitude});
 out geom tags qt;`;
-  const response = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: "data=" + encodeURIComponent(query),
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
+  const endpoints = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+  ];
 
-  const data = (await response.json()) as {
+  let data: {
     elements?: Array<{
       geometry?: Array<{ lat: number; lon: number }>;
       tags?: Record<string, string>;
     }>;
-  };
+  } | null = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: "data=" + encodeURIComponent(query),
+        cache: "no-store",
+        signal: AbortSignal.timeout(18000),
+      });
+      if (!response.ok) continue;
+      const candidate = (await response.json()) as {
+        elements?: Array<{
+          geometry?: Array<{ lat: number; lon: number }>;
+          tags?: Record<string, string>;
+        }>;
+      };
+      if (Array.isArray(candidate.elements)) {
+        data = candidate;
+        if (candidate.elements.length > 0) break;
+      }
+    } catch {
+      // Try the next public Overpass endpoint.
+    }
+  }
+
+  if (!data) return [];
+
   const mLat = 111320;
   const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
   const area = (points: Array<{ x: number; y: number }>) => {
@@ -262,23 +246,31 @@ out geom tags qt;`;
       }));
       const tags = element.tags ?? {};
       const levels = Math.max(1, Number(tags["building:levels"]) || 1);
-      const taggedHeight = Number.parseFloat(tags.height ?? "");
+      const taggedHeight = Number.parseFloat(
+        String(tags.height ?? "").replace(",", ".").match(/-?\d+(?:\.\d+)?/)?.[0] ?? "",
+      );
       const heightMeters = Number.isFinite(taggedHeight)
         ? Math.max(3, taggedHeight)
         : levels * 3;
       return {
         polygon: geo.map((p) => ({ latitude: p.lat, longitude: p.lon })),
         areaM2: area(projected),
-        containsTarget: projected.length >= 3 && pointInPolygon({ x: 0, y: 0 }, projected),
+        containsTarget:
+          projected.length >= 3 && pointInPolygon({ x: 0, y: 0 }, projected),
         heightMeters,
         levels,
       };
     })
-    .filter((item) => item.polygon.length >= 3 && item.areaM2 >= 12 && item.areaM2 <= 100000)
+    .filter(
+      (item) =>
+        item.polygon.length >= 3 &&
+        item.areaM2 >= 12 &&
+        item.areaM2 <= 100000,
+    )
     .sort((a, b) => {
-      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
-      // Keep tall buildings in the scene because they are the most important
-      // nearby obstruction for solar production.
+      if (a.containsTarget !== b.containsTarget) {
+        return a.containsTarget ? -1 : 1;
+      }
       return (b.heightMeters - a.heightMeters) || (a.areaM2 - b.areaM2);
     })
     .slice(0, 40);
@@ -391,6 +383,16 @@ function roofVisualCommands({
     "1.5 w",
     mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
   );
+
+  if (!satelliteTiles.length) {
+    commands.push(
+      "0.02 0.04 0.07 rg",
+      (mapX + 18).toFixed(1) + " " + (mapY + mapH - 34).toFixed(1) + " 250 22 re f",
+      "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
+        (mapX + 26).toFixed(1) + " " + (mapY + mapH - 27).toFixed(1) +
+        " Td (Satellite imagery unavailable - mapped buildings remain visible) Tj ET",
+    );
+  }
 
   // Real-location 3D site model: every mapped OSM building is extruded from
   // its actual footprint. Height comes from OSM height/building:levels, with
@@ -623,9 +625,9 @@ function roofVisualCommands({
       };
     });
 
-  // Building shadow footprints: the shadow points away from the sun.
-  // Height comes from OSM height/levels, so taller neighboring buildings create
-  // longer shadow reaches and visibly identify lower-production zones.
+  // Building shadow footprints: each mapped building casts a shadow
+  // according to its own OSM height and the actual sun elevation/azimuth.
+  // This makes taller buildings produce longer shadow zones on the roof map.
   const shadowSamples = baseSunCycle
     .filter(
       (sample) =>
@@ -634,19 +636,18 @@ function roofVisualCommands({
         numberValue(sample.elevationDeg) !== null &&
         (numberValue(sample.elevationDeg) ?? 0) > 8,
     )
-    .filter((_, index, arr) => index === 0 || index === Math.floor(arr.length / 2) || index === arr.length - 1)
+    .filter(
+      (_, index, arr) =>
+        index === 0 ||
+        index === Math.floor(arr.length / 2) ||
+        index === arr.length - 1,
+    )
     .slice(0, 3);
 
   for (const sample of shadowSamples) {
     const sunAzimuth = numberValue(sample.azimuthDeg) ?? 0;
     const sunElevation = numberValue(sample.elevationDeg) ?? 20;
-    const shadowLengthScale = Math.min(
-      120,
-      Math.max(12, 1 / Math.tan((sunElevation * Math.PI) / 180) * 18),
-    );
     const shadowBearing = ((sunAzimuth + 180) * Math.PI) / 180;
-    const dxMeters = Math.sin(shadowBearing) * shadowLengthScale;
-    const dyMeters = Math.cos(shadowBearing) * shadowLengthScale;
 
     for (const building of sceneBuildings) {
       if (building.containsTarget) continue;
@@ -655,27 +656,20 @@ function roofVisualCommands({
         .filter((p): p is { x: number; y: number } => Boolean(p));
       if (base.length < 3) continue;
 
-      const center = building.polygon.reduce(
-        (acc, point) => ({
-          latitude: acc.latitude + point.latitude / building.polygon.length,
-          longitude: acc.longitude + point.longitude / building.polygon.length,
-        }),
-        { latitude: 0, longitude: 0 },
+      const heightMeters = Math.max(3, building.heightMeters || 3);
+      const shadowMeters = Math.min(
+        140,
+        Math.max(8, heightMeters / Math.tan((sunElevation * Math.PI) / 180)),
       );
-      const end = {
-        latitude: center.latitude + dyMeters / 111320,
-        longitude:
-          center.longitude +
-          dxMeters / (111320 * Math.max(0.2, Math.cos((center.latitude * Math.PI) / 180))),
-      };
-      const endPoint = projectGround(end);
-      const cx = base.reduce((sum, p) => sum + p.x, 0) / base.length;
-      const cy = base.reduce((sum, p) => sum + p.y, 0) / base.length;
-      const tx = endPoint.x - cx;
-      const ty = endPoint.y - cy;
+      const metersPerPixel =
+        634 / (1024 * (156543.03392 / 2 ** satelliteZoom));
+      const dxPixels =
+        Math.sin(shadowBearing) * shadowMeters * metersPerPixel;
+      const dyPixels =
+        -Math.cos(shadowBearing) * shadowMeters * metersPerPixel;
 
       commands.push(
-        "0.55 0.08 0.08 rg",
+        "0.65 0.08 0.08 rg",
         base[0].x.toFixed(1) + " " + base[0].y.toFixed(1) + " m",
       );
       for (let i = 1; i < base.length; i += 1) {
@@ -683,10 +677,31 @@ function roofVisualCommands({
       }
       for (let i = base.length - 1; i >= 0; i -= 1) {
         commands.push(
-          (base[i].x + tx).toFixed(1) + " " + (base[i].y + ty).toFixed(1) + " l",
+          (base[i].x + dxPixels).toFixed(1) +
+            " " +
+            (base[i].y + dyPixels).toFixed(1) +
+            " l",
         );
       }
       commands.push("h f");
+
+      if (heightMeters >= 9) {
+        const center = base.reduce(
+          (acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }),
+          { x: 0, y: 0 },
+        );
+        center.x /= base.length;
+        center.y /= base.length;
+        commands.push(
+          "BT /F2 5.5 Tf 1.00 0.86 0.86 rg " +
+            (center.x + 4).toFixed(1) +
+            " " +
+            (center.y + 3).toFixed(1) +
+            " Td (" +
+            heightMeters.toFixed(0) +
+            "m building) Tj ET",
+        );
+      }
     }
   }
 
