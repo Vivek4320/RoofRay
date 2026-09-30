@@ -74,6 +74,7 @@ type MappedBuilding = {
   polygon: Array<{ latitude: number; longitude: number }>;
   areaM2: number;
   containsTarget: boolean;
+  distanceMeters: number;
   heightMeters: number;
   levels: number;
 };
@@ -213,9 +214,11 @@ function pointInPolygon(
 async function fetchMappedBuildings(
   latitude: number,
   longitude: number,
-  radiusMeters = 260,
+  radiusMeters = 450,
 ): Promise<MappedBuilding[]> {
-  const safeRadius = Math.min(Math.max(radiusMeters, 80), 300);
+  // GPS on desktop can easily be off by 50-150m. Keep a wider search area so
+  // a nearby mapped building can still be used for the site model.
+  const safeRadius = Math.min(Math.max(radiusMeters, 120), 700);
   const query = `[out:json][timeout:25];
 way["building"](around:${safeRadius},${latitude},${longitude});
 out geom tags qt;`;
@@ -288,11 +291,24 @@ out geom tags qt;`;
       const heightMeters = Number.isFinite(taggedHeight)
         ? Math.max(3, taggedHeight)
         : levels * 3;
+      const containsTarget =
+        projected.length >= 3 && pointInPolygon({ x: 0, y: 0 }, projected);
+      const centroid =
+        projected.length > 0
+          ? projected.reduce(
+              (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+              { x: 0, y: 0 },
+            )
+          : { x: 0, y: 0 };
+      if (projected.length > 0) {
+        centroid.x /= projected.length;
+        centroid.y /= projected.length;
+      }
       return {
         polygon: geo.map((p) => ({ latitude: p.lat, longitude: p.lon })),
         areaM2: area(projected),
-        containsTarget:
-          projected.length >= 3 && pointInPolygon({ x: 0, y: 0 }, projected),
+        containsTarget,
+        distanceMeters: Math.hypot(centroid.x, centroid.y),
         heightMeters,
         levels,
       };
@@ -307,7 +323,11 @@ out geom tags qt;`;
       if (a.containsTarget !== b.containsTarget) {
         return a.containsTarget ? -1 : 1;
       }
-      return (b.heightMeters - a.heightMeters) || (a.areaM2 - b.areaM2);
+      return (
+        (a.distanceMeters - b.distanceMeters) ||
+        (b.heightMeters - a.heightMeters) ||
+        (a.areaM2 - b.areaM2)
+      );
     })
     .slice(0, 40);
 }
@@ -344,7 +364,14 @@ function roofVisualCommands({
   const roofPolygon = Array.isArray(roofFootprint?.polygon)
     ? roofFootprint.polygon as Array<Record<string, unknown>>
     : [];
-  const mappedTarget = mappedBuildings.find((building) => building.containsTarget) ?? null;
+  const exactTarget = mappedBuildings.find((building) => building.containsTarget) ?? null;
+  // When browser GPS lands on a road/parking area, the point may be just
+  // outside the mapped footprint. In that case use the nearest mapped
+  // building rather than producing an empty roof panel card.
+  const mappedTarget =
+    exactTarget ??
+    mappedBuildings.find((building) => building.distanceMeters <= 150) ??
+    null;
   const actualRoofPolygon =
     roofPolygon.length >= 3 ? roofPolygon : (mappedTarget?.polygon ?? []);
 
@@ -518,13 +545,14 @@ function roofVisualCommands({
     }
     commands.push("h f S");
 
-    if (building.containsTarget) {
+    if (building === mappedTarget) {
       const cx = roof.reduce((sum, p) => sum + p.x, 0) / roof.length;
       const cy = roof.reduce((sum, p) => sum + p.y, 0) / roof.length;
+      const label = building.containsTarget ? "YOUR HOUSE" : "NEAREST MAPPED BUILDING";
       commands.push(
         "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
           (cx - 25).toFixed(1) + " " + (cy + 5).toFixed(1) +
-          " Td (YOUR HOUSE) Tj ET",
+          " Td (" + label + ") Tj ET",
         "BT /F1 5.5 Tf 0.80 0.92 0.98 rg " +
           (cx - 20).toFixed(1) + " " + (cy - 5).toFixed(1) +
           " Td (" + height.toFixed(0) + "m / " + String(building.levels) + " levels) Tj ET",
@@ -534,7 +562,7 @@ function roofVisualCommands({
 
   // If the exact GPS point is not inside an OSM building, show the
   // real location marker instead of drawing a fake house footprint.
-  if (!mappedBuildings.some((building) => building.containsTarget)) {
+  if (!mappedTarget) {
     const target = project(centerLat, centerLon);
     commands.push(
       "0.10 0.75 1.00 rg",
@@ -543,7 +571,7 @@ function roofVisualCommands({
       (target.x + 8).toFixed(1) + " " + (target.y + 6).toFixed(1) + " 72 14 re f",
       "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
         (target.x + 11).toFixed(1) + " " + (target.y + 10).toFixed(1) +
-        " Td (LOCATION - ROOF FOOTPRINT NOT MAPPED) Tj ET",
+        " Td (LOCATION - NO MAPPED BUILDING WITHIN 150M) Tj ET",
     );
   }
 
