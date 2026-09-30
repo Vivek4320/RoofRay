@@ -1434,9 +1434,48 @@ export default function RoofRayChat() {
     analysis: SolarAnalysis,
     inputs: Record<string, unknown>,
   ) {
+    // Never send a stale 0,0 location to the PDF renderer. Prefer the fresh
+    // browser location when the analysis payload has an invalid/missing one.
+    const analysisLocation = analysis.location as Record<string, unknown> | undefined;
+    const analysisLat = readNumber(analysisLocation?.latitude);
+    const analysisLon = readNumber(analysisLocation?.longitude);
+    const fallbackLat = locationCoords?.latitude ?? null;
+    const fallbackLon = locationCoords?.longitude ?? null;
+    const hasAnalysisLocation =
+      analysisLat !== null &&
+      analysisLon !== null &&
+      !(analysisLat === 0 && analysisLon === 0);
+    const hasFallbackLocation =
+      fallbackLat !== null &&
+      fallbackLon !== null &&
+      !(fallbackLat === 0 && fallbackLon === 0);
+
+    if (!hasAnalysisLocation && !hasFallbackLocation) {
+      setReportPdfError("Real location is not available. Please run Location Analysis again before generating the PDF.");
+      return;
+    }
+
+    const finalAnalysis = hasAnalysisLocation
+      ? analysis
+      : ({
+          ...analysis,
+          location: {
+            ...(analysisLocation ?? {}),
+            latitude: fallbackLat,
+            longitude: fallbackLon,
+          },
+          planningEstimate: {
+            ...((analysis.planningEstimate ?? {}) as Record<string, unknown>),
+            location: {
+              latitude: fallbackLat,
+              longitude: fallbackLon,
+            },
+          },
+        } as SolarAnalysis);
+
     const payload = {
       report,
-      solarContext: analysis,
+      solarContext: finalAnalysis,
       userInputs: inputs,
       reportMetrics: extractReportMetrics(report),
       generatedAt: Date.now(),
