@@ -1111,22 +1111,20 @@ function roofVisualCommands({
   );
 
   // Prominent red location pin at the exact device GPS point.
-  const pinPoint = gpsHousePoint;
   commands.push(
     "0.90 0.12 0.12 rg",
-    (pinPoint.x - 6).toFixed(1) + " " + (pinPoint.y - 4).toFixed(1) + " 12 12 re f",
+    (gpsHousePoint.x - 6).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 12 12 re f",
     "0.98 0.98 1.00 RG",
     "1.2 w",
-    (pinPoint.x - 6).toFixed(1) + " " + (pinPoint.y - 4).toFixed(1) + " 12 12 re S",
+    (gpsHousePoint.x - 6).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 12 12 re S",
     "0.90 0.12 0.12 rg",
-    (pinPoint.x - 2.5).toFixed(1) + " " + (pinPoint.y - 11).toFixed(1) + " m",
-    (pinPoint.x + 2.5).toFixed(1) + " " + (pinPoint.y - 11).toFixed(1) + " l",
-    pinPoint.x.toFixed(1) + " " + (pinPoint.y - 18).toFixed(1) + " l h f",
+    (gpsHousePoint.x - 2.5).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " m",
+    (gpsHousePoint.x + 2.5).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " l",
+    gpsHousePoint.x.toFixed(1) + " " + (gpsHousePoint.y - 18).toFixed(1) + " l h f",
     "BT /F2 6.5 Tf 0.98 0.98 1.00 rg " +
-      (pinPoint.x + 10).toFixed(1) + " " + (pinPoint.y + 2).toFixed(1) +
+      (gpsHousePoint.x + 10).toFixed(1) + " " + (gpsHousePoint.y + 2).toFixed(1) +
       " Td (GPS LOCATION) Tj ET",
   );
-
 
   // Actual mapped target roof outline + geometry-validated panel placement.
   // Panels are generated only from the detected roof polygon; no generic
