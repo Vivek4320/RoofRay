@@ -523,14 +523,23 @@ async function fetchMicrosoftBuildingFootprints(
       heightMeters: number;
     }> = [];
 
-    for (const quadKey of quadKeys) {
+    const orderedQuadKeys = [
+      quadKeys.find((key) => key === bingQuadKey(latitude, longitude, 9)) ?? quadKeys[0],
+      ...quadKeys.filter((key) => key !== bingQuadKey(latitude, longitude, 9)),
+    ];
+
+    for (const quadKey of orderedQuadKeys) {
       const dataUrl = rows.get(quadKey);
       if (!dataUrl) continue;
 
       try {
+        console.info("[RoofRay] Microsoft footprint tile download", { quadKey });
         const dataResponse = await fetch(dataUrl, {
-          cache: "no-store",
-          signal: AbortSignal.timeout(20000),
+          cache: "force-cache",
+          next: { revalidate: 604800 },
+          signal: AbortSignal.timeout(
+            quadKey === bingQuadKey(latitude, longitude, 9) ? 90000 : 30000,
+          ),
         });
         if (!dataResponse.ok) {
           console.warn("[RoofRay] Microsoft footprint tile HTTP", {
@@ -546,7 +555,7 @@ async function fetchMicrosoftBuildingFootprints(
         let nearbyFeatures = 0;
 
         for (const line of raw.split(/\r?\n/)) {
-          if (results.length >= 120 || !line.trim()) continue;
+          if (!line.trim()) continue;
           try {
             const feature = JSON.parse(line) as {
               geometry?: { type?: string; coordinates?: unknown };
@@ -590,9 +599,7 @@ async function fetchMicrosoftBuildingFootprints(
             if (
               pMaxLat < minLat || pMinLat > maxLat ||
               pMaxLon < minLon || pMinLon > maxLon
-            ) {
-              continue;
-            }
+            ) continue;
 
             const rawHeight = Number(
               feature.properties?.height ??
@@ -606,6 +613,7 @@ async function fetchMicrosoftBuildingFootprints(
 
             results.push({ polygon, heightMeters });
             nearbyFeatures += 1;
+            if (results.length >= 120) break;
           } catch {
             // Ignore malformed GeoJSONL records.
           }
@@ -617,16 +625,17 @@ async function fetchMicrosoftBuildingFootprints(
           nearbyFeatures,
           compressedBytes: compressed.length,
         });
+
+        // The center tile is the only tile expected to contain the exact GPS
+        // neighbourhood. Stop immediately once it produced buildings.
+        if (nearbyFeatures > 0 || results.length >= 120) break;
       } catch (error) {
         console.warn("[RoofRay] Microsoft footprint tile failed", {
           quadKey,
           error: error instanceof Error ? error.message : String(error),
         });
       }
-
-      if (results.length >= 120) break;
     }
-
     return results;
   } catch (error) {
     console.warn("[RoofRay] Microsoft building footprint fallback failed:", error);
