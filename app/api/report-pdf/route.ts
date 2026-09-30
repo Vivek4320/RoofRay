@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gunzipSync } from "node:zlib";
 
 type PdfBody = {
   report?: unknown;
@@ -395,6 +396,150 @@ function fitPanelsToPolygon(
   return best;
 }
 
+function bingQuadKey(latitude: number, longitude: number, level = 9): string {
+  const n = 2 ** level;
+  const x = Math.floor(((longitude + 180) / 360) * n);
+  const sinLat = Math.sin((latitude * Math.PI) / 180);
+  const y = Math.floor(
+    ((0.5 - Math.log((1 + sinLat) / Math.max(1e-12, 1 - sinLat)) / (4 * Math.PI)) * n),
+  );
+  let quadKey = "";
+  for (let i = level; i > 0; i -= 1) {
+    const mask = 1 << (i - 1);
+    let digit = 0;
+    if (x & mask) digit += 1;
+    if (y & mask) digit += 2;
+    quadKey += String(digit);
+  }
+  return quadKey;
+}
+
+async function fetchMicrosoftBuildingFootprints(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+): Promise<Array<{
+  polygon: Array<{ latitude: number; longitude: number }>;
+  heightMeters: number;
+}>> {
+  try {
+    const linksResponse = await fetch(
+      "https://bfppub.blob.core.windows.net/%24web/2026-08-13/dataset-links.csv",
+      { cache: "force-cache", next: { revalidate: 86400 }, signal: AbortSignal.timeout(12000) },
+    );
+    if (!linksResponse.ok) return [];
+    const csv = await linksResponse.text();
+    const lines = csv.split(/\r?\n/).filter(Boolean);
+    if (!lines.length) return [];
+
+    const header = lines[0].split(",").map((value) => value.replace(/^"|"$/g, "").trim());
+    const locationIndex = header.findIndex((value) => value.toLowerCase() === "location");
+    const quadIndex = header.findIndex((value) => value.toLowerCase() === "quadkey");
+    const urlIndex = header.findIndex((value) => value.toLowerCase() === "url");
+    if (locationIndex < 0 || quadIndex < 0 || urlIndex < 0) return [];
+
+    const quadKey = bingQuadKey(latitude, longitude, 9);
+    let dataUrl = "";
+    for (let i = 1; i < lines.length; i += 1) {
+      const fields = lines[i].split(",").map((value) => value.replace(/^"|"$/g, "").trim());
+      if (
+        fields[locationIndex]?.toLowerCase() === "india" &&
+        fields[quadIndex] === quadKey
+      ) {
+        dataUrl = fields[urlIndex] ?? "";
+        break;
+      }
+    }
+    if (!dataUrl) return [];
+
+    const dataResponse = await fetch(dataUrl, {
+      cache: "force-cache",
+      next: { revalidate: 604800 },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!dataResponse.ok) return [];
+
+    const compressed = Buffer.from(await dataResponse.arrayBuffer());
+    const raw = gunzipSync(compressed).toString("utf8");
+    const minLat = latitude - radiusMeters / 111320;
+    const maxLat = latitude + radiusMeters / 111320;
+    const lonMeters = 111320 * Math.cos((latitude * Math.PI) / 180);
+    const minLon = longitude - radiusMeters / Math.max(1, lonMeters);
+    const maxLon = longitude + radiusMeters / Math.max(1, lonMeters);
+
+    const results: Array<{
+      polygon: Array<{ latitude: number; longitude: number }>;
+      heightMeters: number;
+    }> = [];
+
+    for (const line of raw.split(/\r?\n/)) {
+      if (results.length >= 100) break;
+      if (!line.trim()) continue;
+      try {
+        const feature = JSON.parse(line) as {
+          geometry?: {
+            type?: string;
+            coordinates?: unknown;
+          };
+          properties?: Record<string, unknown>;
+        };
+        const geometry = feature.geometry;
+        if (!geometry?.coordinates) continue;
+
+        let ring: unknown[] | null = null;
+        if (geometry.type === "Polygon") {
+          const coordinates = geometry.coordinates as unknown[];
+          ring = Array.isArray(coordinates?.[0]) ? coordinates[0] as unknown[] : null;
+        } else if (geometry.type === "MultiPolygon") {
+          const polygons = geometry.coordinates as unknown[];
+          const firstPolygon = polygons.find((polygon) => Array.isArray(polygon) && Array.isArray((polygon as unknown[])[0]));
+          ring = firstPolygon ? (firstPolygon as unknown[])[0] as unknown[] : null;
+        }
+        if (!ring || ring.length < 4) continue;
+
+        const polygon = ring
+          .map((point) => Array.isArray(point) ? {
+            longitude: Number(point[0]),
+            latitude: Number(point[1]),
+          } : null)
+          .filter((point): point is { latitude: number; longitude: number } =>
+            point !== null && Number.isFinite(point.latitude) && Number.isFinite(point.longitude),
+          );
+        if (polygon.length < 4) continue;
+
+        const center = polygon.reduce(
+          (sum, point) => ({ latitude: sum.latitude + point.latitude, longitude: sum.longitude + point.longitude }),
+          { latitude: 0, longitude: 0 },
+        );
+        center.latitude /= polygon.length;
+        center.longitude /= polygon.length;
+
+        if (
+          center.latitude < minLat || center.latitude > maxLat ||
+          center.longitude < minLon || center.longitude > maxLon
+        ) continue;
+
+        const rawHeight = Number(
+          feature.properties?.height ??
+          feature.properties?.Height ??
+          feature.properties?.height_m ??
+          feature.properties?.heightMeters ??
+          -1,
+        );
+        const heightMeters = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 6;
+        results.push({ polygon, heightMeters });
+      } catch {
+        // Skip malformed GeoJSONL records.
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.warn("[RoofRay] Microsoft building footprint fallback failed:", error);
+    return [];
+  }
+}
+
 async function fetchMappedBuildings(
   latitude: number,
   longitude: number,
@@ -447,7 +592,53 @@ out geom tags qt;`;
     }
   }
 
-  if (!data) return [];
+  if (!data || !Array.isArray(data.elements) || data.elements.length === 0) {
+    const microsoftBuildings = await fetchMicrosoftBuildingFootprints(
+      latitude,
+      longitude,
+      safeRadius,
+    );
+    const mLat = 111320;
+    const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
+    const polygonArea = (points: Array<{ x: number; y: number }>) => {
+      let sum = 0;
+      for (let i = 0; i < points.length; i += 1) {
+        const n = points[(i + 1) % points.length];
+        sum += points[i].x * n.y - n.x * points[i].y;
+      }
+      return Math.abs(sum) / 2;
+    };
+    return microsoftBuildings
+      .map((building) => {
+        const projected = building.polygon.map((p) => ({
+          x: (p.longitude - longitude) * mLon,
+          y: (p.latitude - latitude) * mLat,
+        }));
+        const containsTarget = pointInPolygon({ x: 0, y: 0 }, projected);
+        const centroid = projected.reduce(
+          (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+          { x: 0, y: 0 },
+        );
+        if (projected.length) {
+          centroid.x /= projected.length;
+          centroid.y /= projected.length;
+        }
+        return {
+          polygon: building.polygon,
+          areaM2: polygonArea(projected),
+          containsTarget,
+          distanceMeters: Math.hypot(centroid.x, centroid.y),
+          heightMeters: Math.max(3, building.heightMeters),
+          levels: Math.max(1, Math.round(building.heightMeters / 3)),
+        };
+      })
+      .filter((item) => item.areaM2 >= 12 && item.areaM2 <= 100000)
+      .sort((a, b) => {
+        if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+        return a.distanceMeters - b.distanceMeters;
+      })
+      .slice(0, 40);
+  }
 
   const mLat = 111320;
   const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
