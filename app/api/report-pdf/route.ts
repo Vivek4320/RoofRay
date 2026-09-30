@@ -1007,17 +1007,36 @@ function roofVisualCommands({
   // footprints can span a different tile extent than the imagery window.
   const metersLon = 111320 * Math.cos((centerLat * Math.PI) / 180);
   const metersLat = 111320;
-  const scenePoints = mappedBuildings.flatMap((building) =>
+  // Build the PDF scene from a compact local neighbourhood around the GPS
+  // point. The previous renderer used all 40 mapped footprints to calculate
+  // the scale, which made the target tiny and pulled unrelated buildings into
+  // the foreground. Keep the geography exact, but only show the useful local
+  // context in the 3D viewport.
+  const candidateBuildings = mappedBuildings
+    .filter((building) => building.polygon.length >= 3)
+    .filter((building) => building.distanceMeters <= 170);
+
+  const sceneBuildings = (candidateBuildings.length >= 8
+    ? candidateBuildings
+    : mappedBuildings.filter((building) => building.polygon.length >= 3)
+  )
+    .sort((a, b) => {
+      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+      return a.distanceMeters - b.distanceMeters;
+    })
+    .slice(0, 18);
+
+  const scenePoints = sceneBuildings.flatMap((building) =>
     building.polygon.map((point) => ({
       x: (point.longitude - centerLon) * metersLon,
       y: (point.latitude - centerLat) * metersLat,
     })),
   );
   const maxSceneDistance = Math.max(
-    120,
+    70,
     ...scenePoints.map((point) => Math.hypot(point.x, point.y)),
   );
-  const sceneScale = Math.min(mapW - 28, mapH - 28) / (2 * maxSceneDistance * 1.08);
+  const sceneScale = Math.min(mapW - 34, mapH - 34) / (2 * maxSceneDistance * 1.08);
 
   const project = (lat: number, lon: number) => {
     const xMeters = (lon - centerLon) * metersLon;
@@ -1087,44 +1106,42 @@ function roofVisualCommands({
   // its actual footprint. Height comes from OSM height/building:levels, with
   // 3m per level as the documented fallback. This is a map-based 3D
   // visualization, not a photogrammetric claim.
-  const sceneBuildings = (roofPhoto ? [] : mappedBuildings)
-    .filter((building) => building.polygon.length >= 3)
-    .sort((a, b) => {
-      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
-      if (a === mappedTarget || b === mappedTarget) return a === mappedTarget ? -1 : 1;
-      return a.distanceMeters - b.distanceMeters;
-    })
-    .slice(0, 24);
-
   const projectGround = (point: { latitude: number; longitude: number }) =>
     project(point.latitude, point.longitude);
 
-  for (const building of sceneBuildings) {
+  // Draw far buildings first and the target last so the 3D faces never
+  // visually bury the target. Height is converted with the same local metre
+  // scale as the footprint, so the extrusion is proportional to the map.
+  const orderedSceneBuildings = [...sceneBuildings].sort((a, b) => {
+    const aDepth = a.distanceMeters + (a.containsTarget ? 10000 : 0);
+    const bDepth = b.distanceMeters + (b.containsTarget ? 10000 : 0);
+    return bDepth - aDepth;
+  });
+
+  for (const building of orderedSceneBuildings) {
     const ground = building.polygon
       .map(projectGround)
       .filter((p): p is { x: number; y: number } => Boolean(p));
     if (ground.length < 3) continue;
 
-    const height = Math.max(3, Math.min(24, building.heightMeters || 3));
-    const liftX = -height * 0.85;
-    const liftY = height * 0.52;
+    const height = Math.max(3, Math.min(18, building.heightMeters || 3));
+    const lift = Math.max(5, height * sceneScale);
+    const liftX = -lift * 0.62;
+    const liftY = lift * 0.38;
     const roof = ground.map((p) => ({ x: p.x + liftX, y: p.y - liftY }));
+    const isTarget = building === exactTarget;
+    const isTall = !isTarget && height >= 10;
 
-    // Building side faces, ordered around the footprint.
+    // Four-sided extrusion. Alternating side tones give a clean architectural
+    // 3D read without painting the whole neighbourhood red.
     for (let i = 0; i < ground.length; i += 1) {
       const j = (i + 1) % ground.length;
-      const face = [
-        ground[i],
-        ground[j],
-        roof[j],
-        roof[i],
-      ];
+      const face = [ground[i], ground[j], roof[j], roof[i]];
+      const sideTone = i % 2 === 0
+        ? (isTarget ? "0.10 0.34 0.76 rg" : isTall ? "0.78 0.48 0.10 rg" : "0.76 0.79 0.82 rg")
+        : (isTarget ? "0.14 0.43 0.88 rg" : isTall ? "0.88 0.57 0.14 rg" : "0.84 0.86 0.88 rg");
       commands.push(
-        building === mappedTarget || building.containsTarget
-          ? "0.16 0.42 0.92 rg"
-          : building.heightMeters >= 12
-            ? "0.92 0.62 0.20 rg"
-            : "0.86 0.88 0.90 rg",
+        sideTone,
         face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
         face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
         face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
@@ -1132,19 +1149,10 @@ function roofVisualCommands({
       );
     }
 
-    // Roof surface follows the real mapped polygon.
     commands.push(
-      building === mappedTarget || building.containsTarget
-        ? "0.32 0.66 1.00 rg"
-        : building.heightMeters >= 12
-          ? "0.98 0.74 0.30 rg"
-          : "0.95 0.96 0.97 rg",
-      building === mappedTarget || building.containsTarget
-        ? "0.08 0.30 0.72 RG"
-        : building.heightMeters >= 12
-          ? "0.82 0.50 0.10 RG"
-          : "0.70 0.73 0.76 RG",
-      "1 w",
+      isTarget ? "0.34 0.68 1.00 rg" : isTall ? "0.98 0.74 0.30 rg" : "0.96 0.97 0.98 rg",
+      isTarget ? "0.06 0.30 0.72 RG" : isTall ? "0.78 0.48 0.10 RG" : "0.62 0.66 0.70 RG",
+      "0.9 w",
       roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
     );
     for (let i = 1; i < roof.length; i += 1) {
@@ -1152,16 +1160,17 @@ function roofVisualCommands({
     }
     commands.push("h f S");
 
-    if (building === mappedTarget) {
+    if (isTarget) {
       const cx = roof.reduce((sum, p) => sum + p.x, 0) / roof.length;
       const cy = roof.reduce((sum, p) => sum + p.y, 0) / roof.length;
-      const label = building.containsTarget ? "YOUR HOUSE" : "NEAREST MAPPED BUILDING";
       commands.push(
+        "0.03 0.08 0.13 rg",
+        (cx - 38).toFixed(1) + " " + (cy + 8).toFixed(1) + " 76 18 re f",
         "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
-          (cx - 25).toFixed(1) + " " + (cy + 5).toFixed(1) +
-          " Td (" + label + ") Tj ET",
-        "BT /F1 5.5 Tf 0.80 0.92 0.98 rg " +
-          (cx - 20).toFixed(1) + " " + (cy - 5).toFixed(1) +
+          (cx - 29).toFixed(1) + " " + (cy + 14).toFixed(1) +
+          " Td (YOUR HOUSE) Tj ET",
+        "BT /F1 5.2 Tf 0.76 0.88 0.96 rg " +
+          (cx - 24).toFixed(1) + " " + (cy + 3).toFixed(1) +
           " Td (" + height.toFixed(0) + "m / " + String(building.levels) + " levels) Tj ET",
       );
     }
@@ -1187,19 +1196,23 @@ function roofVisualCommands({
       " Td (" + (mappedTarget ? "Mapped building + GPS point" : "GPS point - building footprint unavailable") + ") Tj ET",
   );
 
-  // Prominent red location pin at the exact device GPS point.
+  // Exact GPS point. The marker is independent of footprint coverage, so
+  // it can never be silently moved onto a nearby building.
   commands.push(
+    "0.10 0.55 1.00 RG",
+    "2.4 w",
+    (gpsHousePoint.x - 10).toFixed(1) + " " + (gpsHousePoint.y - 10).toFixed(1) + " 20 20 re S",
     "0.90 0.12 0.12 rg",
-    (gpsHousePoint.x - 6).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 12 12 re f",
+    (gpsHousePoint.x - 5).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 10 10 re f",
     "0.98 0.98 1.00 RG",
-    "1.2 w",
-    (gpsHousePoint.x - 6).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 12 12 re S",
+    "1.1 w",
+    (gpsHousePoint.x - 5).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 10 10 re S",
     "0.90 0.12 0.12 rg",
-    (gpsHousePoint.x - 2.5).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " m",
-    (gpsHousePoint.x + 2.5).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " l",
+    (gpsHousePoint.x - 2.2).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " m",
+    (gpsHousePoint.x + 2.2).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " l",
     gpsHousePoint.x.toFixed(1) + " " + (gpsHousePoint.y - 18).toFixed(1) + " l h f",
-    "BT /F2 6.5 Tf 0.98 0.98 1.00 rg " +
-      (gpsHousePoint.x + 10).toFixed(1) + " " + (gpsHousePoint.y + 2).toFixed(1) +
+    "BT /F2 6.2 Tf 0.03 0.08 0.13 rg " +
+      (gpsHousePoint.x + 12).toFixed(1) + " " + (gpsHousePoint.y - 2).toFixed(1) +
       " Td (GPS LOCATION) Tj ET",
   );
 
@@ -1329,111 +1342,9 @@ function roofVisualCommands({
     commands.push(
       "0.02 0.15 0.30 rg",
       modelX.toFixed(1) + " " + modelY.toFixed(1) + " m",
-      (modelX + modelW).toFixed(1) + " " + (modelY + 10).toFixed(1) + " l",
-      (modelX + modelW - 24).toFixed(1) + " " + (modelY + modelH + 28).toFixed(1) + " l",
-      (modelX + 18).toFixed(1) + " " + (modelY + modelH + 18).toFixed(1) + " l h f",
-    );
-    for (let i = 0; i < (safePanels || 0); i += 1) {
-      const row = Math.floor(i / cols);
-      const col = i % cols;
-      const x = modelX + 24 + col * (pw + 4);
-      const y = modelY + 22 + row * (ph + 4);
-      commands.push(
-        "0.02 0.15 0.30 rg",
-        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re f",
-        "0.35 0.82 1.00 RG",
-        "0.65 w",
-        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re S",
-      );
-    }
-    commands.push(
-      "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
-        (modelX + 8).toFixed(1) + " " + (modelY + modelH + 38).toFixed(1) +
-        " Td (PLANNED PANEL ARRAY) Tj ET",
-    );
-  }
-
-  // Building shadow footprints: each mapped building casts a shadow
-  // according to its own OSM height and the actual sun elevation/azimuth.
-  // This makes taller buildings produce longer shadow zones on the roof map.
-  const shadowSamples = baseSunCycle
-    .filter(
-      (sample) =>
-        sample.aboveHorizon !== false &&
-        numberValue(sample.azimuthDeg) !== null &&
-        numberValue(sample.elevationDeg) !== null &&
-        (numberValue(sample.elevationDeg) ?? 0) > 8,
-    )
-    .filter(
-      (_, index, arr) =>
-        index === 0 ||
-        index === Math.floor(arr.length / 2) ||
-        index === arr.length - 1,
-    )
-    .slice(0, 3);
-
-  for (const sample of shadowSamples) {
-    const sunAzimuth = numberValue(sample.azimuthDeg) ?? 0;
-    const sunElevation = numberValue(sample.elevationDeg) ?? 20;
-    const shadowBearing = ((sunAzimuth + 180) * Math.PI) / 180;
-
-    for (const building of sceneBuildings) {
-      if (building.containsTarget) continue;
-      const base = building.polygon
-        .map(projectGround)
-        .filter((p): p is { x: number; y: number } => Boolean(p));
-      if (base.length < 3) continue;
-
-      const heightMeters = Math.max(3, building.heightMeters || 3);
-      const shadowMeters = Math.min(
-        140,
-        Math.max(8, heightMeters / Math.tan((sunElevation * Math.PI) / 180)),
-      );
-      const metersPerPixel = 156543.03392 / 2 ** satelliteZoom;
-      const pixelsPerMeterX = mapW / (1280 * metersPerPixel);
-      const pixelsPerMeterY = mapH / (768 * metersPerPixel);
-      const dxPixels =
-        Math.sin(shadowBearing) * shadowMeters * pixelsPerMeterX;
-      const dyPixels =
-        -Math.cos(shadowBearing) * shadowMeters * pixelsPerMeterY;
-
-      commands.push(
-        "0.65 0.08 0.08 rg",
-        base[0].x.toFixed(1) + " " + base[0].y.toFixed(1) + " m",
-      );
-      for (let i = 1; i < base.length; i += 1) {
-        commands.push(base[i].x.toFixed(1) + " " + base[i].y.toFixed(1) + " l");
-      }
-      for (let i = base.length - 1; i >= 0; i -= 1) {
-        commands.push(
-          (base[i].x + dxPixels).toFixed(1) +
-            " " +
-            (base[i].y + dyPixels).toFixed(1) +
-            " l",
-        );
-      }
-      commands.push("h f");
-
-      if (heightMeters >= 9) {
-        const center = base.reduce(
-          (acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }),
-          { x: 0, y: 0 },
-        );
-        center.x /= base.length;
-        center.y /= base.length;
-        commands.push(
-          "BT /F2 5.5 Tf 1.00 0.86 0.86 rg " +
-            (center.x + 4).toFixed(1) +
-            " " +
-            (center.y + 3).toFixed(1) +
-            " Td (" +
-            heightMeters.toFixed(0) +
-            "m building) Tj ET",
-        );
-      }
-    }
-  }
-
+      (modelX + modelW).toFixed(1) + " " + (modelY + 10).toFixed(1) +   // Keep the main 3D map clean. Shading is calculated and shown in the
+  // analysis card below, but large filled shadow polygons are deliberately
+  // not painted over the building geometry because they obscure the 3D scene.
   if (sunPoints.length >= 2) {
     // Yellow dashed sight lines make the solar direction and the potential
     // shadow direction immediately readable in the aerial map.
