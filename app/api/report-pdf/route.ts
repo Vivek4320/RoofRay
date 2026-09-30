@@ -1348,6 +1348,9 @@ export async function POST(request: Request) {
 
     const mappedBuildings = await fetchMappedBuildings(lat, lon);
     const satelliteTiles = await fetchSatelliteTiles(lat, lon);
+    const roofPhoto = decodeJpegDataUrl(
+      body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
+    );
     console.info("[RoofRay] PDF visual data", {
       latitude: lat,
       longitude: lon,
@@ -1356,9 +1359,6 @@ export async function POST(request: Request) {
       satelliteTiles: satelliteTiles.length,
       roofPhoto: Boolean(roofPhoto),
     });
-    const roofPhoto = decodeJpegDataUrl(
-      body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
-    );
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
     const reportPanels = reportNumber(reportText, /Panels:\s*([\d,.]+)\s*[×x]/i);
