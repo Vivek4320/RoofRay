@@ -36,6 +36,33 @@ function numberValue(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function validCoordinate(value: unknown, min: number, max: number): number | null {
+  const n = numberValue(value);
+  return n !== null && n >= min && n <= max ? n : null;
+}
+
+function resolveReportLocation(
+  context: Record<string, unknown>,
+  planning: Record<string, unknown>,
+): { latitude: number; longitude: number } | null {
+  const candidates: Array<Record<string, unknown> | null | undefined> = [
+    planning.location as Record<string, unknown> | undefined,
+    context.location as Record<string, unknown> | undefined,
+    context.roof as Record<string, unknown> | undefined,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const latitude = validCoordinate(candidate.latitude, -90, 90);
+    const longitude = validCoordinate(candidate.longitude, -180, 180);
+    if (latitude === null || longitude === null) continue;
+    if (latitude === 0 && longitude === 0) continue;
+    return { latitude, longitude };
+  }
+
+  return null;
+}
+
 function reportNumber(report: string, pattern: RegExp): number | null {
   const match = report.match(pattern);
   if (!match) return null;
@@ -1020,16 +1047,24 @@ export async function POST(request: Request) {
     const shade = numberValue(planning.estimatedShadingPercent);
     const roof = numberValue(planning.roofAreaSqFt);
     const bill = numberValue(inputs.monthlyBillInr);
-    const lat = numberValue((planning.location as Record<string, unknown> | undefined)?.latitude);
-    const lon = numberValue((planning.location as Record<string, unknown> | undefined)?.longitude);
-    const mappedBuildings =
-      lat !== null && lon !== null
-        ? await fetchMappedBuildings(lat, lon)
-        : [];
-    const satelliteTiles =
-      lat !== null && lon !== null
-        ? await fetchSatelliteTiles(lat, lon)
-        : [];
+    const resolvedLocation = resolveReportLocation(context, planning);
+    const lat = resolvedLocation?.latitude ?? null;
+    const lon = resolvedLocation?.longitude ?? null;
+
+    // Never generate a fake map around 0,0. If a stale/legacy payload has no
+    // real coordinates, the caller must refresh the solar analysis first.
+    if (lat === null || lon === null) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Real roof location is missing from the report data. Please run Location Analysis again before generating the PDF.",
+        },
+        { status: 422 },
+      );
+    }
+
+    const mappedBuildings = await fetchMappedBuildings(lat, lon);
+    const satelliteTiles = await fetchSatelliteTiles(lat, lon);
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
     const reportPanels = reportNumber(reportText, /Panels:\s*([\d,.]+)\s*[×x]/i);
