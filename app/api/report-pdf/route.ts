@@ -194,7 +194,7 @@ async function fetchSatelliteTiles(
   const center = webMercatorPixel(latitude, longitude, zoom);
   const centerTileX = Math.floor(center.x / 256);
   const centerTileY = Math.floor(center.y / 256);
-  const startX = centerTileX - 1;
+  const startX = centerTileX - 2;
   const startY = centerTileY - 1;
   const hosts = [
     "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile",
@@ -203,8 +203,11 @@ async function fetchSatelliteTiles(
   const tiles: SatelliteTile[] = [];
   const jobs: Array<Promise<void>> = [];
 
+  // Five columns x three rows gives a wider high-resolution site window
+  // around the exact GPS coordinate. The renderer scales this complete
+  // mosaic into the PDF map frame.
   for (let row = 0; row < 3; row += 1) {
-    for (let col = 0; col < 4; col += 1) {
+    for (let col = 0; col < 5; col += 1) {
       const tileX = startX + col;
       const tileY = startY + row;
       jobs.push(
@@ -223,16 +226,16 @@ async function fetchSatelliteTiles(
               tiles.push({
                 name: "ImSat" + row + "_" + col,
                 bytes,
-                // PDF coordinates grow upward, so the northern/top tile row
-                // is placed at the top of the 3-row mosaic.
+                // Keep source-image coordinates in ordinary screen order:
+                // row 0 is the northern/top row.
                 x: col * 256,
-                y: (2 - row) * 256,
+                y: row * 256,
                 w: 256,
                 h: 256,
               });
               return;
             } catch {
-              // Try the next ArcGIS host.
+              // Try the next imagery host.
             }
           }
         })(),
@@ -555,7 +558,7 @@ function roofVisualCommands({
     const relativeX = pixel.x - startTileX * 256;
     const relativeY = pixel.y - startTileY * 256;
     return {
-      x: mapX + (relativeX / 1024) * mapW,
+      x: mapX + (relativeX / 1280) * mapW,
       y: mapY + mapH - (relativeY / 768) * mapH,
     };
   };
@@ -621,11 +624,11 @@ function roofVisualCommands({
       "q",
       mapX + " " + mapY + " " + mapW + " " + mapH + " re W n",
     );
-    // The fetched tiles are 4 columns x 3 rows (1024 x 768 source pixels).
+    // The fetched tiles are 5 columns x 3 rows (1280 x 768 source pixels).
     // Scale that complete mosaic into the actual map frame. Previously the
     // raw 256px tiles were drawn at 1:1, so most of the imagery landed outside
     // the 634 x 310pt map viewport and the report looked like an empty grey map.
-    const tileW = mapW / 4;
+    const tileW = mapW / 5;
     const tileH = mapH / 3;
     for (const tile of satelliteTiles) {
       commands.push(
@@ -652,7 +655,7 @@ function roofVisualCommands({
       (mapX + 18).toFixed(1) + " " + (mapY + mapH - 34).toFixed(1) + " 250 22 re f",
       "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
         (mapX + 26).toFixed(1) + " " + (mapY + mapH - 27).toFixed(1) +
-        " Td (Satellite imagery unavailable - mapped buildings remain visible) Tj ET",
+        " Td (High-resolution aerial imagery unavailable - mapped geometry shown) Tj ET",
     );
   }
 
@@ -946,7 +949,7 @@ function roofVisualCommands({
         Math.max(8, heightMeters / Math.tan((sunElevation * Math.PI) / 180)),
       );
       const metersPerPixel = 156543.03392 / 2 ** satelliteZoom;
-      const pixelsPerMeterX = mapW / (1024 * metersPerPixel);
+      const pixelsPerMeterX = mapW / (1280 * metersPerPixel);
       const pixelsPerMeterY = mapH / (768 * metersPerPixel);
       const dxPixels =
         Math.sin(shadowBearing) * shadowMeters * pixelsPerMeterX;
@@ -1575,7 +1578,19 @@ export async function POST(request: Request) {
 
     const mappedBuildings = await fetchMappedBuildings(lat, lon);
     const roofAerialImage = await fetchMapplsStillImage(lat, lon);
-    const satelliteTiles = roofAerialImage ? [] : await fetchSatelliteTiles(lat, lon);
+
+    // Prefer the highest-resolution real aerial imagery available. This is
+    // intentionally a real imagery fetch, not a generated roof illustration.
+    let satelliteTiles: SatelliteTile[] = [];
+    if (!roofAerialImage) {
+      for (const zoom of [20, 19, 18]) {
+        const candidate = await fetchSatelliteTiles(lat, lon, zoom);
+        if (candidate.length >= 8) {
+          satelliteTiles = candidate;
+          break;
+        }
+      }
+    }
     const roofPhoto = decodeJpegDataUrl(
       body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
     );
