@@ -651,7 +651,7 @@ out geom tags qt;`;
     return Math.abs(sum) / 2;
   };
 
-  return (data.elements ?? [])
+  const mappedBuildings = (data.elements ?? [])
     .map((element) => {
       const geo = element.geometry ?? [];
       const projected = geo.map((p) => ({
@@ -703,6 +703,56 @@ out geom tags qt;`;
         (b.heightMeters - a.heightMeters) ||
         (a.areaM2 - b.areaM2)
       );
+    })
+    .slice(0, 40);
+
+  if (mappedBuildings.length > 0) return mappedBuildings;
+
+  // OSM can return successfully while having no building polygons in this
+  // neighbourhood. Fall back to Microsoft's satellite-derived footprints.
+  const microsoftBuildings = await fetchMicrosoftBuildingFootprints(
+    latitude,
+    longitude,
+    safeRadius,
+  );
+  const mLatFallback = 111320;
+  const mLonFallback = 111320 * Math.cos((latitude * Math.PI) / 180);
+  const fallbackArea = (points: Array<{ x: number; y: number }>) => {
+    let sum = 0;
+    for (let i = 0; i < points.length; i += 1) {
+      const n = points[(i + 1) % points.length];
+      sum += points[i].x * n.y - n.x * points[i].y;
+    }
+    return Math.abs(sum) / 2;
+  };
+  return microsoftBuildings
+    .map((building) => {
+      const projected = building.polygon.map((p) => ({
+        x: (p.longitude - longitude) * mLonFallback,
+        y: (p.latitude - latitude) * mLatFallback,
+      }));
+      const containsTarget = pointInPolygon({ x: 0, y: 0 }, projected);
+      const centroid = projected.reduce(
+        (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+        { x: 0, y: 0 },
+      );
+      if (projected.length) {
+        centroid.x /= projected.length;
+        centroid.y /= projected.length;
+      }
+      return {
+        polygon: building.polygon,
+        areaM2: fallbackArea(projected),
+        containsTarget,
+        distanceMeters: Math.hypot(centroid.x, centroid.y),
+        heightMeters: Math.max(3, building.heightMeters),
+        levels: Math.max(1, Math.round(building.heightMeters / 3)),
+      };
+    })
+    .filter((item) => item.areaM2 >= 12 && item.areaM2 <= 100000)
+    .sort((a, b) => {
+      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+      return a.distanceMeters - b.distanceMeters;
     })
     .slice(0, 40);
 }
