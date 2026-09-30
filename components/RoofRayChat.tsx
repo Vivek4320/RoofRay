@@ -1882,6 +1882,13 @@ export default function RoofRayChat() {
       }
     }
 
+    if (goal !== null && imageAttachment && nextRoofPhotoDataUrl) {
+      const liveAnalysis = await loadLocationAnalysis(roofArea);
+      if (liveAnalysis) currentSolarContext = liveAnalysis;
+      setLoading(false);
+      return;
+    }
+
     const validToken = await getValidToken();
     if (!validToken) {
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: "Your login session is not available. Please log in again, then try your message." }]);
