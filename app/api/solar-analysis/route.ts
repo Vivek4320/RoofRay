@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getNearbyObstacleAnalysis, buildCurrentSunCycle } from "@/lib/obstacles";
+import { getNearbyObstacleAnalysis, buildCurrentSunCycle, estimateDaylightShadowFactor } from "@/lib/obstacles";
 import { getRoofFootprint } from "@/lib/roofFootprint";
 import { estimatePanelPlacement } from "@/lib/panelPlacement";
 import { getPVGISAnalysis } from "@/lib/pvgis";
@@ -86,11 +86,10 @@ export async function POST(request: Request) {
     // available. A mapped roof footprint is useful for spatial validation, but it
     // should not block the solar-size/generation estimate if footprint mapping fails.
     const planningRoofAreaM2 = roofAreaM2 ?? roof?.areaM2 ?? null;
-    const shadingFactor = shadow.timeSeries.length
-      ? shadow.timeSeries.filter(
-          (sample) => sample.risk === "high" || sample.risk === "medium",
-        ).length / shadow.timeSeries.length * 0.15
-      : 0;
+    const shadingFactor = estimateDaylightShadowFactor(
+      obstacles.obstacles,
+      sunCycle.next12Hours,
+    );
 
     const panelPlacement = planningRoofAreaM2 !== null
       ? estimatePanelPlacement({
