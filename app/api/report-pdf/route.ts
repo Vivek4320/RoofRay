@@ -612,7 +612,7 @@ async function fetchMicrosoftBuildingFootprints(
 
             results.push({ polygon, heightMeters });
             nearbyFeatures += 1;
-            if (results.length >= 120) break;
+            if (results.length >= 500) break;
           } catch {
             // Ignore malformed GeoJSONL records.
           }
@@ -627,7 +627,7 @@ async function fetchMicrosoftBuildingFootprints(
 
         // The center tile is the only tile expected to contain the exact GPS
         // neighbourhood. Stop immediately once it produced buildings.
-        if (nearbyFeatures > 0 || results.length >= 120) break;
+        if (nearbyFeatures > 0 || results.length >= 500) break;
       } catch (error) {
         console.warn("[RoofRay] Microsoft footprint tile failed", {
           quadKey,
@@ -807,7 +807,15 @@ out geom tags qt;`;
     })
     .slice(0, 40);
 
-  if (mappedBuildings.length > 0) return mappedBuildings;
+  // OSM coverage can be sparse even when the endpoint returns successfully.
+  // For the PDF neighborhood model, use Microsoft footprints whenever OSM
+  // provides fewer than 5 usable buildings so the scene does not randomly
+  // collapse to a GPS marker on different runs.
+  if (mappedBuildings.length >= 5) return mappedBuildings;
+
+  console.info("[RoofRay] OSM building coverage sparse; using Microsoft footprints", {
+    osmBuildings: mappedBuildings.length,
+  });
 
   // OSM can return successfully while having no building polygons in this
   // neighbourhood. Fall back to Microsoft's satellite-derived footprints.
@@ -826,6 +834,13 @@ out geom tags qt;`;
     }
     return Math.abs(sum) / 2;
   };
+  console.info("[RoofRay] Microsoft PDF fallback result", {
+    footprints: microsoftBuildings.length,
+    latitude,
+    longitude,
+    radiusMeters: safeRadius,
+  });
+
   return microsoftBuildings
     .map((building) => {
       const projected = building.polygon.map((p) => ({
