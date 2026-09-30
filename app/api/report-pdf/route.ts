@@ -1091,9 +1091,10 @@ function roofVisualCommands({
     .filter((building) => building.polygon.length >= 3)
     .sort((a, b) => {
       if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
-      return b.heightMeters - a.heightMeters;
+      if (a === mappedTarget || b === mappedTarget) return a === mappedTarget ? -1 : 1;
+      return a.distanceMeters - b.distanceMeters;
     })
-    .slice(0, 32);
+    .slice(0, 24);
 
   const projectGround = (point: { latitude: number; longitude: number }) =>
     project(point.latitude, point.longitude);
@@ -1104,9 +1105,9 @@ function roofVisualCommands({
       .filter((p): p is { x: number; y: number } => Boolean(p));
     if (ground.length < 3) continue;
 
-    const height = Math.max(3, Math.min(30, building.heightMeters || 3));
-    const liftX = -height * 1.15;
-    const liftY = height * 0.72;
+    const height = Math.max(3, Math.min(24, building.heightMeters || 3));
+    const liftX = -height * 0.85;
+    const liftY = height * 0.52;
     const roof = ground.map((p) => ({ x: p.x + liftX, y: p.y - liftY }));
 
     // Building side faces, ordered around the footprint.
@@ -1120,10 +1121,10 @@ function roofVisualCommands({
       ];
       commands.push(
         building === mappedTarget || building.containsTarget
-          ? "0.18 0.45 0.95 rg"
-          : building.heightMeters >= 10
-            ? "0.96 0.55 0.08 rg"
-            : "0.78 0.80 0.82 rg",
+          ? "0.16 0.42 0.92 rg"
+          : building.heightMeters >= 12
+            ? "0.92 0.62 0.20 rg"
+            : "0.86 0.88 0.90 rg",
         face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
         face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
         face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
@@ -1134,15 +1135,15 @@ function roofVisualCommands({
     // Roof surface follows the real mapped polygon.
     commands.push(
       building === mappedTarget || building.containsTarget
-        ? "0.30 0.62 1.00 rg"
-        : building.heightMeters >= 10
-          ? "1.00 0.67 0.18 rg"
-          : "0.93 0.94 0.95 rg",
+        ? "0.32 0.66 1.00 rg"
+        : building.heightMeters >= 12
+          ? "0.98 0.74 0.30 rg"
+          : "0.95 0.96 0.97 rg",
       building === mappedTarget || building.containsTarget
-        ? "0.05 0.28 0.72 RG"
-        : building.heightMeters >= 10
-          ? "0.80 0.36 0.02 RG"
-          : "0.72 0.74 0.76 RG",
+        ? "0.08 0.30 0.72 RG"
+        : building.heightMeters >= 12
+          ? "0.82 0.50 0.10 RG"
+          : "0.70 0.73 0.76 RG",
       "1 w",
       roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
     );
