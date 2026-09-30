@@ -1216,22 +1216,6 @@ function buildPdf(lines: string[], visual: {
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
 
-  if (visual.roofPhoto) {
-    const photo = visual.roofPhoto;
-    objects.push(
-      Buffer.concat([
-        Buffer.from(
-          "<< /Type /XObject /Subtype /Image /Width " + photo.width +
-          " /Height " + photo.height + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
-          photo.bytes.length + " >>\nstream\n",
-          "ascii",
-        ),
-        Buffer.from(photo.bytes),
-        Buffer.from("\nendstream", "ascii"),
-      ]),
-    );
-  }
-
   for (let i = 0; i < visual.satelliteTiles.length; i += 1) {
     const tile = visual.satelliteTiles[i];
     objects.push(
@@ -1247,6 +1231,22 @@ function buildPdf(lines: string[], visual: {
           "ascii",
         ),
         Buffer.from(tile.bytes),
+        Buffer.from("\nendstream", "ascii"),
+      ]),
+    );
+  }
+
+  if (visual.roofPhoto) {
+    const photo = visual.roofPhoto;
+    objects.push(
+      Buffer.concat([
+        Buffer.from(
+          "<< /Type /XObject /Subtype /Image /Width " + photo.width +
+          " /Height " + photo.height + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
+          photo.bytes.length + " >>\nstream\n",
+          "ascii",
+        ),
+        Buffer.from(photo.bytes),
         Buffer.from("\nendstream", "ascii"),
       ]),
     );
