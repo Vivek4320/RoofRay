@@ -1062,8 +1062,9 @@ function roofVisualCommands({
     }
   }
 
-  // Map legend: blue = user's house, red = nearby/taller shading-risk
-  // buildings, yellow = sun direction/path.
+  // Technical 3D site-view legend: blue = target house, amber = taller
+  // nearby buildings that may contribute to shading, grey = other mapped
+  // buildings, yellow = calculated sun direction/path.
   const legendX = mapX + 14;
   const legendY = mapY + mapH - 74;
   commands.push(
@@ -1072,9 +1073,9 @@ function roofVisualCommands({
     "0.10 0.55 1.00 rg",
     (legendX + 8).toFixed(1) + " " + (legendY + 37).toFixed(1) + " 10 10 re f",
     "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 39).toFixed(1) + " Td (Your house / GPS) Tj ET",
-    "0.72 0.20 0.20 rg",
+    "0.72 0.46 0.16 rg",
     (legendX + 8).toFixed(1) + " " + (legendY + 21).toFixed(1) + " 10 10 re f",
-    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 23).toFixed(1) + " Td (Nearby shading-risk building) Tj ET",
+    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 23).toFixed(1) + " Td (Nearby tall / shading-risk building) Tj ET",
     "1.00 0.62 0.00 RG",
     "2 w",
     (legendX + 8).toFixed(1) + " " + (legendY + 8).toFixed(1) + " m",
@@ -1082,7 +1083,7 @@ function roofVisualCommands({
     "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 6).toFixed(1) + " Td (Sun direction / rays) Tj ET",
   );
 
-  // North compass.
+  // North compass and a compact 3D-view orientation marker.
   const compassX = mapX + mapW - 34;
   const compassY = mapY + mapH - 28;
   commands.push(
@@ -1118,7 +1119,7 @@ function roofVisualCommands({
   commands.push(
     "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[0] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Sun Path & Shading Analysis) Tj ET",
     "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[1] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (YOUR ROOFTOP - SOLAR PANEL PLACEMENT) Tj ET",
-    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[2] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Suggested Installation) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[2] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (3D INSTALLATION VIEW) Tj ET",
   );
 
   // Card 1: a measured site-geometry diagram. This deliberately does not
@@ -1326,9 +1327,9 @@ function roofVisualCommands({
     );
   }
 
-  // Card 3: 3D-style installation sketch built from the actual mapped roof
-  // footprint. It is a visualization, not a claim that the source imagery is
-  // photogrammetric 3D.
+  // Card 3: only show an installation model when an actual mapped roof
+  // polygon exists. Never draw a generic house/panel model when the roof
+  // footprint has not been verified.
   const c3x = cardXs[2] + 14;
   const c3y = cardY + 30;
   const c3w = cardW - 28;
@@ -1337,6 +1338,8 @@ function roofVisualCommands({
   const baseY = c3y + 35;
   const baseW = c3w * 0.68;
   const baseH = c3h * 0.42;
+
+  if (roofPoints.length >= 3) {
   commands.push(
     "0.10 0.18 0.22 rg",
     baseX.toFixed(1) + " " + baseY.toFixed(1) + " " + baseW.toFixed(1) + " " + baseH.toFixed(1) + " re f",
@@ -1363,6 +1366,27 @@ function roofVisualCommands({
       "0.35 0.75 1.00 RG",
       "0.35 w",
       x.toFixed(1) + " " + y.toFixed(1) + " " + pw3.toFixed(1) + " " + ph3.toFixed(1) + " re S",
+    );
+  }
+
+  commands.push(
+    "BT /F1 5.5 Tf 0.65 0.72 0.78 rg " +
+      (c3x + 10).toFixed(1) + " " + (c3y + 8).toFixed(1) +
+      " Td (3D sketch based on mapped roof footprint) Tj ET",
+  );
+  } else {
+    commands.push(
+      "0.08 0.12 0.16 rg",
+      c3x.toFixed(1) + " " + c3y.toFixed(1) + " " + c3w.toFixed(1) + " " + c3h.toFixed(1) + " re f",
+      "BT /F2 8 Tf 0.98 0.98 0.98 rg " +
+        (c3x + 14).toFixed(1) + " " + (c3y + 92).toFixed(1) +
+        " Td (3D installation view unavailable) Tj ET",
+      "BT /F1 6.5 Tf 0.65 0.72 0.78 rg " +
+        (c3x + 14).toFixed(1) + " " + (c3y + 76).toFixed(1) +
+        " Td (A verified roof footprint is required.) Tj ET",
+      "BT /F1 6 Tf 0.55 0.65 0.72 rg " +
+        (c3x + 14).toFixed(1) + " " + (c3y + 62).toFixed(1) +
+        " Td (No generic roof geometry has been substituted.) Tj ET",
     );
   }
 
@@ -1409,15 +1433,15 @@ function roofVisualCommands({
   commands.push(
     "BT /F1 7 Tf 0.55 0.65 0.72 rg 30 120 Td (" + text(monthlyText) + ") Tj ET",
     "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 102 Td (OSM footprint is not survey-grade; imagery availability varies.) Tj ET",
-    "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 88 Td (Satellite: Esri World Imagery | Map: OpenStreetMap.) Tj ET",
+    "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 88 Td (Aerial: available imagery | 3D: mapped building geometry.) Tj ET",
   );
 
   return [
     ...commands,
-    "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (RoofRay Solar Site Assessment) Tj ET",
-    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Real rooftop aerial view + mapped 3D buildings + panel placement + calculated sun path) Tj ET",
-    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Your House / mapped target) Tj ET",
-    "BT /F1 7 Tf 0.95 0.95 0.95 rg 208 522 Td (Blue = your house / GPS | Red = nearby shading risk | Yellow = sun rays) Tj ET",
+    "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (3D SITE VIEW - BUILDING ANALYSIS) Tj ET",
+    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Aerial base + mapped building heights + target-house highlight + shading geometry) Tj ET",
+    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Blue = your house | Amber = nearby tall building | Yellow = sun path) Tj ET",
+    "BT /F1 7 Tf 0.82 0.86 0.90 rg 208 522 Td (3D geometry is map-derived; building heights are estimates where source heights are unavailable.) Tj ET",
   ];
 }
 
