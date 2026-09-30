@@ -1007,19 +1007,12 @@ function roofVisualCommands({
   // footprints can span a different tile extent than the imagery window.
   const metersLon = 111320 * Math.cos((centerLat * Math.PI) / 180);
   const metersLat = 111320;
-  // Build the PDF scene from a compact local neighbourhood around the GPS
-  // point. The previous renderer used all 40 mapped footprints to calculate
-  // the scale, which made the target tiny and pulled unrelated buildings into
-  // the foreground. Keep the geography exact, but only show the useful local
-  // context in the 3D viewport.
-  const candidateBuildings = mappedBuildings
+  // Keep the 3D viewport centred on the actual GPS point. Using all
+  // mapped footprints for the scale makes the target tiny and allows distant
+  // buildings to dominate the page.
+  const sceneBuildings = (roofPhoto ? [] : mappedBuildings)
     .filter((building) => building.polygon.length >= 3)
-    .filter((building) => building.distanceMeters <= 170);
-
-  const sceneBuildings = (candidateBuildings.length >= 8
-    ? candidateBuildings
-    : mappedBuildings.filter((building) => building.polygon.length >= 3)
-  )
+    .filter((building) => building.distanceMeters <= 170)
     .sort((a, b) => {
       if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
       return a.distanceMeters - b.distanceMeters;
@@ -1109,9 +1102,8 @@ function roofVisualCommands({
   const projectGround = (point: { latitude: number; longitude: number }) =>
     project(point.latitude, point.longitude);
 
-  // Draw far buildings first and the target last so the 3D faces never
-  // visually bury the target. Height is converted with the same local metre
-  // scale as the footprint, so the extrusion is proportional to the map.
+  // Render farther buildings first and the true target last. Heights are
+  // converted through the same local metre-to-PDF scale as the footprint.
   const orderedSceneBuildings = [...sceneBuildings].sort((a, b) => {
     const aDepth = a.distanceMeters + (a.containsTarget ? 10000 : 0);
     const bDepth = b.distanceMeters + (b.containsTarget ? 10000 : 0);
@@ -1126,14 +1118,13 @@ function roofVisualCommands({
 
     const height = Math.max(3, Math.min(18, building.heightMeters || 3));
     const lift = Math.max(5, height * sceneScale);
-    const liftX = -lift * 0.62;
-    const liftY = lift * 0.38;
-    const roof = ground.map((p) => ({ x: p.x + liftX, y: p.y - liftY }));
+    const roof = ground.map((p) => ({
+      x: p.x - lift * 0.62,
+      y: p.y - lift * 0.38,
+    }));
     const isTarget = building === exactTarget;
     const isTall = !isTarget && height >= 10;
 
-    // Four-sided extrusion. Alternating side tones give a clean architectural
-    // 3D read without painting the whole neighbourhood red.
     for (let i = 0; i < ground.length; i += 1) {
       const j = (i + 1) % ground.length;
       const face = [ground[i], ground[j], roof[j], roof[i]];
@@ -1180,23 +1171,19 @@ function roofVisualCommands({
   // building coverage, so the report always shows the device GPS location.
   const gpsHousePoint = project(centerLat, centerLon);
 
-  // Exact GPS point. The marker is independent of footprint coverage, so
-  // it can never be silently moved onto a nearby building.
+  // Prominent red location pin at the exact device GPS point.
   commands.push(
-    "0.10 0.55 1.00 RG",
-    "2.4 w",
-    (gpsHousePoint.x - 10).toFixed(1) + " " + (gpsHousePoint.y - 10).toFixed(1) + " 20 20 re S",
     "0.90 0.12 0.12 rg",
-    (gpsHousePoint.x - 5).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 10 10 re f",
+    (gpsHousePoint.x - 6).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 12 12 re f",
     "0.98 0.98 1.00 RG",
-    "1.1 w",
-    (gpsHousePoint.x - 5).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 10 10 re S",
+    "1.2 w",
+    (gpsHousePoint.x - 6).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 12 12 re S",
     "0.90 0.12 0.12 rg",
-    (gpsHousePoint.x - 2.2).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " m",
-    (gpsHousePoint.x + 2.2).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " l",
+    (gpsHousePoint.x - 2.5).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " m",
+    (gpsHousePoint.x + 2.5).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " l",
     gpsHousePoint.x.toFixed(1) + " " + (gpsHousePoint.y - 18).toFixed(1) + " l h f",
-    "BT /F2 6.2 Tf 0.03 0.08 0.13 rg " +
-      (gpsHousePoint.x + 12).toFixed(1) + " " + (gpsHousePoint.y - 2).toFixed(1) +
+    "BT /F2 6.5 Tf 0.98 0.98 1.00 rg " +
+      (gpsHousePoint.x + 10).toFixed(1) + " " + (gpsHousePoint.y + 2).toFixed(1) +
       " Td (GPS LOCATION) Tj ET",
   );
 
@@ -1326,9 +1313,33 @@ function roofVisualCommands({
     commands.push(
       "0.02 0.15 0.30 rg",
       modelX.toFixed(1) + " " + modelY.toFixed(1) + " m",
-      (modelX + modelW).toFixed(1) + " " + (modelY + 10).toFixed(1) +   // Keep the main 3D map clean. Shading is calculated and shown in the
-  // analysis card below, but large filled shadow polygons are deliberately
-  // not painted over the building geometry because they obscure the 3D scene.
+      (modelX + modelW).toFixed(1) + " " + (modelY + 10).toFixed(1) + " l",
+      (modelX + modelW - 24).toFixed(1) + " " + (modelY + modelH + 28).toFixed(1) + " l",
+      (modelX + 18).toFixed(1) + " " + (modelY + modelH + 18).toFixed(1) + " l h f",
+    );
+    for (let i = 0; i < (safePanels || 0); i += 1) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const x = modelX + 24 + col * (pw + 4);
+      const y = modelY + 22 + row * (ph + 4);
+      commands.push(
+        "0.02 0.15 0.30 rg",
+        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re f",
+        "0.35 0.82 1.00 RG",
+        "0.65 w",
+        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re S",
+      );
+    }
+    commands.push(
+      "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+        (modelX + 8).toFixed(1) + " " + (modelY + modelH + 38).toFixed(1) +
+        " Td (PLANNED PANEL ARRAY) Tj ET",
+    );
+  }
+
+  // Shadow geometry remains in the numeric analysis card below.
+  // Do not paint filled shadow polygons over the 3D buildings.
+  
   if (sunPoints.length >= 2) {
     // Yellow dashed sight lines make the solar direction and the potential
     // shadow direction immediately readable in the aerial map.
