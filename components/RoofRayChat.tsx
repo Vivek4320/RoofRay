@@ -1870,15 +1870,18 @@ export default function RoofRayChat() {
       else if (normalized.includes("feasibility")) nextGoal = "Just check feasibility";
       if (nextGoal) {
         setGoal(nextGoal);
-        // The roof photo is collected before location analysis/report generation.
+        // Location analysis and report generation start immediately after the goal is selected.
       }
     }
 
-    if (goal !== null && imageAttachment && nextRoofPhotoDataUrl) {
-      const liveAnalysis = await loadLocationAnalysis(roofArea);
+    // The final goal answer now immediately starts live location analysis and PDF generation.
+    // A roof photo is no longer required: the report uses the detected building footprint
+    // and mapped 3D building data for the site model.
+    if (nextGoal !== null && goal === null) {
+      const liveAnalysis = await loadLocationAnalysis(nextRoofArea);
       if (liveAnalysis) {
         currentSolarContext = liveAnalysis;
-        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl);
+        await generateFinalReport(liveAnalysis);
       }
       setLoading(false);
       return;
@@ -1968,9 +1971,7 @@ export default function RoofRayChat() {
                       ? "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)"
                       : nextGoal === null
                         ? "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)"
-                        : !nextRoofPhotoDataUrl
-                          ? "📸 Please upload a clear photo of your roof. RoofRay will use it to create the roof-based 3D solar model in your PDF."
-                          : data.message;
+  : data.message;
 
       setMessages((current) => [
         ...current,
