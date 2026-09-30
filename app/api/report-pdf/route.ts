@@ -370,8 +370,6 @@ function roofVisualCommands({
     // Scale that complete mosaic into the actual map frame. Previously the
     // raw 256px tiles were drawn at 1:1, so most of the imagery landed outside
     // the 634 x 310pt map viewport and the report looked like an empty grey map.
-    const mosaicW = 256 * 4;
-    const mosaicH = 256 * 3;
     const tileW = mapW / 4;
     const tileH = mapH / 3;
     for (const tile of satelliteTiles) {
