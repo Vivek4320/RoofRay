@@ -87,6 +87,42 @@ type SatelliteTile = {
   h: number;
 };
 
+type RoofPhoto = {
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+};
+
+function decodeJpegDataUrl(dataUrl: unknown): RoofPhoto | null {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/jpeg;base64,")) return null;
+  try {
+    const bytes = new Uint8Array(Buffer.from(dataUrl.slice("data:image/jpeg;base64,".length), "base64"));
+    if (bytes.length < 20 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+    let offset = 2;
+    while (offset + 9 < bytes.length) {
+      if (bytes[offset] !== 0xff) { offset += 1; continue; }
+      const marker = bytes[offset + 1];
+      offset += 2;
+      if (marker === 0xd8 || marker === 0xd9) continue;
+      if (offset + 2 > bytes.length) break;
+      const segmentLength = (bytes[offset] << 8) | bytes[offset + 1];
+      if (segmentLength < 2 || offset + segmentLength > bytes.length) break;
+      const isSof =
+        (marker >= 0xc0 && marker <= 0xc3) ||
+        (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) ||
+        (marker >= 0xcd && marker <= 0xcf);
+      if (isSof && segmentLength >= 7) {
+        const height = (bytes[offset + 3] << 8) | bytes[offset + 4];
+        const width = (bytes[offset + 5] << 8) | bytes[offset + 6];
+        if (width > 0 && height > 0) return { bytes, width, height };
+      }
+      offset += segmentLength;
+    }
+  } catch {}
+  return null;
+}
+
 function webMercatorPixel(latitude: number, longitude: number, zoom: number) {
   const size = 256 * 2 ** zoom;
   const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, latitude));
@@ -289,6 +325,7 @@ function roofVisualCommands({
   sunCycle,
   mappedBuildings,
   satelliteTiles,
+  roofPhoto,
 }: {
   roofAreaSqFt: number | null;
   roofType: string;
@@ -301,6 +338,7 @@ function roofVisualCommands({
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
+  roofPhoto: RoofPhoto | null;
 }): string[] {
   const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
   const roofPolygon = Array.isArray(roofFootprint?.polygon)
@@ -361,7 +399,30 @@ function roofVisualCommands({
     mapX + " " + mapY + " " + mapW + " " + mapH + " re f",
   ];
 
-  if (satelliteTiles.length) {
+  if (roofPhoto) {
+    const photoW = mapW - 28;
+    const photoH = Math.min(mapH - 28, photoW * (roofPhoto.height / Math.max(1, roofPhoto.width)));
+    const photoX = mapX + 14;
+    const photoY = mapY + (mapH - photoH) / 2;
+    commands.push(
+      "q",
+      photoW.toFixed(2) + " 0 0 " + photoH.toFixed(2) + " " +
+        (photoX + 8).toFixed(2) + " " + (photoY - 8).toFixed(2) + " cm",
+      "/RoofPhoto Do",
+      "Q",
+      "q",
+      photoW.toFixed(2) + " 0 0 " + photoH.toFixed(2) + " " +
+        photoX.toFixed(2) + " " + photoY.toFixed(2) + " cm",
+      "/RoofPhoto Do",
+      "Q",
+      "0.20 0.85 1.00 RG",
+      "1.8 w",
+      photoX.toFixed(2) + " " + photoY.toFixed(2) + " " + photoW.toFixed(2) + " " + photoH.toFixed(2) + " re S",
+      "BT /F2 8 Tf 0.98 0.98 0.98 rg " +
+        (photoX + 10).toFixed(1) + " " + (photoY + photoH - 18).toFixed(1) +
+        " Td (PHOTO-BASED ROOF 3D MODEL) Tj ET",
+    );
+  } else if (satelliteTiles.length) {
     commands.push(
       "q",
       mapX + " " + mapY + " " + mapW + " " + mapH + " re W n",
@@ -391,7 +452,7 @@ function roofVisualCommands({
     mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
   );
 
-  if (!satelliteTiles.length) {
+  if (!satelliteTiles.length && !roofPhoto) {
     commands.push(
       "0.02 0.04 0.07 rg",
       (mapX + 18).toFixed(1) + " " + (mapY + mapH - 34).toFixed(1) + " 250 22 re f",
@@ -405,7 +466,7 @@ function roofVisualCommands({
   // its actual footprint. Height comes from OSM height/building:levels, with
   // 3m per level as the documented fallback. This is a map-based 3D
   // visualization, not a photogrammetric claim.
-  const sceneBuildings = mappedBuildings
+  const sceneBuildings = (roofPhoto ? [] : mappedBuildings)
     .filter((building) => building.polygon.length >= 3)
     .sort((a, b) => {
       if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
@@ -631,6 +692,42 @@ function roofVisualCommands({
         y: houseCenter.y + Math.cos(az) * sunRadius * el,
       };
     });
+
+  if (roofPhoto) {
+    const modelX = mapX + 80;
+    const modelY = mapY + 54;
+    const modelW = mapW - 160;
+    const modelH = Math.min(145, mapH - 108);
+    const cols = Math.max(1, Math.min(8, Math.ceil(Math.sqrt(safePanels || 1))));
+    const rows = Math.max(1, Math.ceil((safePanels || 1) / cols));
+    const pw = Math.max(16, (modelW * 0.78) / cols);
+    const ph = Math.max(9, (modelH * 0.55) / rows);
+    commands.push(
+      "0.02 0.15 0.30 rg",
+      modelX.toFixed(1) + " " + modelY.toFixed(1) + " m",
+      (modelX + modelW).toFixed(1) + " " + (modelY + 10).toFixed(1) + " l",
+      (modelX + modelW - 24).toFixed(1) + " " + (modelY + modelH + 28).toFixed(1) + " l",
+      (modelX + 18).toFixed(1) + " " + (modelY + modelH + 18).toFixed(1) + " l h f",
+    );
+    for (let i = 0; i < (safePanels || 0); i += 1) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const x = modelX + 24 + col * (pw + 4);
+      const y = modelY + 22 + row * (ph + 4);
+      commands.push(
+        "0.02 0.15 0.30 rg",
+        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re f",
+        "0.35 0.82 1.00 RG",
+        "0.65 w",
+        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re S",
+      );
+    }
+    commands.push(
+      "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+        (modelX + 8).toFixed(1) + " " + (modelY + modelH + 38).toFixed(1) +
+        " Td (PLANNED PANEL ARRAY) Tj ET",
+    );
+  }
 
   // Building shadow footprints: each mapped building casts a shadow
   // according to its own OSM height and the actual sun elevation/azimuth.
@@ -1099,6 +1196,7 @@ function buildPdf(lines: string[], visual: {
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
+  roofPhoto: RoofPhoto | null;
 }): Uint8Array {
   const pageWidth = 842, pageHeight = 595, margin = 42, lineHeight = 15, linesPerPage = 32;
   const pages: string[][] = [];
@@ -1107,8 +1205,8 @@ function buildPdf(lines: string[], visual: {
 
   const visualPageIndex = pages.length;
   const totalPages = pages.length + 1;
-  const imageObjects = visual.satelliteTiles.map((_, index) => 5 + index);
-  const pageObjectStart = 5 + visual.satelliteTiles.length;
+  const roofPhotoObject = 5 + visual.satelliteTiles.length;
+  const pageObjectStart = 5 + visual.satelliteTiles.length + (visual.roofPhoto ? 1 : 0);
   const objects: Array<string | Buffer> = [];
 
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
@@ -1117,6 +1215,22 @@ function buildPdf(lines: string[], visual: {
     "] /Count " + totalPages + " >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+
+  if (visual.roofPhoto) {
+    const photo = visual.roofPhoto;
+    objects.push(
+      Buffer.concat([
+        Buffer.from(
+          "<< /Type /XObject /Subtype /Image /Width " + photo.width +
+          " /Height " + photo.height + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
+          photo.bytes.length + " >>\nstream\n",
+          "ascii",
+        ),
+        Buffer.from(photo.bytes),
+        Buffer.from("\nendstream", "ascii"),
+      ]),
+    );
+  }
 
   for (let i = 0; i < visual.satelliteTiles.length; i += 1) {
     const tile = visual.satelliteTiles[i];
@@ -1141,9 +1255,10 @@ function buildPdf(lines: string[], visual: {
   for (let i = 0; i < totalPages; i += 1) {
     const pageObject = pageObjectStart + i * 2;
     const contentObject = pageObject + 1;
-    const xObjectEntries = i === visualPageIndex && visual.satelliteTiles.length
+    const xObjectEntries = i === visualPageIndex && (visual.satelliteTiles.length || visual.roofPhoto)
       ? " /XObject << " +
         visual.satelliteTiles.map((tile) => "/" + tile.name + " " + (5 + visual.satelliteTiles.indexOf(tile)) + " 0 R").join(" ") +
+        (visual.roofPhoto ? " /RoofPhoto " + roofPhotoObject + " 0 R" : "") +
         " >>"
       : "";
     const contentLines = i === visualPageIndex
@@ -1239,7 +1354,11 @@ export async function POST(request: Request) {
       mappedBuildings: mappedBuildings.length,
       targetBuildingMapped: mappedBuildings.some((building) => building.containsTarget),
       satelliteTiles: satelliteTiles.length,
+      roofPhoto: Boolean(roofPhoto),
     });
+    const roofPhoto = decodeJpegDataUrl(
+      body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
+    );
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
     const reportPanels = reportNumber(reportText, /Panels:\s*([\d,.]+)\s*[×x]/i);
@@ -1313,6 +1432,7 @@ export async function POST(request: Request) {
       sunCycle: (context.sunCycle ?? null) as Record<string, unknown> | null,
       mappedBuildings,
       satelliteTiles,
+      roofPhoto,
     });
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
