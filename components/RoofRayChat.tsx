@@ -104,6 +104,25 @@ function readNumber(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+async function prepareRoofPhoto(file: File): Promise<string | null> {
+  if (!ALLOWED_IMAGES.includes(file.type)) return null;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 1600;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } catch {
+    return null;
+  }
+}
+
 /* ----------------------------------------------------------------------- */
 /* Lightweight inline + block markdown rendering for assistant messages.   */
 /* Supports: paragraphs, bullet lists, numbered lists, **bold**, `code`.   */
@@ -1044,6 +1063,7 @@ export default function RoofRayChat() {
   const [hasStarted, setHasStarted] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
+  const [roofPhotoDataUrl, setRoofPhotoDataUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -1136,7 +1156,15 @@ export default function RoofRayChat() {
       newAtts.push({ id, file, preview });
     }
     if (error) setFileError(error);
-    if (newAtts.length > 0) setAttachments((prev) => [...prev, ...newAtts]);
+    if (newAtts.length > 0) {
+      setAttachments((prev) => [...prev, ...newAtts]);
+      const firstImage = newAtts.find((att) => ALLOWED_IMAGES.includes(att.file.type));
+      if (firstImage) {
+        void prepareRoofPhoto(firstImage.file).then((dataUrl) => {
+          if (dataUrl) setRoofPhotoDataUrl(dataUrl);
+        });
+      }
+    }
   }, [attachments.length]);
 
   function removeAttachment(id: string) {
@@ -1476,7 +1504,11 @@ export default function RoofRayChat() {
     const payload = {
       report,
       solarContext: finalAnalysis,
-      userInputs: inputs,
+      userInputs: {
+        ...inputs,
+        roofPhotoDataUrl: roofPhotoDataUrl || undefined,
+      },
+      roofPhotoDataUrl: roofPhotoDataUrl || undefined,
       reportMetrics: extractReportMetrics(report),
       generatedAt: Date.now(),
     };
@@ -1597,7 +1629,9 @@ export default function RoofRayChat() {
             connectionType,
             ownership,
             goal,
+            roofPhotoDataUrl: roofPhotoDataUrl || undefined,
           },
+          roofPhotoDataUrl: roofPhotoDataUrl || undefined,
           reportMetrics: extractReportMetrics(reportOverride),
           generatedAt: Date.now(),
         };
@@ -1731,7 +1765,16 @@ export default function RoofRayChat() {
         ...current,
         { id: crypto.randomUUID(), role: "assistant", content: data.message },
       ]);
-      await persistReportAndDownloadPdf(data.message, analysis, { name, roofAreaSqFt: roofArea, roofType, monthlyBillInr: monthlyBill, applianceDetails, connectionType, ownership, goal });
+      await persistReportAndDownloadPdf(data.message, analysis, {
+        name,
+        roofAreaSqFt: roofArea,
+        roofType,
+        monthlyBillInr: monthlyBill,
+        applianceDetails,
+        connectionType,
+        ownership,
+        goal,
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("[RoofRay] Final report error:", error);
