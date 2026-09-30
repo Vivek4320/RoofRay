@@ -118,18 +118,28 @@ async function fetchMicrosoftBuildings(
     const maxLon = longitude + lonDelta;
     const result: Building[] = [];
 
-    for (const quadKey of quadKeys) {
+    const centerQuadKey = bingQuadKey(latitude, longitude, 9);
+    const orderedQuadKeys = [
+      centerQuadKey,
+      ...quadKeys.filter((key) => key !== centerQuadKey),
+    ];
+
+    for (const quadKey of orderedQuadKeys) {
       const dataUrl = rows.get(quadKey);
       if (!dataUrl) continue;
 
       try {
+        console.info("[RoofRay] Microsoft 3D tile download", { quadKey });
         const response = await fetch(dataUrl, {
-          cache: "no-store",
-          signal: AbortSignal.timeout(20000),
+          cache: "force-cache",
+          next: { revalidate: 604800 },
+          signal: AbortSignal.timeout(quadKey === centerQuadKey ? 90000 : 30000),
         });
         if (!response.ok) continue;
 
         const raw = gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8");
+        let nearbyFeatures = 0;
+
         for (const line of raw.split(/\r?\n/)) {
           if (result.length >= 100 || !line.trim()) continue;
           try {
@@ -191,18 +201,24 @@ async function fetchMicrosoftBuildings(
               levels: Math.max(1, Math.round(heightMeters / 3)),
               containsTarget: false,
             });
+            nearbyFeatures += 1;
           } catch {}
         }
+
+        console.info("[RoofRay] Microsoft 3D tile parsed", {
+          quadKey,
+          nearbyFeatures,
+          buildings: result.length,
+        });
+
+        if (nearbyFeatures > 0 || result.length >= 100) break;
       } catch (error) {
         console.warn("[RoofRay] Microsoft 3D tile failed", {
           quadKey,
           error: error instanceof Error ? error.message : String(error),
         });
       }
-
-      if (result.length >= 100) break;
     }
-
     const mLat = 111320;
     const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
     function containsTarget(points: Array<{ x: number; y: number }>) {
