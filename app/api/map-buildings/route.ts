@@ -221,17 +221,18 @@ async function fetchMicrosoftBuildings(
     }
     const mLat = 111320;
     const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
-    function containsTarget(points: Array<{ x: number; y: number }>) {
+    const containsTarget = (points: Array<{ x: number; y: number }>) => {
       let inside = false;
       for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-        const a = points[i], b = points[j];
+        const a = points[i];
+        const b = points[j];
         const hit =
           a.y > 0 !== b.y > 0 &&
           0 < ((b.x - a.x) * (0 - a.y)) / (b.y - a.y) + a.x;
         if (hit) inside = !inside;
       }
       return inside;
-    }
+    };
 
     return result.map((building) => ({
       ...building,
@@ -302,7 +303,7 @@ out geom tags qt;`;
     const metersLat = 111320;
     const metersLon = 111320 * Math.cos((latitude * Math.PI) / 180);
 
-    function containsTarget(points: Array<{ x: number; y: number }>) {
+    const containsTarget = (points: Array<{ x: number; y: number }>) => {
       let inside = false;
       for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
         const a = points[i];
@@ -313,7 +314,7 @@ out geom tags qt;`;
         if (hit) inside = !inside;
       }
       return inside;
-    }
+    };
 
     const buildings: Building[] = (data.elements ?? [])
       .map((element) => {
