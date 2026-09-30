@@ -1792,7 +1792,12 @@ export default function RoofRayChat() {
     if (!content && attachments.length === 0) return;
     if (loading) return;
 
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", content: content || `[${attachments.length} file(s) attached]` };
+    const imageAttachment = attachments.find((att) => ALLOWED_IMAGES.includes(att.file.type));
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: content || (imageAttachment ? "📸 Roof photo uploaded" : `[${attachments.length} file(s) attached]`),
+    };
     const nextMessages = [...messages, userMessage];
     setHasStarted(true);
     setAutoScroll(true);
@@ -1812,6 +1817,15 @@ export default function RoofRayChat() {
     let nextOwnership = ownership;
     let nextGoal = goal;
     let currentSolarContext = solarContext;
+    let nextRoofPhotoDataUrl = roofPhotoDataUrl;
+
+    if (imageAttachment && !nextRoofPhotoDataUrl) {
+      const preparedPhoto = await prepareRoofPhoto(imageAttachment.file);
+      if (preparedPhoto) {
+        nextRoofPhotoDataUrl = preparedPhoto;
+        setRoofPhotoDataUrl(preparedPhoto);
+      }
+    }
 
     const normalized = content.toLowerCase();
 
@@ -1864,13 +1878,7 @@ export default function RoofRayChat() {
       else if (normalized.includes("feasibility")) nextGoal = "Just check feasibility";
       if (nextGoal) {
         setGoal(nextGoal);
-        // Final question answered: request location first, then generate the report.
-        const liveAnalysis = await loadLocationAnalysis(nextRoofArea);
-        if (!liveAnalysis) {
-          setLoading(false);
-          return;
-        }
-        currentSolarContext = liveAnalysis;
+        // The roof photo is collected before location analysis/report generation.
       }
     }
 
@@ -1958,7 +1966,9 @@ export default function RoofRayChat() {
                       ? "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)"
                       : nextGoal === null
                         ? "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)"
-                        : data.message;
+                        : !nextRoofPhotoDataUrl
+                          ? "📸 Please upload a clear photo of your roof. RoofRay will use it to create the roof-based 3D solar model in your PDF."
+                          : data.message;
 
       setMessages((current) => [
         ...current,
