@@ -319,7 +319,7 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
         const lat = Number.isFinite(Number(latitude)) ? Number(latitude) : stored?.latitude;
         const lon = Number.isFinite(Number(longitude)) ? Number(longitude) : stored?.longitude;
 
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        if (lat === undefined || lon === undefined || !Number.isFinite(lat) || !Number.isFinite(lon)) {
           throw new Error("No location found. Return to RoofRay and complete location analysis first.");
         }
 

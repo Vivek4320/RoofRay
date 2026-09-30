@@ -5,6 +5,7 @@ type PdfBody = {
   report?: unknown;
   solarContext?: Record<string, unknown> | null;
   userInputs?: Record<string, unknown> | null;
+  roofPhotoDataUrl?: unknown;
 };
 
 function text(value: unknown): string {
@@ -871,6 +872,7 @@ function roofVisualCommands({
   sunCycle,
   mappedBuildings,
   satelliteTiles,
+  satelliteZoom,
   roofAerialImage,
   roofPhoto,
   reportLocation,
@@ -886,6 +888,7 @@ function roofVisualCommands({
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
+  satelliteZoom: number;
   roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
   reportLocation: { latitude: number; longitude: number };
@@ -1794,6 +1797,7 @@ function buildPdf(lines: string[], visual: {
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
+  satelliteZoom: number;
   roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
   reportLocation: { latitude: number; longitude: number };
@@ -1972,10 +1976,12 @@ export async function POST(request: Request) {
     // source made the PDF look like an empty dark map even though the request
     // succeeded. Esri World Imagery is the explicit satellite fallback.
     let satelliteTiles: SatelliteTile[] = [];
+    let satelliteZoom = 20;
     for (const zoom of [20, 19, 18]) {
       const candidate = await fetchSatelliteTiles(lat, lon, zoom);
       if (candidate.length >= 8) {
         satelliteTiles = candidate;
+        satelliteZoom = zoom;
         break;
       }
     }
@@ -2023,7 +2029,7 @@ export async function POST(request: Request) {
       "",
       "Solar feasibility",
       ...wrap(`Recommended system size: ${(reportSize ?? size) !== null ? (reportSize ?? size)!.toFixed(2) + " kW" : "Unavailable"}`),
-      ...wrap(`Estimated panels: ${(reportPanels ?? panels) !== null ? Math.round(reportPanels ?? panels) : "Unavailable"}`),
+      ...wrap(`Estimated panels: ${(reportPanels ?? panels) !== null ? Math.round((reportPanels ?? panels)!) : "Unavailable"}`),
       ...wrap(`Estimated generation: ${(reportMonthly ?? monthly) !== null ? (reportMonthly ?? monthly) + " kWh/month" : "Unavailable"}${(reportAnnual ?? annual) !== null ? " | " + (reportAnnual ?? annual) + " kWh/year" : ""}`),
       ...wrap(`Average expected generation: ${dailyGeneration !== null ? dailyGeneration.toFixed(1) + " kWh/day" : "Unavailable"}`),
       ...wrap(`Estimated shading: ${(reportShade ?? shade) !== null ? (reportShade ?? shade)!.toFixed(1) + "%" : "Unavailable"}`),
@@ -2070,6 +2076,7 @@ export async function POST(request: Request) {
       sunCycle: (context.sunCycle ?? null) as Record<string, unknown> | null,
       mappedBuildings,
       satelliteTiles,
+      satelliteZoom,
       roofAerialImage,
       roofPhoto,
       reportLocation: { latitude: lat, longitude: lon },
