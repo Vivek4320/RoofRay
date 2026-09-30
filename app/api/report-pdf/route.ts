@@ -1090,10 +1090,10 @@ function roofVisualCommands({
     }
   }
 
-  // Exact GPS house marker. This is rendered independently from OSM
-  // building coverage, so the report always shows where the user's device
-  // actually reported the house location.
+  // Exact GPS house marker. This is rendered independently from mapped
+  // building coverage, so the report always shows the device GPS location.
   const gpsHousePoint = project(centerLat, centerLon);
+
   commands.push(
     "0.10 0.55 1.00 rg",
     (gpsHousePoint.x - 7).toFixed(1) + " " + (gpsHousePoint.y - 7).toFixed(1) + " 14 14 re f",
@@ -1108,9 +1108,9 @@ function roofVisualCommands({
     "BT /F1 5.5 Tf 0.80 0.92 0.98 rg " +
       (gpsHousePoint.x + 14).toFixed(1) + " " + (gpsHousePoint.y + 3).toFixed(1) +
       " Td (" + (mappedTarget ? "Mapped building + GPS point" : "GPS point - building footprint unavailable") + ") Tj ET",
+  );
 
-  // Prominent location pin: exact device GPS, placed over the target house
-  // whenever the mapped target is close enough to the GPS point.
+  // Prominent red location pin at the exact device GPS point.
   const pinPoint = gpsHousePoint;
   commands.push(
     "0.90 0.12 0.12 rg",
@@ -1127,7 +1127,6 @@ function roofVisualCommands({
       " Td (GPS LOCATION) Tj ET",
   );
 
-  );
 
   // Actual mapped target roof outline + geometry-validated panel placement.
   // Panels are generated only from the detected roof polygon; no generic
