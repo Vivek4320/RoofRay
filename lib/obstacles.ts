@@ -235,6 +235,36 @@ function angularDifference(a: number, b: number): number {
   return Math.abs(((a - b + 180) % 360) - 180);
 }
 
+export function estimateDaylightShadowFactor(
+  obstacles: SolarObstacle[],
+  sunSamples: Array<{ azimuthDeg: number; elevationDeg: number; aboveHorizon?: boolean }>,
+): number {
+  const daylight = sunSamples.filter(
+    (sample) => sample.aboveHorizon !== false && sample.elevationDeg > 5,
+  );
+  if (!daylight.length || !obstacles.length) return 0;
+
+  let weightedRisk = 0;
+  for (const sun of daylight) {
+    let strongest = 0;
+    for (const obstacle of obstacles) {
+      const shadowReach =
+        obstacle.heightMeters / Math.tan(toRadians(sun.elevationDeg));
+      if (obstacle.distanceMeters > shadowReach) continue;
+
+      const shadowBearing = (sun.azimuthDeg + 180) % 360;
+      const alignment = angularDifference(obstacle.bearingDeg, shadowBearing);
+      strongest = Math.max(
+        strongest,
+        alignment <= 22.5 ? 1 : alignment <= 45 ? 0.55 : 0,
+      );
+    }
+    weightedRisk += strongest;
+  }
+
+  return Math.min(0.35, (weightedRisk / daylight.length) * 0.25);
+}
+
 function classifyShadow(
   obstacleHeight: number,
   distance: number,
@@ -246,7 +276,10 @@ function classifyShadow(
   const shadowReach = obstacleHeight / Math.tan(toRadians(sun.elevationDeg));
   if (distance > shadowReach) return "low";
 
-  const alignment = angularDifference(obstacleBearing, sun.azimuthDeg);
+  // A building blocks sunlight in the direction opposite the sun.
+  // obstacleBearing points from the target toward the obstacle.
+  const shadowBearing = (sun.azimuthDeg + 180) % 360;
+  const alignment = angularDifference(obstacleBearing, shadowBearing);
   if (alignment <= 22.5) return "high";
   if (alignment <= 45) return "medium";
   return "low";
