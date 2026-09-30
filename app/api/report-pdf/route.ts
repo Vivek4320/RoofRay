@@ -277,6 +277,87 @@ function pointInPolygon(
   return inside;
 }
 
+
+type PanelRect = { x: number; y: number; w: number; h: number };
+
+function fitPanelsToPolygon(
+  polygon: Array<{ x: number; y: number }>,
+  requestedPanels: number,
+): PanelRect[] {
+  if (polygon.length < 3 || requestedPanels <= 0) return [];
+
+  const minX = Math.min(...polygon.map((p) => p.x));
+  const maxX = Math.max(...polygon.map((p) => p.x));
+  const minY = Math.min(...polygon.map((p) => p.y));
+  const maxY = Math.max(...polygon.map((p) => p.y));
+  const roofW = maxX - minX;
+  const roofH = maxY - minY;
+  if (roofW < 8 || roofH < 8) return [];
+
+  const target = Math.min(40, Math.max(1, Math.round(requestedPanels)));
+  const aspect = 1.72;
+  let best: PanelRect[] = [];
+
+  // Try several real rectangular panel-grid configurations. A panel is
+  // accepted only when all four corners are inside the mapped roof polygon.
+  // This prevents panels from being drawn over roads/outside the roof.
+  for (const rotated of [false, true]) {
+    for (let cols = 1; cols <= Math.min(12, target); cols += 1) {
+      const rows = Math.ceil(target / cols);
+      const gap = Math.max(1.2, Math.min(3.5, Math.min(roofW, roofH) * 0.035));
+      const usableW = roofW * 0.86;
+      const usableH = roofH * 0.86;
+      const cellW = usableW / cols;
+      const cellH = usableH / rows;
+      let panelW = rotated ? cellH * aspect : cellW * 0.82;
+      let panelH = rotated ? cellW / aspect : cellH * 0.82;
+
+      if (rotated) {
+        panelW = Math.min(panelW, cellW * 0.82);
+        panelH = Math.min(panelH, cellH * 0.82);
+      } else {
+        const ratio = panelW / Math.max(panelH, 1);
+        if (ratio > aspect) panelW = panelH * aspect;
+        else panelH = panelW / aspect;
+      }
+
+      panelW = Math.max(4.5, panelW);
+      panelH = Math.max(3.5, panelH);
+
+      const rects: PanelRect[] = [];
+      const startX = minX + roofW * 0.07 + Math.max(0, (cellW - panelW) / 2);
+      const startY = minY + roofH * 0.07 + Math.max(0, (cellH - panelH) / 2);
+
+      for (let row = 0; row < rows && rects.length < target; row += 1) {
+        for (let col = 0; col < cols && rects.length < target; col += 1) {
+          const x = startX + col * cellW;
+          const y = startY + row * cellH;
+          const corners = [
+            { x, y },
+            { x: x + panelW, y },
+            { x: x + panelW, y: y + panelH },
+            { x, y: y + panelH },
+          ];
+          if (corners.every((corner) => pointInPolygon(corner, polygon))) {
+            rects.push({ x, y, w: panelW, h: panelH });
+          }
+        }
+      }
+
+      if (
+        rects.length > best.length ||
+        (rects.length === best.length && rects.length > 0 &&
+          rects[0].w * rects[0].h > best[0].w * best[0].h)
+      ) {
+        best = rects;
+      }
+      if (best.length >= target) return best;
+    }
+  }
+
+  return best;
+}
+
 async function fetchMappedBuildings(
   latitude: number,
   longitude: number,
@@ -678,7 +759,9 @@ function roofVisualCommands({
       " Td (" + (mappedTarget ? "Mapped building + GPS point" : "GPS point - building footprint unavailable") + ") Tj ET",
   );
 
-  // Actual mapped target roof outline + clipped panel placement.
+  // Actual mapped target roof outline + geometry-validated panel placement.
+  // Panels are generated only from the detected roof polygon; no generic
+  // rectangle is used as a substitute for the real roof.
   if (roofPoints.length >= 3) {
     commands.push(
       "0.20 0.90 1.00 RG",
@@ -686,55 +769,21 @@ function roofVisualCommands({
       roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m",
     );
     for (let i = 1; i < roofPoints.length; i += 1) {
-      commands.push(
-        roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l",
-      );
+      commands.push(roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l");
     }
     commands.push("h S");
 
-    if (safePanels > 0) {
-      const minX = Math.min(...roofPoints.map((p) => p.x));
-      const maxX = Math.max(...roofPoints.map((p) => p.x));
-      const minY = Math.min(...roofPoints.map((p) => p.y));
-      const maxY = Math.max(...roofPoints.map((p) => p.y));
-      const roofW = Math.max(24, maxX - minX);
-      const roofH = Math.max(24, maxY - minY);
-      const cols = Math.max(
-        1,
-        Math.min(8, Math.ceil(Math.sqrt(safePanels * roofW / Math.max(roofH, 1)))),
-      );
-      const rows = Math.max(1, Math.ceil(safePanels / cols));
-      const gap = Math.max(1.5, Math.min(4, Math.min(roofW, roofH) * 0.025));
-      const cellW = Math.max(5, (roofW * 0.76 - gap * (cols - 1)) / cols);
-      const cellH = Math.max(5, (roofH * 0.70 - gap * (rows - 1)) / rows);
-
-      commands.push("q");
+    const fittedPanels = fitPanelsToPolygon(roofPoints, safePanels);
+    for (const panel of fittedPanels) {
       commands.push(
-        roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m",
+        "0.02 0.17 0.34 rg",
+        panel.x.toFixed(1) + " " + panel.y.toFixed(1) + " " +
+          panel.w.toFixed(1) + " " + panel.h.toFixed(1) + " re f",
+        "0.35 0.82 1.00 RG",
+        "0.55 w",
+        panel.x.toFixed(1) + " " + panel.y.toFixed(1) + " " +
+          panel.w.toFixed(1) + " " + panel.h.toFixed(1) + " re S",
       );
-      for (let i = 1; i < roofPoints.length; i += 1) {
-        commands.push(
-          roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l",
-        );
-      }
-      commands.push("h W n");
-
-      for (let i = 0; i < safePanels; i += 1) {
-        const row = Math.floor(i / cols);
-        const col = i % cols;
-        const x = minX + roofW * 0.12 + col * (cellW + gap);
-        const y = maxY - roofH * 0.15 - (row + 1) * cellH - row * gap;
-        commands.push(
-          "0.025 0.15 0.32 rg",
-          x.toFixed(1) + " " + y.toFixed(1) + " " +
-            cellW.toFixed(1) + " " + cellH.toFixed(1) + " re f",
-          "0.35 0.75 1.00 RG",
-          "0.55 w",
-          x.toFixed(1) + " " + y.toFixed(1) + " " +
-            cellW.toFixed(1) + " " + cellH.toFixed(1) + " re S",
-        );
-      }
-      commands.push("Q");
     }
 
     const houseCenter = {
@@ -745,10 +794,10 @@ function roofVisualCommands({
       "0.10 0.55 1.00 rg",
       (houseCenter.x - 5).toFixed(1) + " " + (houseCenter.y - 5).toFixed(1) + " 10 10 re f",
       "0.05 0.12 0.20 rg",
-      (houseCenter.x + 5).toFixed(1) + " " + (houseCenter.y + 4).toFixed(1) + " 56 16 re f",
-      "BT /F2 8 Tf 0.98 0.98 0.98 rg " +
+      (houseCenter.x + 5).toFixed(1) + " " + (houseCenter.y + 4).toFixed(1) + " 92 18 re f",
+      "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
         (houseCenter.x + 9).toFixed(1) + " " + (houseCenter.y + 8).toFixed(1) +
-        " Td (Your mapped roof) Tj ET",
+        " Td (Mapped roof - " + fittedPanels.length + " panels fit) Tj ET",
     );
   }
 
@@ -1209,35 +1258,23 @@ function roofVisualCommands({
       commands.push(mapped[i].x.toFixed(1) + " " + mapped[i].y.toFixed(1) + " l");
     }
     commands.push("h S");
-    const pMinX = Math.min(...mapped.map((p) => p.x));
-    const pMaxX = Math.max(...mapped.map((p) => p.x));
-    const pMinY = Math.min(...mapped.map((p) => p.y));
-    const pMaxY = Math.max(...mapped.map((p) => p.y));
-    const cols = Math.max(1, Math.min(8, Math.ceil(Math.sqrt(safePanels || 1))));
-    const rows = Math.max(1, Math.ceil((safePanels || 1) / cols));
-    const pw = Math.max(5, (pMaxX - pMinX) * 0.72 / cols);
-    const ph = Math.max(5, (pMaxY - pMinY) * 0.70 / rows);
-    commands.push("q");
-    commands.push(mapped[0].x.toFixed(1) + " " + mapped[0].y.toFixed(1) + " m");
-    for (let i = 1; i < mapped.length; i += 1) commands.push(mapped[i].x.toFixed(1) + " " + mapped[i].y.toFixed(1) + " l");
-    commands.push("h W n");
-    for (let i = 0; i < (safePanels || 0); i += 1) {
-      const row = Math.floor(i / cols);
-      const col = i % cols;
-      const x = pMinX + (pMaxX - pMinX) * 0.14 + col * (pw + 2);
-      const y = pMaxY - (pMaxY - pMinY) * 0.15 - (row + 1) * ph - row * 2;
+    const fittedCardPanels = fitPanelsToPolygon(mapped, safePanels);
+    for (const panel of fittedCardPanels) {
       commands.push(
-        "0.025 0.15 0.32 rg",
-        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re f",
-        "0.35 0.75 1.00 RG",
-        "0.4 w",
-        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re S",
+        "0.02 0.17 0.34 rg",
+        panel.x.toFixed(1) + " " + panel.y.toFixed(1) + " " +
+          panel.w.toFixed(1) + " " + panel.h.toFixed(1) + " re f",
+        "0.35 0.82 1.00 RG",
+        "0.45 w",
+        panel.x.toFixed(1) + " " + panel.y.toFixed(1) + " " +
+          panel.w.toFixed(1) + " " + panel.h.toFixed(1) + " re S",
       );
     }
-    commands.push("Q");
     commands.push(
-      "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c2x + c2w - 74).toFixed(1) + " " + (c2y + 7).toFixed(1) +
-        " Td (" + (safePanels || 0) + " panels | " + (panelPowerW ?? 450) + " W) Tj ET",
+      "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+        (c2x + 8).toFixed(1) + " " + (c2y + 7).toFixed(1) +
+        " Td (" + fittedCardPanels.length + "/" + (safePanels || 0) +
+        " requested panels fit inside mapped roof) Tj ET",
     );
   } else {
     commands.push(
