@@ -136,10 +136,12 @@ async function fetchSatelliteTiles(
             tiles.push({
               name: "ImSat" + row + "_" + col,
               bytes,
-              x: col * 128,
-              y: (2 - row) * 120,
-              w: 128,
-              h: 120,
+              // Keep the native 256px tile size. The projection below
+              // assumes a 4 x 3 tile mosaic = 1024 x 768 pixels.
+              x: col * 256,
+              y: (2 - row) * 256,
+              w: 256,
+              h: 256,
             });
           })
           .catch(() => undefined),
