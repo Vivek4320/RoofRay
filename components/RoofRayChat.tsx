@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import MapplsLocationMap from "@/components/MapplsLocationMap";
 import {
   useCallback,
   useEffect,
@@ -677,21 +678,10 @@ function AssistantMessage({
 
             {message.content.startsWith("📍 Location detected:") && locationCoords ? (
               <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.08] bg-black/20">
-                <iframe
-                  title="RoofRay detected location map"
-                  className="h-[240px] w-full border-0"
-                  loading="lazy"
-                  src={(() => {
-                    const { latitude, longitude } = locationCoords;
-                    const delta = 0.0035;
-                    const bbox = [
-                      longitude - delta,
-                      latitude - delta,
-                      longitude + delta,
-                      latitude + delta,
-                    ].join(",");
-                    return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${latitude},${longitude}`;
-                  })()}
+                <MapplsLocationMap
+                  latitude={locationCoords.latitude}
+                  longitude={locationCoords.longitude}
+                  className="h-[240px] w-full"
                 />
                 <div className="px-3 py-2 text-[11px] text-slate-500">
                   📍 Live location • ±{Math.round(locationAccuracy ?? 0)} m accuracy
