@@ -535,8 +535,7 @@ async function fetchMicrosoftBuildingFootprints(
       try {
         console.info("[RoofRay] Microsoft footprint tile download", { quadKey });
         const dataResponse = await fetch(dataUrl, {
-          cache: "force-cache",
-          next: { revalidate: 604800 },
+          cache: "no-store",
           signal: AbortSignal.timeout(
             quadKey === bingQuadKey(latitude, longitude, 9) ? 90000 : 30000,
           ),
@@ -901,7 +900,9 @@ function roofVisualCommands({
   // building rather than producing an empty roof panel card.
   const mappedTarget =
     exactTarget ??
-    mappedBuildings.find((building) => building.distanceMeters <= 150) ??
+    mappedBuildings
+      .filter((building) => building.distanceMeters <= 150)
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)[0] ??
     null;
   const actualRoofPolygon =
     roofPolygon.length >= 3 ? roofPolygon : (mappedTarget?.polygon ?? []);
@@ -925,18 +926,29 @@ function roofVisualCommands({
   const mapW = 634;
   const mapH = 310;
 
-  const satelliteZoom = 19;
-  const centerPixel = webMercatorPixel(centerLat, centerLon, satelliteZoom);
-  const startTileX = Math.floor(centerPixel.x / 256) - 1;
-  const startTileY = Math.floor(centerPixel.y / 256) - 1;
+  // Use a local metre projection for the PDF scene. This is more
+  // reliable than a fixed Web-Mercator tile window because Microsoft
+  // footprints can span a different tile extent than the imagery window.
+  const metersLon = 111320 * Math.cos((centerLat * Math.PI) / 180);
+  const metersLat = 111320;
+  const scenePoints = mappedBuildings.flatMap((building) =>
+    building.polygon.map((point) => ({
+      x: (point.longitude - centerLon) * metersLon,
+      y: (point.latitude - centerLat) * metersLat,
+    })),
+  );
+  const maxSceneDistance = Math.max(
+    120,
+    ...scenePoints.map((point) => Math.hypot(point.x, point.y)),
+  );
+  const sceneScale = Math.min(mapW - 28, mapH - 28) / (2 * maxSceneDistance * 1.08);
 
   const project = (lat: number, lon: number) => {
-    const pixel = webMercatorPixel(lat, lon, satelliteZoom);
-    const relativeX = pixel.x - startTileX * 256;
-    const relativeY = pixel.y - startTileY * 256;
+    const xMeters = (lon - centerLon) * metersLon;
+    const yMeters = (lat - centerLat) * metersLat;
     return {
-      x: mapX + (relativeX / 1280) * mapW,
-      y: mapY + mapH - (relativeY / 768) * mapH,
+      x: mapX + mapW / 2 + xMeters * sceneScale,
+      y: mapY + mapH / 2 - yMeters * sceneScale,
     };
   };
 
