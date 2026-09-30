@@ -108,14 +108,67 @@ async function fetchSatelliteTiles(
   const center = webMercatorPixel(latitude, longitude, zoom);
   const centerTileX = Math.floor(center.x / 256);
   const centerTileY = Math.floor(center.y / 256);
-  const startX = centerTileX - 1;
-  const startY = centerTileY - 1;
+  const startTileX = centerTileX - 1;
+  const startTileY = centerTileY - 1;
+
+  // Prefer one server-rendered World Imagery export for the exact PDF extent.
+  // This avoids blank PDFs when one or more individual tiles fail upstream.
+  const worldSizeMeters = 2 * Math.PI * 6378137;
+  const pixelsToMeters = worldSizeMeters / center.size;
+  const minX3857 = startTileX * 256 * pixelsToMeters - worldSizeMeters / 2;
+  const maxX3857 = (startTileX + 4) * 256 * pixelsToMeters - worldSizeMeters / 2;
+  const maxY3857 = worldSizeMeters / 2 - startTileY * 256 * pixelsToMeters;
+  const minY3857 = worldSizeMeters / 2 - (startTileY + 3) * 256 * pixelsToMeters;
+
+  const exportUrl =
+    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?" +
+    new URLSearchParams({
+      bbox: [
+        minX3857.toFixed(2),
+        minY3857.toFixed(2),
+        maxX3857.toFixed(2),
+        maxY3857.toFixed(2),
+      ].join(","),
+      bboxSR: "3857",
+      imageSR: "3857",
+      size: "1024,768",
+      imageFormat: "jpg",
+      format: "jpg",
+      transparent: "false",
+      f: "image",
+    }).toString();
+
+  try {
+    const response = await fetch(exportUrl, {
+      cache: "no-store",
+      headers: { Accept: "image/jpeg,image/*" },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (response.ok) {
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length > 5000) {
+        return [{
+          name: "ImSatExport",
+          bytes,
+          x: 0,
+          y: 0,
+          w: 1024,
+          h: 768,
+        }];
+      }
+    }
+  } catch {
+    // Fall through to individual tiles below.
+  }
+
+  // Fallback: fetch the same 4 x 3 World Imagery tile mosaic used by the
+  // PDF projection. If some tiles fail, keep the successful ones.
   const tiles: SatelliteTile[] = [];
   const jobs: Array<Promise<void>> = [];
   for (let row = 0; row < 3; row += 1) {
     for (let col = 0; col < 4; col += 1) {
-      const tileX = startX + col;
-      const tileY = startY + row;
+      const tileX = startTileX + col;
+      const tileY = startTileY + row;
       const url =
         "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/" +
         zoom +
@@ -136,8 +189,6 @@ async function fetchSatelliteTiles(
             tiles.push({
               name: "ImSat" + row + "_" + col,
               bytes,
-              // Keep the native 256px tile size. The projection below
-              // assumes a 4 x 3 tile mosaic = 1024 x 768 pixels.
               x: col * 256,
               y: (2 - row) * 256,
               w: 256,
@@ -1049,7 +1100,11 @@ function buildPdf(lines: string[], visual: {
     objects.push(
       Buffer.concat([
         Buffer.from(
-          "<< /Type /XObject /Subtype /Image /Width 256 /Height 256 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
+          "<< /Type /XObject /Subtype /Image /Width " +
+          tile.w +
+          " /Height " +
+          tile.h +
+          " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
           tile.bytes.length +
           " >>\nstream\n",
           "ascii",
@@ -1155,6 +1210,13 @@ export async function POST(request: Request) {
 
     const mappedBuildings = await fetchMappedBuildings(lat, lon);
     const satelliteTiles = await fetchSatelliteTiles(lat, lon);
+    console.info("[RoofRay] PDF visual data", {
+      latitude: lat,
+      longitude: lon,
+      mappedBuildings: mappedBuildings.length,
+      targetBuildingMapped: mappedBuildings.some((building) => building.containsTarget),
+      satelliteTiles: satelliteTiles.length,
+    });
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
     const reportPanels = reportNumber(reportText, /Panels:\s*([\d,.]+)\s*[×x]/i);
