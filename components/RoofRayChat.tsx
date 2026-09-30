@@ -1506,9 +1506,9 @@ export default function RoofRayChat() {
       solarContext: finalAnalysis,
       userInputs: {
         ...inputs,
-        roofPhotoDataUrl: roofPhotoDataUrl || undefined,
+        roofPhotoDataUrl: (inputs.roofPhotoDataUrl as string | undefined) || roofPhotoDataUrl || undefined,
       },
-      roofPhotoDataUrl: roofPhotoDataUrl || undefined,
+      roofPhotoDataUrl: (inputs.roofPhotoDataUrl as string | undefined) || roofPhotoDataUrl || undefined,
       reportMetrics: extractReportMetrics(report),
       generatedAt: Date.now(),
     };
@@ -1708,8 +1708,8 @@ export default function RoofRayChat() {
     link.remove();
   }
 
-  async function generateFinalReport(analysis: SolarAnalysis) {
-    if (loading || goal === null) return;
+  async function generateFinalReport(analysis: SolarAnalysis, roofPhotoOverride?: string | null) {
+    if (goal === null) return;
     setLoading(true);
 
     try {
@@ -1734,6 +1734,7 @@ export default function RoofRayChat() {
             connectionType,
             ownership,
             goal,
+            roofPhotoDataUrl: roofPhotoOverride || roofPhotoDataUrl || undefined,
           },
         },
       };
@@ -1774,6 +1775,7 @@ export default function RoofRayChat() {
         connectionType,
         ownership,
         goal,
+        roofPhotoDataUrl: roofPhotoOverride || roofPhotoDataUrl || undefined,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -1884,7 +1886,10 @@ export default function RoofRayChat() {
 
     if (goal !== null && imageAttachment && nextRoofPhotoDataUrl) {
       const liveAnalysis = await loadLocationAnalysis(roofArea);
-      if (liveAnalysis) currentSolarContext = liveAnalysis;
+      if (liveAnalysis) {
+        currentSolarContext = liveAnalysis;
+        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl);
+      }
       setLoading(false);
       return;
     }
