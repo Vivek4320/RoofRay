@@ -661,12 +661,13 @@ function roofVisualCommands({
         140,
         Math.max(8, heightMeters / Math.tan((sunElevation * Math.PI) / 180)),
       );
-      const metersPerPixel =
-        634 / (1024 * (156543.03392 / 2 ** satelliteZoom));
+      const metersPerPixel = 156543.03392 / 2 ** satelliteZoom;
+      const pixelsPerMeterX = mapW / (1024 * metersPerPixel);
+      const pixelsPerMeterY = mapH / (768 * metersPerPixel);
       const dxPixels =
-        Math.sin(shadowBearing) * shadowMeters * metersPerPixel;
+        Math.sin(shadowBearing) * shadowMeters * pixelsPerMeterX;
       const dyPixels =
-        -Math.cos(shadowBearing) * shadowMeters * metersPerPixel;
+        -Math.cos(shadowBearing) * shadowMeters * pixelsPerMeterY;
 
       commands.push(
         "0.65 0.08 0.08 rg",
