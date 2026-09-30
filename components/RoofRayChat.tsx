@@ -1698,8 +1698,9 @@ export default function RoofRayChat() {
     link.remove();
   }
 
-  async function generateFinalReport(analysis: SolarAnalysis, roofPhotoOverride?: string | null) {
-    if (goal === null) return;
+  async function generateFinalReport(analysis: SolarAnalysis, roofPhotoOverride?: string | null, goalOverride?: string | null) {
+    const reportGoal = goalOverride ?? goal;
+    if (reportGoal === null) return;
     setLoading(true);
 
     try {
@@ -1723,7 +1724,7 @@ export default function RoofRayChat() {
             applianceDetails,
             connectionType,
             ownership,
-            goal,
+            goal: reportGoal,
             roofPhotoDataUrl: roofPhotoOverride || roofPhotoDataUrl || undefined,
           },
         },
@@ -1881,7 +1882,7 @@ export default function RoofRayChat() {
       const liveAnalysis = await loadLocationAnalysis(nextRoofArea);
       if (liveAnalysis) {
         currentSolarContext = liveAnalysis;
-        await generateFinalReport(liveAnalysis);
+        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl, nextGoal);
       }
       setLoading(false);
       return;
