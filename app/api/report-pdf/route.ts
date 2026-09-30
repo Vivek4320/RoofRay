@@ -525,7 +525,11 @@ function roofVisualCommands({
         roof[i],
       ];
       commands.push(
-        building.containsTarget ? "0.03 0.32 0.44 rg" : "0.16 0.22 0.28 rg",
+        building.containsTarget
+          ? "0.03 0.32 0.44 rg"
+          : building.heightMeters >= 8
+            ? "0.52 0.12 0.12 rg"
+            : "0.16 0.22 0.28 rg",
         face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
         face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
         face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
@@ -535,8 +539,16 @@ function roofVisualCommands({
 
     // Roof surface follows the real mapped polygon.
     commands.push(
-      building.containsTarget ? "0.08 0.68 0.82 rg" : "0.40 0.46 0.52 rg",
-      building.containsTarget ? "0.55 0.95 1.00 RG" : "0.70 0.76 0.80 RG",
+      building.containsTarget
+        ? "0.08 0.68 0.82 rg"
+        : building.heightMeters >= 8
+          ? "0.72 0.20 0.20 rg"
+          : "0.40 0.46 0.52 rg",
+      building.containsTarget
+        ? "0.55 0.95 1.00 RG"
+        : building.heightMeters >= 8
+          ? "1.00 0.45 0.45 RG"
+          : "0.70 0.76 0.80 RG",
       "1 w",
       roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
     );
@@ -560,20 +572,25 @@ function roofVisualCommands({
     }
   }
 
-  // If the exact GPS point is not inside an OSM building, show the
-  // real location marker instead of drawing a fake house footprint.
-  if (!mappedTarget) {
-    const target = project(centerLat, centerLon);
-    commands.push(
-      "0.10 0.75 1.00 rg",
-      (target.x - 6).toFixed(1) + " " + (target.y - 6).toFixed(1) + " 12 12 re f",
-      "0.05 0.12 0.20 rg",
-      (target.x + 8).toFixed(1) + " " + (target.y + 6).toFixed(1) + " 72 14 re f",
-      "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
-        (target.x + 11).toFixed(1) + " " + (target.y + 10).toFixed(1) +
-        " Td (LOCATION - NO MAPPED BUILDING WITHIN 150M) Tj ET",
-    );
-  }
+  // Exact GPS house marker. This is rendered independently from OSM
+  // building coverage, so the report always shows where the user's device
+  // actually reported the house location.
+  const gpsHousePoint = project(centerLat, centerLon);
+  commands.push(
+    "0.10 0.55 1.00 rg",
+    (gpsHousePoint.x - 7).toFixed(1) + " " + (gpsHousePoint.y - 7).toFixed(1) + " 14 14 re f",
+    "0.98 0.98 1.00 RG",
+    "1.5 w",
+    (gpsHousePoint.x - 7).toFixed(1) + " " + (gpsHousePoint.y - 7).toFixed(1) + " 14 14 re S",
+    "0.03 0.08 0.13 rg",
+    (gpsHousePoint.x + 10).toFixed(1) + " " + (gpsHousePoint.y + 6).toFixed(1) + " 88 18 re f",
+    "BT /F2 7 Tf 0.98 0.98 1.00 rg " +
+      (gpsHousePoint.x + 14).toFixed(1) + " " + (gpsHousePoint.y + 12).toFixed(1) +
+      " Td (YOUR HOUSE) Tj ET",
+    "BT /F1 5.5 Tf 0.80 0.92 0.98 rg " +
+      (gpsHousePoint.x + 14).toFixed(1) + " " + (gpsHousePoint.y + 3).toFixed(1) +
+      " Td (" + (mappedTarget ? "Mapped building + GPS point" : "GPS point - building footprint unavailable") + ") Tj ET",
+  );
 
   // Actual mapped target roof outline + clipped panel placement.
   if (roofPoints.length >= 3) {
@@ -839,6 +856,21 @@ function roofVisualCommands({
   }
 
   if (sunPoints.length >= 2) {
+    // Yellow dashed sight lines make the solar direction and the potential
+    // shadow direction immediately readable in the aerial map.
+    commands.push(
+      "1.00 0.62 0.00 RG",
+      "1.1 w",
+      "[4 3] 0 d",
+    );
+    for (const point of sunPoints.filter((_, index) => index === 0 || index === Math.floor(sunPoints.length / 2) || index === sunPoints.length - 1)) {
+      commands.push(
+        gpsHousePoint.x.toFixed(1) + " " + gpsHousePoint.y.toFixed(1) + " m",
+        point.x.toFixed(1) + " " + point.y.toFixed(1) + " l S",
+      );
+    }
+    commands.push("[] 0 d");
+
     commands.push(
       "1.00 0.57 0.00 RG",
       "2.2 w",
@@ -857,6 +889,26 @@ function roofVisualCommands({
       );
     }
   }
+
+  // Map legend: blue = user's house, red = nearby/taller shading-risk
+  // buildings, yellow = sun direction/path.
+  const legendX = mapX + 14;
+  const legendY = mapY + mapH - 74;
+  commands.push(
+    "0.02 0.05 0.08 rg",
+    legendX.toFixed(1) + " " + legendY.toFixed(1) + " 174 58 re f",
+    "0.10 0.55 1.00 rg",
+    (legendX + 8).toFixed(1) + " " + (legendY + 37).toFixed(1) + " 10 10 re f",
+    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 39).toFixed(1) + " Td (Your house / GPS) Tj ET",
+    "0.72 0.20 0.20 rg",
+    (legendX + 8).toFixed(1) + " " + (legendY + 21).toFixed(1) + " 10 10 re f",
+    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 23).toFixed(1) + " Td (Nearby shading-risk building) Tj ET",
+    "1.00 0.62 0.00 RG",
+    "2 w",
+    (legendX + 8).toFixed(1) + " " + (legendY + 8).toFixed(1) + " m",
+    (legendX + 18).toFixed(1) + " " + (legendY + 8).toFixed(1) + " l S",
+    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 6).toFixed(1) + " Td (Sun direction / rays) Tj ET",
+  );
 
   // North compass.
   const compassX = mapX + mapW - 34;
@@ -1103,10 +1155,14 @@ function roofVisualCommands({
     );
   } else {
     commands.push(
-      "BT /F1 8 Tf 0.95 0.95 0.95 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 40).toFixed(1) +
-        " Td (Building footprint not mapped.) Tj ET",
-      "BT /F1 7 Tf 0.75 0.78 0.82 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 25).toFixed(1) +
-        " Td (No fake roof geometry is shown.) Tj ET",
+      "0.10 0.55 1.00 rg",
+      (c2x + c2w / 2 - 7).toFixed(1) + " " + (c2y + 64).toFixed(1) + " 14 14 re f",
+      "BT /F2 9 Tf 0.98 0.98 0.98 rg " + (c2x + 18).toFixed(1) + " " + (c2y + 43).toFixed(1) +
+        " Td (YOUR HOUSE - GPS LOCATION) Tj ET",
+      "BT /F1 7 Tf 0.75 0.78 0.82 rg " + (c2x + 18).toFixed(1) + " " + (c2y + 28).toFixed(1) +
+        " Td (Exact coordinates are marked on the aerial map.) Tj ET",
+      "BT /F1 6.5 Tf 0.65 0.72 0.78 rg " + (c2x + 18).toFixed(1) + " " + (c2y + 15).toFixed(1) +
+        " Td (Roof footprint is not available from the map source.) Tj ET",
     );
   }
 
@@ -1201,7 +1257,7 @@ function roofVisualCommands({
     "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (RoofRay Solar Site Assessment) Tj ET",
     "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Real aerial imagery + 3D mapped buildings + roof panels + calculated sun path) Tj ET",
     "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Your House / mapped target) Tj ET",
-    "BT /F1 7 Tf 0.95 0.95 0.95 rg 208 522 Td (Cyan = target building | Grey = nearby mapped buildings | Yellow = sun path) Tj ET",
+    "BT /F1 7 Tf 0.95 0.95 0.95 rg 208 522 Td (Blue = your house / GPS | Red = nearby shading risk | Yellow = sun rays) Tj ET",
   ];
 }
 
