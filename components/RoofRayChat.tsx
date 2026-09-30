@@ -1494,6 +1494,33 @@ export default function RoofRayChat() {
         sessionStorage.getItem("roofray_report_data") ||
         localStorage.getItem("roofray_report_data");
 
+      // Prefer the newest in-memory/stored solar analysis over a stale
+      // report payload. This prevents old 0,0 coordinates from being reused
+      // after a real location analysis or manual house selection.
+      try {
+        const latestAnalysis = solarContext || getStoredAnalysis();
+        const latestLocation = latestAnalysis?.location as Record<string, unknown> | undefined;
+        const latestLatitude = readNumber(latestLocation?.latitude);
+        const latestLongitude = readNumber(latestLocation?.longitude);
+        const hasRealLocation =
+          latestLatitude !== null &&
+          latestLongitude !== null &&
+          latestLatitude >= -90 &&
+          latestLatitude <= 90 &&
+          latestLongitude >= -180 &&
+          latestLongitude <= 180 &&
+          !(latestLatitude === 0 && latestLongitude === 0);
+
+        if (hasRealLocation && raw) {
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          parsed.solarContext = latestAnalysis;
+          parsed.generatedAt = Date.now();
+          raw = JSON.stringify(parsed);
+          sessionStorage.setItem("roofray_report_data", raw);
+          localStorage.setItem("roofray_report_data", raw);
+        }
+      } catch {}
+
       // Older chat records may contain the report message but not the PDF
       // payload. Rebuild the payload from the saved chat + saved analysis.
       if (!raw && reportOverride) {
