@@ -538,7 +538,7 @@ async function fetchMicrosoftBuildingFootprints(
         const dataResponse = await fetch(dataUrl, {
           cache: "no-store",
           signal: AbortSignal.timeout(
-            quadKey === bingQuadKey(latitude, longitude, 9) ? 90000 : 30000,
+            quadKey === bingQuadKey(latitude, longitude, 9) ? 120000 : 30000,
           ),
         });
         if (!dataResponse.ok) {
@@ -650,6 +650,64 @@ async function fetchMappedBuildings(
   // GPS on desktop can easily be off by 50-150m. Keep a wider search area so
   // a nearby mapped building can still be used for the site model.
   const safeRadius = Math.min(Math.max(radiusMeters, 120), 700);
+
+  // Prefer the satellite-derived Microsoft footprint dataset for the PDF.
+  // It is deterministic for a given GPS/quadkey and avoids sparse OSM
+  // coverage causing the PDF to randomly collapse to zero buildings.
+  const microsoftPrimary = await fetchMicrosoftBuildingFootprints(
+    latitude,
+    longitude,
+    safeRadius,
+  );
+  console.info("[RoofRay] Microsoft primary PDF buildings", {
+    footprints: microsoftPrimary.length,
+    latitude,
+    longitude,
+    radiusMeters: safeRadius,
+  });
+  if (microsoftPrimary.length > 0) {
+    const mLatPrimary = 111320;
+    const mLonPrimary = 111320 * Math.cos((latitude * Math.PI) / 180);
+    const primaryArea = (points: Array<{ x: number; y: number }>) => {
+      let sum = 0;
+      for (let i = 0; i < points.length; i += 1) {
+        const n = points[(i + 1) % points.length];
+        sum += points[i].x * n.y - n.x * points[i].y;
+      }
+      return Math.abs(sum) / 2;
+    };
+    return microsoftPrimary
+      .map((building) => {
+        const projected = building.polygon.map((p) => ({
+          x: (p.longitude - longitude) * mLonPrimary,
+          y: (p.latitude - latitude) * mLatPrimary,
+        }));
+        const containsTarget = pointInPolygon({ x: 0, y: 0 }, projected);
+        const centroid = projected.reduce(
+          (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+          { x: 0, y: 0 },
+        );
+        if (projected.length) {
+          centroid.x /= projected.length;
+          centroid.y /= projected.length;
+        }
+        return {
+          polygon: building.polygon,
+          areaM2: primaryArea(projected),
+          containsTarget,
+          distanceMeters: Math.hypot(centroid.x, centroid.y),
+          heightMeters: Math.max(3, building.heightMeters),
+          levels: Math.max(1, Math.round(building.heightMeters / 3)),
+        };
+      })
+      .filter((item) => item.areaM2 >= 12 && item.areaM2 <= 100000)
+      .sort((a, b) => {
+        if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+        return a.distanceMeters - b.distanceMeters;
+      })
+      .slice(0, 40);
+  }
+
   const query = `[out:json][timeout:25];
 way["building"](around:${safeRadius},${latitude},${longitude});
 out geom tags qt;`;
