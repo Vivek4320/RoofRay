@@ -1180,22 +1180,6 @@ function roofVisualCommands({
   // building coverage, so the report always shows the device GPS location.
   const gpsHousePoint = project(centerLat, centerLon);
 
-  commands.push(
-    "0.10 0.55 1.00 rg",
-    (gpsHousePoint.x - 7).toFixed(1) + " " + (gpsHousePoint.y - 7).toFixed(1) + " 14 14 re f",
-    "0.98 0.98 1.00 RG",
-    "1.5 w",
-    (gpsHousePoint.x - 7).toFixed(1) + " " + (gpsHousePoint.y - 7).toFixed(1) + " 14 14 re S",
-    "0.03 0.08 0.13 rg",
-    (gpsHousePoint.x + 10).toFixed(1) + " " + (gpsHousePoint.y + 6).toFixed(1) + " 88 18 re f",
-    "BT /F2 7 Tf 0.98 0.98 1.00 rg " +
-      (gpsHousePoint.x + 14).toFixed(1) + " " + (gpsHousePoint.y + 12).toFixed(1) +
-      " Td (YOUR HOUSE) Tj ET",
-    "BT /F1 5.5 Tf 0.80 0.92 0.98 rg " +
-      (gpsHousePoint.x + 14).toFixed(1) + " " + (gpsHousePoint.y + 3).toFixed(1) +
-      " Td (" + (mappedTarget ? "Mapped building + GPS point" : "GPS point - building footprint unavailable") + ") Tj ET",
-  );
-
   // Exact GPS point. The marker is independent of footprint coverage, so
   // it can never be silently moved onto a nearby building.
   commands.push(
