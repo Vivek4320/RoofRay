@@ -186,6 +186,24 @@ async function fetchMapplsStillImage(
   return null;
 }
 
+function satelliteTileFingerprint(bytes: Uint8Array): string {
+  // We do not need to decode JPEGs server-side. Esri's no-imagery response
+  // is commonly the same placeholder image repeated across the whole tile
+  // window. Sampling deterministic byte positions lets us reject a window
+  // made entirely from identical placeholder tiles while keeping real
+  // satellite imagery fast.
+  if (bytes.length < 1200) return "tiny";
+  const positions = [
+    2,
+    Math.floor(bytes.length * 0.1),
+    Math.floor(bytes.length * 0.25),
+    Math.floor(bytes.length * 0.5),
+    Math.floor(bytes.length * 0.75),
+    bytes.length - 3,
+  ];
+  return positions.map((p) => bytes[Math.max(0, Math.min(bytes.length - 1, p))]).join(",");
+}
+
 async function fetchSatelliteTiles(
   latitude: number,
   longitude: number,
@@ -244,6 +262,22 @@ async function fetchSatelliteTiles(
   }
 
   await Promise.all(jobs);
+
+  // Do not accept an entire mosaic made from the same "Map data not
+  // available" placeholder. A successful HTTP 200 alone is not evidence
+  // that satellite imagery exists at this zoom level.
+  const fingerprints = new Set(
+    tiles.map((tile) => satelliteTileFingerprint(tile.bytes)),
+  );
+  if (tiles.length >= 8 && fingerprints.size < Math.min(3, tiles.length)) {
+    console.warn("[RoofRay] Satellite tile window appears to be placeholder imagery", {
+      zoom,
+      tiles: tiles.length,
+      uniqueTileFingerprints: fingerprints.size,
+    });
+    return [];
+  }
+
   return tiles.sort((a, b) => a.name.localeCompare(b.name));
 }
 
