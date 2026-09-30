@@ -331,31 +331,22 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
           container: containerRef.current,
           style: {
             version: 8,
-            sources: {
-              satellite: {
-                type: "raster",
-                tiles: [
-                  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-                ],
-                tileSize: 256,
-                maxzoom: 19,
-                attribution: "Esri World Imagery",
-              },
-            },
+            sources: {},
             layers: [
               {
-                id: "satellite",
-                type: "raster",
-                source: "satellite",
+                id: "bg",
+                type: "background",
+                paint: { "background-color": "#e9e6df" },
               },
             ],
           },
           center: [lon, lat],
-          zoom: 19,
-          pitch: 52,
-          bearing: 15,
+          zoom: 18.5,
+          pitch: 60,
+          bearing: -20,
           maxZoom: 21,
-          attributionControl: true,
+          preserveDrawingBuffer: true,
+          attributionControl: false,
         });
 
         mapRef.current = map;
@@ -384,12 +375,14 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
                   "fill-extrusion-color": [
                     "case",
                     ["get", "target"],
-                    "#22d3ee",
-                    "#64748b",
+                    "#3b82f6",
+                    [">", ["get", "height"], 10],
+                    "#f5b971",
+                    "#f1f1f1",
                   ],
                   "fill-extrusion-height": ["get", "height"],
                   "fill-extrusion-base": 0,
-                  "fill-extrusion-opacity": 0.62,
+                  "fill-extrusion-opacity": 0.95,
                 },
               });
             }
@@ -409,10 +402,10 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
               )
               .addTo(map);
 
-            setStatus("Real satellite imagery loaded. Drag, zoom, rotate and tilt.");
+            setStatus("3D building map loaded. Drag, zoom, rotate and tilt.");
           } catch (buildingError) {
             console.warn("[RoofRay] Building/overlay load failed:", buildingError);
-            setStatus("Satellite map loaded. Building data is unavailable at this location.");
+            setStatus("3D map loaded. Building data is unavailable at this location.");
           }
         });
 
@@ -556,9 +549,9 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
           RoofRay 3D Roof View
         </p>
-        <h1 className="mt-1 text-lg font-semibold">See your actual house on satellite</h1>
+        <h1 className="mt-1 text-lg font-semibold">3D building analysis</h1>
         <p className="mt-1 text-xs leading-relaxed text-slate-300">
-          Real aerial imagery with mapped OpenStreetMap buildings. Click “Set house”
+          Map-derived 3D building footprints. Click “Set house”
           and select your exact roof if browser location is inaccurate.
         </p>
       </div>
@@ -593,7 +586,7 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
 
       <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-2xl border border-white/10 bg-[#07111c]/90 px-4 py-4 text-xs text-slate-200 backdrop-blur-xl">
         <div className="font-semibold text-white">RoofRay overlay</div>
-        <div className="mt-2 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />Mapped building</div>
+        <div className="mt-2 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />Other / mapped building</div>
         <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-blue-500" />Solar panels</div>
         <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Sun path</div>
       </div>
