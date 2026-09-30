@@ -612,25 +612,16 @@ function roofVisualCommands({
     mapX + " " + mapY + " " + mapW + " " + mapH + " re f",
   ];
 
-  if (roofAerialImage) {
-    const imageW = mapW - 24;
-    const imageH = Math.min(mapH - 24, imageW * (roofAerialImage.height / Math.max(1, roofAerialImage.width)));
-    const imageX = mapX + 12;
-    const imageY = mapY + (mapH - imageH) / 2;
-    commands.push(
-      "q",
-      imageW.toFixed(2) + " 0 0 " + imageH.toFixed(2) + " " +
-        imageX.toFixed(2) + " " + imageY.toFixed(2) + " cm",
-      "/RoofAerial Do",
-      "Q",
-      "0.20 0.90 1.00 RG",
-      "2.2 w",
-      imageX.toFixed(2) + " " + imageY.toFixed(2) + " " + imageW.toFixed(2) + " " + imageH.toFixed(2) + " re S",
-      "BT /F2 8 Tf 0.98 0.98 0.98 rg " +
-        (imageX + 10).toFixed(1) + " " + (imageY + imageH - 18).toFixed(1) +
-        " Td (YOUR ROOFTOP - MAPPLS AERIAL VIEW) Tj ET",
-    );
-  } else if (roofPhoto) {
+  // The PDF site-view is intentionally a clean map-style 3D diagram:
+  // white/grey buildings, blue target house, amber taller neighbours.
+  // Satellite imagery is kept out of this panel so the geometry remains
+  // visually clear and matches the interactive 3D building-map experience.
+  commands.push(
+    "0.94 0.95 0.96 rg",
+    (mapX + 2).toFixed(1) + " " + (mapY + 2).toFixed(1) + " " + (mapW - 4).toFixed(1) + " " + (mapH - 4).toFixed(1) + " re f",
+  );
+
+  if (roofPhoto) {
     const photoW = mapW - 28;
     const photoH = Math.min(mapH - 28, photoW * (roofPhoto.height / Math.max(1, roofPhoto.width)));
     const photoX = mapX + 14;
@@ -653,28 +644,6 @@ function roofVisualCommands({
         (photoX + 10).toFixed(1) + " " + (photoY + photoH - 18).toFixed(1) +
         " Td (PHOTO-BASED ROOF 3D MODEL) Tj ET",
     );
-  } else if (satelliteTiles.length) {
-    commands.push(
-      "q",
-      mapX + " " + mapY + " " + mapW + " " + mapH + " re W n",
-    );
-    // The fetched tiles are 5 columns x 3 rows (1280 x 768 source pixels).
-    // Scale that complete mosaic into the actual map frame. Previously the
-    // raw 256px tiles were drawn at 1:1, so most of the imagery landed outside
-    // the 634 x 310pt map viewport and the report looked like an empty grey map.
-    const tileW = mapW / 5;
-    const tileH = mapH / 3;
-    for (const tile of satelliteTiles) {
-      commands.push(
-        "q",
-        tileW.toFixed(2) + " 0 0 " + tileH.toFixed(2) + " " +
-          (mapX + (tile.x / 256) * tileW).toFixed(2) + " " +
-          (mapY + (tile.y / 256) * tileH).toFixed(2) + " cm",
-        "/" + tile.name + " Do",
-        "Q",
-      );
-    }
-    commands.push("Q");
   }
 
   commands.push(
@@ -682,16 +651,6 @@ function roofVisualCommands({
     "1.5 w",
     mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
   );
-
-  if (!satelliteTiles.length && !roofPhoto) {
-    commands.push(
-      "0.02 0.04 0.07 rg",
-      (mapX + 18).toFixed(1) + " " + (mapY + mapH - 34).toFixed(1) + " 250 22 re f",
-      "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
-        (mapX + 26).toFixed(1) + " " + (mapY + mapH - 27).toFixed(1) +
-        " Td (High-resolution aerial imagery unavailable - mapped geometry shown) Tj ET",
-    );
-  }
 
   // Real-location 3D site model: every mapped OSM building is extruded from
   // its actual footprint. Height comes from OSM height/building:levels, with
@@ -730,10 +689,10 @@ function roofVisualCommands({
       ];
       commands.push(
         building.containsTarget
-          ? "0.03 0.32 0.44 rg"
+          ? "0.20 0.50 0.92 rg"
           : building.heightMeters >= 8
-            ? "0.52 0.12 0.12 rg"
-            : "0.16 0.22 0.28 rg",
+            ? "0.92 0.63 0.22 rg"
+            : "0.78 0.80 0.82 rg",
         face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
         face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
         face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
@@ -744,15 +703,15 @@ function roofVisualCommands({
     // Roof surface follows the real mapped polygon.
     commands.push(
       building.containsTarget
-        ? "0.08 0.68 0.82 rg"
+        ? "0.32 0.64 0.96 rg"
         : building.heightMeters >= 8
-          ? "0.72 0.20 0.20 rg"
-          : "0.40 0.46 0.52 rg",
+          ? "0.98 0.73 0.32 rg"
+          : "0.93 0.94 0.95 rg",
       building.containsTarget
-        ? "0.55 0.95 1.00 RG"
+        ? "0.08 0.34 0.78 RG"
         : building.heightMeters >= 8
-          ? "1.00 0.45 0.45 RG"
-          : "0.70 0.76 0.80 RG",
+          ? "0.78 0.47 0.08 RG"
+          : "0.72 0.74 0.76 RG",
       "1 w",
       roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
     );
@@ -1073,9 +1032,9 @@ function roofVisualCommands({
     "0.10 0.55 1.00 rg",
     (legendX + 8).toFixed(1) + " " + (legendY + 37).toFixed(1) + " 10 10 re f",
     "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 39).toFixed(1) + " Td (Your house / GPS) Tj ET",
-    "0.72 0.46 0.16 rg",
+    "0.92 0.63 0.22 rg",
     (legendX + 8).toFixed(1) + " " + (legendY + 21).toFixed(1) + " 10 10 re f",
-    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 23).toFixed(1) + " Td (Nearby tall / shading-risk building) Tj ET",
+    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 23).toFixed(1) + " Td (Nearby tall building / shading risk) Tj ET",
     "1.00 0.62 0.00 RG",
     "2 w",
     (legendX + 8).toFixed(1) + " " + (legendY + 8).toFixed(1) + " m",
@@ -1264,7 +1223,7 @@ function roofVisualCommands({
 
   commands.push(
     "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1x + 8).toFixed(1) + " " + (c1y + c1h - 12).toFixed(1) + " Td (SUN + SURROUNDING BUILDING GEOMETRY) Tj ET",
-    "BT /F1 5.5 Tf 0.65 0.72 0.78 rg " + (c1x + 8).toFixed(1) + " " + (c1y + 6).toFixed(1) + " Td (Orange = building | label = distance / height | yellow path = calculated sun azimuth) Tj ET",
+    "BT /F1 5.5 Tf 0.65 0.72 0.78 rg " + (c1x + 8).toFixed(1) + " " + (c1y + 6).toFixed(1) + " Td (White = other buildings | Blue = your house | Amber = tall building | Yellow = sun path) Tj ET",
   );
 
   // Card 2: true roof footprint top view, not a generic rectangle.
@@ -1439,8 +1398,8 @@ function roofVisualCommands({
   return [
     ...commands,
     "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (3D SITE VIEW - BUILDING ANALYSIS) Tj ET",
-    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Aerial base + mapped building heights + target-house highlight + shading geometry) Tj ET",
-    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Blue = your house | Amber = nearby tall building | Yellow = sun path) Tj ET",
+    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Clean 3D building map + target-house highlight + nearby building shading analysis) Tj ET",
+    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Blue = your house | Amber = nearby tall building | White/grey = other buildings | Yellow = sun path) Tj ET",
     "BT /F1 7 Tf 0.82 0.86 0.90 rg 208 522 Td (3D geometry is map-derived; building heights are estimates where source heights are unavailable.) Tj ET",
   ];
 }
