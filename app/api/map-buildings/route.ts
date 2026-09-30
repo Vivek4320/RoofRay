@@ -26,6 +26,56 @@ function bingQuadKey(latitude: number, longitude: number, level = 9): string {
   return key;
 }
 
+function parseSimpleCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (quoted && line[i + 1] === '"') {
+        field += '"';
+        i += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === "," && !quoted) {
+      fields.push(field.trim());
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+  fields.push(field.trim());
+  return fields;
+}
+
+function neighboringQuadKeys(latitude: number, longitude: number, level = 9): string[] {
+  const n = 2 ** level;
+  const x = Math.floor(((longitude + 180) / 360) * n);
+  const sinLat = Math.sin((latitude * Math.PI) / 180);
+  const y = Math.floor(
+    (0.5 - Math.log((1 + sinLat) / Math.max(1e-12, 1 - sinLat)) / (4 * Math.PI)) * n,
+  );
+  const keys: string[] = [];
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      const nx = Math.max(0, Math.min(n - 1, x + dx));
+      const ny = Math.max(0, Math.min(n - 1, y + dy));
+      let key = "";
+      for (let i = level; i > 0; i -= 1) {
+        const mask = 1 << (i - 1);
+        let digit = 0;
+        if (nx & mask) digit += 1;
+        if (ny & mask) digit += 2;
+        key += String(digit);
+      }
+      if (!keys.includes(key)) keys.push(key);
+    }
+  }
+  return keys;
+}
+
 async function fetchMicrosoftBuildings(
   latitude: number,
   longitude: number,
@@ -34,35 +84,32 @@ async function fetchMicrosoftBuildings(
   try {
     const links = await fetch(
       "https://bfppub.blob.core.windows.net/%24web/2026-08-13/dataset-links.csv",
-      { cache: "force-cache", next: { revalidate: 86400 }, signal: AbortSignal.timeout(12000) },
+      { cache: "no-store", signal: AbortSignal.timeout(12000) },
     );
     if (!links.ok) return [];
+
     const lines = (await links.text()).split(/\r?\n/).filter(Boolean);
-    const header = lines[0].split(",").map((v) => v.replace(/^"|"$/g, "").trim().toLowerCase());
+    const header = parseSimpleCsvLine(lines[0] ?? "").map((v) => v.toLowerCase());
     const li = header.indexOf("location");
     const qi = header.indexOf("quadkey");
     const ui = header.indexOf("url");
     if (li < 0 || qi < 0 || ui < 0) return [];
 
-    const key = bingQuadKey(latitude, longitude, 9);
-    let dataUrl = "";
+    const rows = new Map<string, string>();
     for (let i = 1; i < lines.length; i += 1) {
-      const fields = lines[i].split(",").map((v) => v.replace(/^"|"$/g, "").trim());
-      if (fields[li]?.toLowerCase() === "india" && fields[qi] === key) {
-        dataUrl = fields[ui] ?? "";
-        break;
+      const fields = parseSimpleCsvLine(lines[i]);
+      if (fields[li]?.toLowerCase() === "india" && fields[qi] && fields[ui]) {
+        rows.set(fields[qi], fields[ui]);
       }
     }
-    if (!dataUrl) return [];
 
-    const response = await fetch(dataUrl, {
-      cache: "force-cache",
-      next: { revalidate: 604800 },
-      signal: AbortSignal.timeout(20000),
+    const quadKeys = neighboringQuadKeys(latitude, longitude, 9);
+    console.info("[RoofRay] Microsoft 3D lookup", {
+      quadKey: bingQuadKey(latitude, longitude, 9),
+      candidateTiles: quadKeys.length,
+      matchedTiles: quadKeys.filter((key) => rows.has(key)).length,
     });
-    if (!response.ok) return [];
 
-    const raw = gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8");
     const latDelta = radius / 111320;
     const lonDelta = radius / Math.max(1, 111320 * Math.cos((latitude * Math.PI) / 180));
     const minLat = latitude - latDelta;
@@ -71,60 +118,89 @@ async function fetchMicrosoftBuildings(
     const maxLon = longitude + lonDelta;
     const result: Building[] = [];
 
-    for (const line of raw.split(/\r?\n/)) {
-      if (result.length >= 80 || !line.trim()) continue;
+    for (const quadKey of quadKeys) {
+      const dataUrl = rows.get(quadKey);
+      if (!dataUrl) continue;
+
       try {
-        const feature = JSON.parse(line) as {
-          geometry?: { type?: string; coordinates?: unknown };
-          properties?: Record<string, unknown>;
-        };
-        const geometry = feature.geometry;
-        if (!geometry?.coordinates) continue;
-
-        let ring: unknown[] | null = null;
-        if (geometry.type === "Polygon") {
-          const polygons = geometry.coordinates as unknown[];
-          ring = Array.isArray(polygons?.[0]) ? polygons[0] as unknown[] : null;
-        } else if (geometry.type === "MultiPolygon") {
-          const polygons = geometry.coordinates as unknown[];
-          const polygon = polygons.find((p) => Array.isArray(p) && Array.isArray((p as unknown[])[0]));
-          ring = polygon ? (polygon as unknown[])[0] as unknown[] : null;
-        }
-        if (!ring || ring.length < 4) continue;
-
-        const polygon = ring
-          .map((p) => Array.isArray(p) ? { longitude: Number(p[0]), latitude: Number(p[1]) } : null)
-          .filter((p): p is { longitude: number; latitude: number } =>
-            p !== null && Number.isFinite(p.longitude) && Number.isFinite(p.latitude),
-          );
-        if (polygon.length < 4) continue;
-
-        const center = polygon.reduce(
-          (sum, p) => ({ latitude: sum.latitude + p.latitude, longitude: sum.longitude + p.longitude }),
-          { latitude: 0, longitude: 0 },
-        );
-        center.latitude /= polygon.length;
-        center.longitude /= polygon.length;
-        if (
-          center.latitude < minLat || center.latitude > maxLat ||
-          center.longitude < minLon || center.longitude > maxLon
-        ) continue;
-
-        const rawHeight = Number(
-          feature.properties?.height ??
-          feature.properties?.Height ??
-          feature.properties?.height_m ??
-          -1,
-        );
-        const heightMeters = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 6;
-
-        result.push({
-          polygon,
-          heightMeters: Math.max(3, heightMeters),
-          levels: Math.max(1, Math.round(heightMeters / 3)),
-          containsTarget: false,
+        const response = await fetch(dataUrl, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(20000),
         });
-      } catch {}
+        if (!response.ok) continue;
+
+        const raw = gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8");
+        for (const line of raw.split(/\r?\n/)) {
+          if (result.length >= 100 || !line.trim()) continue;
+          try {
+            const feature = JSON.parse(line) as {
+              geometry?: { type?: string; coordinates?: unknown };
+              properties?: Record<string, unknown>;
+            };
+            const geometry = feature.geometry;
+            if (!geometry?.coordinates) continue;
+
+            let ring: unknown[] | null = null;
+            if (geometry.type === "Polygon") {
+              const coordinates = geometry.coordinates as unknown[];
+              ring = Array.isArray(coordinates?.[0]) ? coordinates[0] as unknown[] : null;
+            } else if (geometry.type === "MultiPolygon") {
+              const polygons = geometry.coordinates as unknown[];
+              const polygon = polygons.find(
+                (p) => Array.isArray(p) && Array.isArray((p as unknown[])[0]),
+              );
+              ring = polygon ? (polygon as unknown[])[0] as unknown[] : null;
+            }
+            if (!ring || ring.length < 4) continue;
+
+            const polygon = ring
+              .map((p) =>
+                Array.isArray(p)
+                  ? { longitude: Number(p[0]), latitude: Number(p[1]) }
+                  : null,
+              )
+              .filter(
+                (p): p is { longitude: number; latitude: number } =>
+                  p !== null &&
+                  Number.isFinite(p.longitude) &&
+                  Number.isFinite(p.latitude),
+              );
+            if (polygon.length < 4) continue;
+
+            const pMinLat = Math.min(...polygon.map((p) => p.latitude));
+            const pMaxLat = Math.max(...polygon.map((p) => p.latitude));
+            const pMinLon = Math.min(...polygon.map((p) => p.longitude));
+            const pMaxLon = Math.max(...polygon.map((p) => p.longitude));
+            if (
+              pMaxLat < minLat || pMinLat > maxLat ||
+              pMaxLon < minLon || pMinLon > maxLon
+            ) continue;
+
+            const rawHeight = Number(
+              feature.properties?.height ??
+              feature.properties?.Height ??
+              feature.properties?.height_m ??
+              feature.properties?.heightMeters ??
+              -1,
+            );
+            const heightMeters = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 6;
+
+            result.push({
+              polygon,
+              heightMeters: Math.max(3, heightMeters),
+              levels: Math.max(1, Math.round(heightMeters / 3)),
+              containsTarget: false,
+            });
+          } catch {}
+        }
+      } catch (error) {
+        console.warn("[RoofRay] Microsoft 3D tile failed", {
+          quadKey,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (result.length >= 100) break;
     }
 
     const mLat = 111320;
@@ -140,6 +216,7 @@ async function fetchMicrosoftBuildings(
       }
       return inside;
     }
+
     return result.map((building) => ({
       ...building,
       containsTarget: containsTarget(
@@ -154,7 +231,6 @@ async function fetchMicrosoftBuildings(
     return [];
   }
 }
-
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
