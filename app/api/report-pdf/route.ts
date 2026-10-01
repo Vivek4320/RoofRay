@@ -1069,7 +1069,6 @@ function roofVisualCommands({
   satelliteZoom,
   roofAerialImage,
   roofPhoto,
-  reportLocation,
 }: {
   roofAreaSqFt: number | null;
   roofType: string;
@@ -1085,7 +1084,6 @@ function roofVisualCommands({
   satelliteZoom: number;
   roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
-  reportLocation: { latitude: number; longitude: number };
 }): string[] {
   const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
   const roofPolygon = Array.isArray(roofFootprint?.polygon)
@@ -1220,6 +1218,14 @@ function roofVisualCommands({
   // its actual footprint. Height comes from OSM height/building:levels, with
   // 3m per level as the documented fallback. This is a map-based 3D
   // visualization, not a photogrammetric claim.
+  const sceneBuildings = (roofPhoto ? [] : mappedBuildings)
+    .filter((building) => building.polygon.length >= 3)
+    .sort((a, b) => {
+      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+      return b.heightMeters - a.heightMeters;
+    })
+    .slice(0, 32);
+
   const projectGround = (point: { latitude: number; longitude: number }) =>
     project(point.latitude, point.longitude);
 
@@ -1879,7 +1885,11 @@ function roofVisualCommands({
     "BT /F1 7 Tf 0.68 0.82 0.95 rg 150 537 Td (LOCATION-BASED ROOFTOP SOLAR SITE ASSESSMENT) Tj ET",
     "BT /F1 6 Tf 0.70 0.78 0.86 rg 676 551 Td (CONFIDENTIAL) Tj ET",
   ];
-  letterhead.push("BT /F2 15 Tf 0.98 0.98 0.98 rg 34 551 Td (RoofRay) Tj ET");
+  if (logoImage) {
+    letterhead.push("q", "100 0 0 36 34 532 cm", "/RoofRayLogo Do", "Q");
+  } else {
+    letterhead.push("BT /F2 15 Tf 0.98 0.98 0.98 rg 34 551 Td (RoofRay) Tj ET");
+  }
 
   return [
     ...commands,
