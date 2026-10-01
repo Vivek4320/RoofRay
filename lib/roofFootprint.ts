@@ -166,6 +166,35 @@ out geom tags center qt;`;
       const userPoint = { x: 0, y: 0 };
       const areaM2 = polygonArea(projected);
       const perimeterM = polygonPerimeter(projected);
+      const containsUser = containsPoint(userPoint, projected);
+
+      // Distance from the GPS point to the building footprint. This is used
+      // only as a fallback when OSM has a nearby mapped building but the GPS
+      // point is slightly outside its polygon because of GPS drift.
+      let nearestDistanceM = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < projected.length; i++) {
+        const next = projected[(i + 1) % projected.length];
+        const ax = projected[i].x;
+        const ay = projected[i].y;
+        const bx = next.x;
+        const by = next.y;
+        const dx = bx - ax;
+        const dy = by - ay;
+        const lengthSquared = dx * dx + dy * dy;
+        const t =
+          lengthSquared > 0
+            ? Math.max(
+                0,
+                Math.min(1, (-(ax * dx + ay * dy)) / lengthSquared),
+              )
+            : 0;
+        const px = ax + t * dx;
+        const py = ay + t * dy;
+        nearestDistanceM = Math.min(
+          nearestDistanceM,
+          Math.hypot(px, py),
+        );
+      }
 
       return {
         element,
@@ -173,16 +202,26 @@ out geom tags center qt;`;
         projected,
         areaM2,
         perimeterM,
-        containsUser: containsPoint(userPoint, projected),
+        containsUser,
+        nearestDistanceM,
       };
     })
-    .filter((candidate) => candidate.areaM2 >= 15 && candidate.areaM2 <= 100000)
-    .filter((candidate) => candidate.containsUser);
+    .filter((candidate) => candidate.areaM2 >= 15 && candidate.areaM2 <= 100000);
 
-  // Never label an arbitrary nearby building as the user's house. If the GPS
-  // point does not fall inside a mapped building footprint, return no footprint
-  // and let the viewer show the exact location marker instead.
-  const selected = candidates[0];
+  const containingCandidates = candidates.filter(
+    (candidate) => candidate.containsUser,
+  );
+
+  // Prefer the exact containing building. If GPS is a few metres off the
+  // mapped footprint, use the nearest mapped building within 30m instead.
+  // This keeps the real GPS position while making the PDF/map useful when
+  // OSM and phone GPS do not line up perfectly.
+  const selected =
+    containingCandidates.sort((a, b) => a.nearestDistanceM - b.nearestDistanceM)[0] ??
+    candidates
+      .filter((candidate) => candidate.nearestDistanceM <= 30)
+      .sort((a, b) => a.nearestDistanceM - b.nearestDistanceM)[0];
+
   if (!selected) return null;
 
   const dimensionsM = dimensions(selected.projected);
