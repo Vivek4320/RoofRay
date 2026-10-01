@@ -7,6 +7,9 @@ declare global {
     mappls?: {
       Map: new (id: string, options?: Record<string, unknown>) => unknown;
       add3DModel?: (options: { map: unknown }) => void;
+      Marker?: new (options: Record<string, unknown>) => {
+        remove?: () => void;
+      };
     };
     initRoofRayMappls?: () => void;
   }
