@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+<<<<<<< HEAD
+=======
+import { readFile } from "node:fs/promises";
+import { gunzipSync, deflateSync, inflateSync } from "node:zlib";
+import { join } from "node:path";
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
 
 type PdfBody = {
   report?: unknown;
@@ -1270,7 +1276,7 @@ function roofVisualCommands({
   ];
 
   // The PDF site-view is intentionally a clean map-style 3D diagram:
-  // white/grey buildings, blue target house, amber taller neighbours.
+  // blue nearby buildings with a brighter blue target house.
   // Satellite imagery is kept out of this panel so the geometry remains
   // visually clear and matches the interactive 3D building-map experience.
   commands.push(
@@ -1335,7 +1341,13 @@ function roofVisualCommands({
   // its actual footprint. Height comes from OSM height/building:levels, with
   // 3m per level as the documented fallback. This is a map-based 3D
   // visualization, not a photogrammetric claim.
+<<<<<<< HEAD
   const sceneBuildings = (roofPhoto ? [] : mappedBuildings)
+=======
+  // Always render mapped buildings. A user roof photo is an additional visual,
+  // not a reason to remove the real OSM building geometry from the 3D map.
+  const sceneBuildings = mappedBuildings
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
     .filter((building) => building.polygon.length >= 3)
     .sort((a, b) => {
       if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
@@ -1368,7 +1380,11 @@ function roofVisualCommands({
         ? (isTarget ? "0.10 0.34 0.76 rg" : isTall ? "0.78 0.48 0.10 rg" : "0.76 0.79 0.82 rg")
         : (isTarget ? "0.14 0.43 0.88 rg" : isTall ? "0.88 0.57 0.14 rg" : "0.84 0.86 0.88 rg");
       commands.push(
+<<<<<<< HEAD
         building.containsTarget ? "0.03 0.32 0.44 rg" : "0.16 0.22 0.28 rg",
+=======
+        sideTone,
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
         face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
         face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
         face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
@@ -1377,9 +1393,15 @@ function roofVisualCommands({
     }
 
     commands.push(
+<<<<<<< HEAD
       building.containsTarget ? "0.08 0.68 0.82 rg" : "0.40 0.46 0.52 rg",
       building.containsTarget ? "0.55 0.95 1.00 RG" : "0.70 0.76 0.80 RG",
       "1 w",
+=======
+      isTarget ? "0.34 0.68 1.00 rg" : isTall ? "0.20 0.52 0.86 rg" : "0.20 0.52 0.86 rg",
+      isTarget ? "0.06 0.30 0.72 RG" : isTall ? "0.45 0.82 1.00 RG" : "0.45 0.82 1.00 RG",
+      "0.9 w",
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
       roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
     );
     for (let i = 1; i < roof.length; i += 1) {
@@ -2058,17 +2080,24 @@ function roofVisualCommands({
     "BT /F1 6 Tf 0.70 0.78 0.86 rg 676 551 Td (CONFIDENTIAL) Tj ET",
   ];
   if (logoImage) {
-    letterhead.push("q", "52 0 0 52 34 525 cm", "/RoofRayLogo Do", "Q");
+    letterhead.push("q", "100 0 0 36 34 532 cm", "/RoofRayLogo Do", "Q");
   } else {
     letterhead.push("BT /F2 15 Tf 0.98 0.98 0.98 rg 34 551 Td (RoofRay) Tj ET");
   }
 
   return [
     ...commands,
+<<<<<<< HEAD
     "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (RoofRay Solar Site Assessment) Tj ET",
     "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Real aerial imagery + 3D mapped buildings + roof panels + calculated sun path) Tj ET",
     "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Your House / mapped target) Tj ET",
     "BT /F1 7 Tf 0.95 0.95 0.95 rg 208 522 Td (Cyan = target building | Grey = nearby mapped buildings | Yellow = sun path) Tj ET",
+=======
+    ...letterhead,
+    "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 503 Td (3D Building Map & Nearby Shading Analysis) Tj ET",
+    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 490 Td (Real aerial imagery + 3D mapped buildings + roof panels + calculated sun path) Tj ET",
+    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 470 Td (Blue = nearby mapped buildings | Bright blue = target roof | Yellow = sun path) Tj ET",
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
   ];
 }
 
@@ -2094,6 +2123,11 @@ function buildPdf(lines: string[], visual: {
   satelliteZoom: number;
   roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
+<<<<<<< HEAD
+=======
+  reportLocation: { latitude: number; longitude: number };
+  logoImage: LogoImage | null;
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
 }): Uint8Array {
   const pageWidth = 842, pageHeight = 595, margin = 42, lineHeight = 15, linesPerPage = 32;
   const pages: string[][] = [];
@@ -2102,8 +2136,20 @@ function buildPdf(lines: string[], visual: {
 
   const visualPageIndex = pages.length;
   const totalPages = pages.length + 1;
+<<<<<<< HEAD
   const roofPhotoObject = 5 + visual.satelliteTiles.length;
   const pageObjectStart = 5 + visual.satelliteTiles.length + (visual.roofPhoto ? 1 : 0);
+=======
+  const logoObject = 5;
+  const satelliteObjectStart = 6;
+  const roofPhotoObject = satelliteObjectStart + visual.satelliteTiles.length;
+  const aerialObject = roofPhotoObject + (visual.roofPhoto ? 1 : 0);
+  const pageObjectStart =
+    satelliteObjectStart +
+    visual.satelliteTiles.length +
+    (visual.roofPhoto ? 1 : 0) +
+    (visual.roofAerialImage ? 1 : 0);
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
   const objects: Array<string | Buffer> = [];
 
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
@@ -2193,12 +2239,24 @@ function buildPdf(lines: string[], visual: {
   for (let i = 0; i < totalPages; i += 1) {
     const pageObject = pageObjectStart + i * 2;
     const contentObject = pageObject + 1;
+<<<<<<< HEAD
     const xObjectEntries = i === visualPageIndex && (visual.satelliteTiles.length || visual.roofPhoto)
       ? " /XObject << " +
         visual.satelliteTiles.map((tile) => "/" + tile.name + " " + (5 + visual.satelliteTiles.indexOf(tile)) + " 0 R").join(" ") +
         (visual.roofPhoto ? " /RoofPhoto " + roofPhotoObject + " 0 R" : "") +
         " >>"
       : "";
+=======
+    const visualXObjects = visual.satelliteTiles.map((tile) =>
+      "/" + tile.name + " " + (satelliteObjectStart + visual.satelliteTiles.indexOf(tile)) + " 0 R"
+    ).join(" ");
+    const xObjectEntries =
+      " /XObject << /RoofRayLogo " + logoObject + " 0 R " +
+      visualXObjects +
+      (visual.roofPhoto ? " /RoofPhoto " + roofPhotoObject + " 0 R" : "") +
+      (visual.roofAerialImage ? " /RoofAerial " + aerialObject + " 0 R" : "") +
+      " >>";
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
     const contentLines = i === visualPageIndex
       ? roofVisualCommands(visual)
       : [
@@ -2330,6 +2388,11 @@ export async function POST(request: Request) {
       satelliteTiles: satelliteTiles.length,
       roofAerialImage: Boolean(roofAerialImage),
       roofPhoto: Boolean(roofPhoto),
+<<<<<<< HEAD
+=======
+      reportCenter: { latitude: lat, longitude: lon },
+      roofRayLogo: Boolean(logoImage),
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
     });
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
@@ -2407,6 +2470,11 @@ export async function POST(request: Request) {
       satelliteZoom,
       roofAerialImage,
       roofPhoto,
+<<<<<<< HEAD
+=======
+      reportLocation: { latitude: lat, longitude: lon },
+      logoImage,
+>>>>>>> aae7ab2cc987987f2c9f6d141898a241806a9a02
     });
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
