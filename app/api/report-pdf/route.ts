@@ -1281,14 +1281,45 @@ function roofVisualCommands({
         " Td (" + (safePanels || 0) + " panels | " + (panelPowerW ?? 450) + " W) Tj ET",
     );
   } else {
+    // OSM does not always contain the exact house footprint. Do not label a
+    // nearby building as the user's house; use the entered roof area only for
+    // a clearly-labelled planning layout.
+    const planningAreaM2 = roofAreaSqFt !== null ? roofAreaSqFt * 0.092903 : null;
+    const planW = Math.min(c2w - 30, Math.max(44, Math.sqrt(Math.max(1, planningAreaM2 ?? 1)) * 5));
+    const planH = Math.min(c2h - 38, Math.max(32, Math.sqrt(Math.max(1, planningAreaM2 ?? 1)) * 3.5));
+    const px = c2x + (c2w - planW) / 2;
+    const py = c2y + (c2h - planH) / 2;
     commands.push(
-      "BT /F1 8 Tf 0.95 0.95 0.95 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 40).toFixed(1) +
-        " Td (Building footprint not mapped.) Tj ET",
-      "BT /F1 7 Tf 0.75 0.78 0.82 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 25).toFixed(1) +
-        " Td (No fake roof geometry is shown.) Tj ET",
+      "0.11 0.16 0.20 rg",
+      px.toFixed(1) + " " + py.toFixed(1) + " " + planW.toFixed(1) + " " + planH.toFixed(1) + " re f",
+      "0.95 0.70 0.20 RG",
+      "1.3 w",
+      px.toFixed(1) + " " + py.toFixed(1) + " " + planW.toFixed(1) + " " + planH.toFixed(1) + " re S",
+    );
+    const colsPlan = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(safePanels || 1))));
+    const rowsPlan = Math.max(1, Math.ceil((safePanels || 1) / colsPlan));
+    const pwPlan = Math.max(6, (planW * 0.78) / colsPlan);
+    const phPlan = Math.max(5, (planH * 0.68) / rowsPlan);
+    for (let i = 0; i < safePanels; i += 1) {
+      const row = Math.floor(i / colsPlan);
+      const col = i % colsPlan;
+      const x = px + planW * 0.10 + col * pwPlan;
+      const y = py + planH * 0.18 + row * phPlan;
+      commands.push(
+        "0.025 0.15 0.32 rg",
+        x.toFixed(1) + " " + y.toFixed(1) + " " + Math.max(4, pwPlan - 2).toFixed(1) + " " + Math.max(4, phPlan - 2).toFixed(1) + " re f",
+        "0.35 0.75 1.00 RG",
+        "0.4 w",
+        x.toFixed(1) + " " + y.toFixed(1) + " " + Math.max(4, pwPlan - 2).toFixed(1) + " " + Math.max(4, phPlan - 2).toFixed(1) + " re S",
+      );
+    }
+    commands.push(
+      "BT /F1 6.5 Tf 0.75 0.82 0.88 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 7).toFixed(1) +
+        " Td (" + text(planningAreaM2 !== null
+          ? "Planning roof layout from entered area - exact OSM footprint unavailable"
+          : "Exact OSM roof footprint unavailable at this location") + ") Tj ET",
     );
   }
-
   // Card 3: 3D-style installation sketch built from the actual mapped roof
   // footprint. It is a visualization, not a claim that the source imagery is
   // photogrammetric 3D.
