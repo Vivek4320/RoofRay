@@ -47,6 +47,61 @@ function readStoredAnalysis() {
   }
 }
 
+async function fetchBrowserSatelliteReference(latitude: number, longitude: number) {
+  const metersPerDegreeLat = 111320;
+  const halfWidthMeters = 170;
+  const halfHeightMeters = 120;
+  const latDelta = halfHeightMeters / metersPerDegreeLat;
+  const lonDelta =
+    halfWidthMeters /
+    Math.max(1, metersPerDegreeLat * Math.cos((latitude * Math.PI) / 180));
+
+  const bbox = [
+    longitude - lonDelta,
+    latitude - latDelta,
+    longitude + lonDelta,
+    latitude + latDelta,
+  ].join(",");
+
+  const hosts = [
+    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export",
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export",
+  ];
+
+  for (const host of hosts) {
+    try {
+      const params = new URLSearchParams({
+        bbox,
+        bboxSR: "4326",
+        imageSR: "4326",
+        size: "1344,768",
+        format: "jpg",
+        f: "image",
+        transparent: "false",
+      });
+
+      const response = await fetch(`${host}?${params.toString()}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) continue;
+
+      const blob = await response.blob();
+      if (!blob.type.startsWith("image/") || blob.size < 5000) continue;
+
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(reader.error ?? new Error("Unable to read satellite image."));
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      // Try the second ArcGIS host. The API route also has a server-side fallback.
+    }
+  }
+
+  return null;
+}
+
 export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProps) {
   const [image, setImage] = useState("");
   const [status, setStatus] = useState("Generating your AI solar site view...");
@@ -75,6 +130,23 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
 
     try {
       const analysis = readStoredAnalysis();
+      let satelliteReferenceDataUrl: string | null = null;
+
+      try {
+        satelliteReferenceDataUrl = await fetchBrowserSatelliteReference(
+          location.latitude,
+          location.longitude,
+        );
+      } catch {
+        satelliteReferenceDataUrl = null;
+      }
+
+      setStatus(
+        satelliteReferenceDataUrl
+          ? "Satellite reference loaded. Generating the AI solar view..."
+          : "Satellite reference unavailable. Generating the AI solar view from GPS and solar data...",
+      );
+
       const response = await fetch("/api/solar-visual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,6 +154,7 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
           latitude: location.latitude,
           longitude: location.longitude,
           analysis,
+          satelliteReferenceDataUrl,
         }),
       });
 
