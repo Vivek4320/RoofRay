@@ -619,7 +619,7 @@ function roofVisualCommands({
   // visualization, not a photogrammetric claim.
   // Always render mapped buildings. A user roof photo is an additional visual,
   // not a reason to remove the real OSM building geometry from the 3D map.
-  const sceneBuildings = mappedBuildings
+  const siteBuildings3d = mappedBuildings
     .filter((building) => building.polygon.length >= 3)
     .sort((a, b) => {
       if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
@@ -630,7 +630,7 @@ function roofVisualCommands({
   const projectGround = (point: { latitude: number; longitude: number }) =>
     project(point.latitude, point.longitude);
 
-  for (const building of sceneBuildings) {
+  for (const building of siteBuildings3d) {
     const ground = building.polygon
       .map(projectGround)
       .filter((p): p is { x: number; y: number } => Boolean(p));
@@ -907,7 +907,7 @@ function roofVisualCommands({
     const sunElevation = numberValue(sample.elevationDeg) ?? 20;
     const shadowBearing = ((sunAzimuth + 180) * Math.PI) / 180;
 
-    for (const building of sceneBuildings) {
+    for (const building of siteBuildings3d) {
       if (building.containsTarget) continue;
       const base = building.polygon
         .map(projectGround)
