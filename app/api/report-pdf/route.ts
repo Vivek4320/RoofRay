@@ -1624,11 +1624,11 @@ export async function POST(request: Request) {
     // solarContext payloads. If the chat already showed a real number, the PDF
     // should not replace it with "Unavailable".
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\\d,.]+)\\s*kW/i);
-    const reportPanels = reportNumber(reportText, /Panels:\s*([\\d,.]+)\\s*[×x]/i);
-    const reportMonthly = reportNumber(reportText, /Expected generation:\s*~?([\\d,.]+)\\s*kWh\\/month/i);
-    const reportAnnual = reportNumber(reportText, /[|]\\s*~?([\\d,.]+)\\s*kWh\\/year/i);
-    const reportShade = reportNumber(reportText, /Estimated shading:\s*~?([\\d,.]+)%/i);
-    const reportRoof = reportNumber(reportText, /Roof area:\s*~?([\\d,.]+)\\s*sq ft/i);
+    const reportPanels = reportNumber(reportText, /Panels:\s*([\d,.]+)\s*[×x]/i);
+    const reportMonthly = reportNumber(reportText, /Expected generation:\s*~?([\d,.]+)\s*kWh\/month/i);
+    const reportAnnual = reportNumber(reportText, /\|\s*~?([\d,.]+)\s*kWh\/year/i);
+    const reportShade = reportNumber(reportText, /Estimated shading:\s*~?([\d,.]+)%/i);
+    const reportRoof = reportNumber(reportText, /Roof area:\s*~?([\d,.]+)\s*sq ft/i);
     const reportBill = reportNumber(reportText, /Current electricity bill:\s*₹?([\d,.]+)\s*\/month/i);
 
     const size = reportSize ?? numberValue(planning.systemSizeKw);
