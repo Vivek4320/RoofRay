@@ -445,8 +445,9 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
         </p>
         <h1 className="mt-1 text-lg font-semibold">Your location, roof & sun path</h1>
         <p className="mt-1 text-xs leading-relaxed text-slate-300">
-          Real satellite imagery centered on your GPS location with deterministic RoofRay
-          overlays. Green is your house, blue is nearby buildings and yellow is the calculated sun path.
+          {satellite
+            ? "Real satellite imagery centered on your GPS location with deterministic RoofRay overlays. Green is your house, blue is nearby buildings and yellow is the calculated sun path."
+            : "Satellite imagery is unavailable right now, so RoofRay is showing a planning visualization. Green is your house, blue is nearby buildings and yellow is the calculated sun path."}
         </p>
       </div>
 
@@ -469,13 +470,15 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
       </div>
 
 
-      <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 rounded-2xl border border-emerald-300/20 bg-[#07111c]/95 px-5 py-3 text-center text-xs text-slate-200 shadow-2xl backdrop-blur-xl">
-        <div className="flex items-center justify-center gap-2 font-semibold text-emerald-300">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
-          Real Satellite Reference
+      <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#07111c]/95 px-5 py-3 text-center text-xs text-slate-200 shadow-2xl backdrop-blur-xl">
+        <div className={`flex items-center justify-center gap-2 font-semibold ${satellite ? "text-emerald-300" : "text-amber-300"}`}>
+          <span className={`h-2.5 w-2.5 rounded-full ${satellite ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" : "bg-amber-400"}`} />
+          {satellite ? "Real Satellite Reference" : "Planning Visualization"}
         </div>
         <div className="mt-1 text-[11px] text-slate-400">
-          Esri World Imagery • centered on your GPS • {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+          {satellite
+            ? `Esri World Imagery • centered on your GPS • ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+            : `No satellite image loaded • GPS center • ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`}
         </div>
         <div className="mt-1 text-[10px] text-slate-500">
           Green target = mapped building footprint from OpenStreetMap
