@@ -330,6 +330,42 @@ function pointInPolygon(
   return inside;
 }
 
+function planningBuildingFromRoofArea(
+  roofAreaSqFt: number | null,
+  latitude: number,
+  longitude: number,
+): MappedBuilding | null {
+  if (roofAreaSqFt === null || roofAreaSqFt <= 0) return null;
+
+  // Planning-only footprint used when OSM has no building polygon. It is
+  // anchored to the real GPS coordinate and is never marked as "YOUR HOUSE".
+  const areaM2 = roofAreaSqFt * 0.092903;
+  const widthM = Math.max(6, Math.min(30, Math.sqrt(areaM2 / 1.45)));
+  const lengthM = Math.max(8, Math.min(45, areaM2 / widthM));
+  const mLat = 111320;
+  const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
+  const halfW = widthM / 2;
+  const halfL = lengthM / 2;
+  const points = [
+    { x: -halfW, y: -halfL },
+    { x: halfW, y: -halfL },
+    { x: halfW, y: halfL },
+    { x: -halfW, y: halfL },
+  ];
+
+  return {
+    polygon: points.map((point) => ({
+      latitude: latitude + point.y / mLat,
+      longitude: longitude + point.x / mLon,
+    })),
+    areaM2,
+    containsTarget: false,
+    distanceMeters: 0,
+    heightMeters: 4,
+    levels: 1,
+  };
+}
+
 function mappedBuildingFromRoofContext(
   roof: Record<string, unknown> | null,
   latitude: number,
@@ -1774,6 +1810,23 @@ export async function POST(request: Request) {
       const contextRoof = (context.roof ?? null) as Record<string, unknown> | null;
       const fallbackRoof = mappedBuildingFromRoofContext(contextRoof, lat, lon);
       if (fallbackRoof) mappedBuildings = [fallbackRoof];
+    }
+
+    // Final visual fallback: when neither Overpass nor the saved OSM roof
+    // context has a polygon, create a clearly labelled planning footprint
+    // from the user's entered roof area. This keeps the real GPS location
+    // visible without falsely claiming that the rectangle is an OSM-mapped
+    // house.
+    if (!mappedBuildings.length) {
+      const planningAreaSqFt =
+        numberValue((body.userInputs ?? {}).roofAreaSqFt) ??
+        numberValue(planning.roofAreaSqFt);
+      const planningBuilding = planningBuildingFromRoofArea(
+        planningAreaSqFt,
+        lat,
+        lon,
+      );
+      if (planningBuilding) mappedBuildings = [planningBuilding];
     }
 
     const satelliteTiles = await fetchSatelliteTiles(lat, lon);
