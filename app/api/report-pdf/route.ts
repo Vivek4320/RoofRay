@@ -853,7 +853,7 @@ function roofVisualCommands({
         roof[i],
       ];
       commands.push(
-        building.containsTarget ? "0.02 0.45 0.78 rg" : "0.12 0.38 0.70 rg",
+        building.containsTarget ? "0.05 0.55 0.22 rg" : building.source === "planning" ? "0.62 0.42 0.08 rg" : "0.12 0.38 0.70 rg",
         face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
         face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
         face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
@@ -863,8 +863,8 @@ function roofVisualCommands({
 
     // Roof surface follows the real mapped polygon.
     commands.push(
-      building.containsTarget ? "0.04 0.62 0.95 rg" : "0.20 0.52 0.86 rg",
-      building.containsTarget ? "0.45 0.90 1.00 RG" : "0.45 0.82 1.00 RG",
+      building.containsTarget ? "0.10 0.72 0.30 rg" : building.source === "planning" ? "0.78 0.58 0.12 rg" : "0.20 0.52 0.86 rg",
+      building.containsTarget ? "0.55 1.00 0.68 RG" : building.source === "planning" ? "0.98 0.82 0.30 RG" : "0.45 0.82 1.00 RG",
       "1 w",
       roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
     );
@@ -1575,7 +1575,7 @@ function roofVisualCommands({
     ...letterhead,
     "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 503 Td (3D Building Map & Nearby Shading Analysis) Tj ET",
     "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 490 Td (Real aerial imagery + 3D mapped buildings + roof panels + calculated sun path) Tj ET",
-    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 470 Td (Blue = nearby mapped buildings | Bright blue = target roof | Yellow = sun path) Tj ET",
+    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 470 Td (Blue = other buildings | Green = your house | Amber = planning fallback | Yellow = sun path) Tj ET",
   ];
 }
 
