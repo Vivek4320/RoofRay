@@ -1629,7 +1629,7 @@ export async function POST(request: Request) {
     const reportAnnual = reportNumber(reportText, /[|]\\s*~?([\\d,.]+)\\s*kWh\\/year/i);
     const reportShade = reportNumber(reportText, /Estimated shading:\s*~?([\\d,.]+)%/i);
     const reportRoof = reportNumber(reportText, /Roof area:\s*~?([\\d,.]+)\\s*sq ft/i);
-    const reportBill = reportNumber(reportText, /Current electricity bill:\s*₹?([\\d,.]+)\\s*\\/month/i);
+    const reportBill = reportNumber(reportText, /Current electricity bill:\s*₹?([\d,.]+)\s*\/month/i);
 
     const size = reportSize ?? numberValue(planning.systemSizeKw);
     const panels = reportPanels ?? numberValue(planning.panelCount);
