@@ -7,6 +7,7 @@ type PdfBody = {
   report?: unknown;
   solarContext?: Record<string, unknown> | null;
   userInputs?: Record<string, unknown> | null;
+  roofPhotoDataUrl?: unknown;
 };
 
 function text(value: unknown): string {
