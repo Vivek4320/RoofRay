@@ -514,9 +514,9 @@ function roofVisualCommands({
   const sideW = 164;
   const sideH = 559;
   const mapX = 190;
-  const mapY = 250;
+  const mapY = 215;
   const mapW = 634;
-  const mapH = 310;
+  const mapH = 295;
 
   const satelliteZoom = 19;
   const centerPixel = webMercatorPixel(centerLat, centerLon, satelliteZoom);
@@ -997,8 +997,8 @@ function roofVisualCommands({
   );
 
   // Bottom analysis cards.
-  const cardY = 30;
-  const cardH = 198;
+  const cardY = 18;
+  const cardH = 180;
   const cardGap = 10;
   const cardW = (mapW - cardGap * 2) / 3;
   const cardXs = [mapX, mapX + cardW + cardGap, mapX + (cardW + cardGap) * 2];
