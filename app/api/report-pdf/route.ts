@@ -1383,6 +1383,30 @@ function buildPdf(lines: string[], visual: {
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
 
+  if (visual.logoImage) {
+    const logo = visual.logoImage;
+    objects.push(
+      Buffer.concat([
+        Buffer.from(
+          "<< /Type /XObject /Subtype /Image /Width " + logo.width +
+          " /Height " + logo.height +
+          " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length " +
+          logo.bytes.length + " >>\\nstream\\n",
+          "ascii",
+        ),
+        Buffer.from(logo.bytes),
+        Buffer.from("\\nendstream", "ascii"),
+      ]),
+    );
+  } else {
+    objects.push(
+      Buffer.from(
+        "<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length 3 >>\\nstream\\n\\x00\\x00\\x00\\nendstream",
+        "binary",
+      ),
+    );
+  }
+
   for (let i = 0; i < visual.satelliteTiles.length; i += 1) {
     const tile = visual.satelliteTiles[i];
     objects.push(
