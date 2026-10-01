@@ -401,31 +401,48 @@ out geom tags qt;`;
   } | null = null;
 
   for (const endpoint of endpoints) {
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-        body: "data=" + encodeURIComponent(query),
-        cache: "no-store",
-        signal: AbortSignal.timeout(18000),
-      });
-      if (!response.ok) continue;
-      const candidate = (await response.json()) as {
-        elements?: Array<{
-          geometry?: Array<{ lat: number; lon: number }>;
-          tags?: Record<string, string>;
-        }>;
-      };
-      if (Array.isArray(candidate.elements)) {
-        data = candidate;
-        if (candidate.elements.length > 0) break;
+    // Try POST first, then GET. Some deployed runtimes/proxies reject one
+    // request method even though the Overpass endpoint itself is reachable.
+    for (const method of ["POST", "GET"] as const) {
+      try {
+        const response =
+          method === "POST"
+            ? await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  Accept: "application/json",
+                },
+                body: "data=" + encodeURIComponent(query),
+                cache: "no-store",
+                signal: AbortSignal.timeout(18000),
+              })
+            : await fetch(
+                endpoint + "?data=" + encodeURIComponent(query),
+                {
+                  method: "GET",
+                  headers: { Accept: "application/json" },
+                  cache: "no-store",
+                  signal: AbortSignal.timeout(18000),
+                },
+              );
+
+        if (!response.ok) continue;
+        const candidate = (await response.json()) as {
+          elements?: Array<{
+            geometry?: Array<{ lat: number; lon: number }>;
+            tags?: Record<string, string>;
+          }>;
+        };
+        if (Array.isArray(candidate.elements)) {
+          data = candidate;
+          if (candidate.elements.length > 0) break;
+        }
+      } catch {
+        // Try the other request method or the next public Overpass endpoint.
       }
-    } catch {
-      // Try the next public Overpass endpoint.
     }
+    if (data?.elements?.length) break;
   }
 
   if (!data) return [];
