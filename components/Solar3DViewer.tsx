@@ -204,12 +204,14 @@ function sunPoints(
 }
 
 export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProps) {
+  const [mounted, setMounted] = useState(false);
   const [satellite, setSatellite] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [status, setStatus] = useState("Preparing your location-based solar visual...");
   const [error, setError] = useState("");
 
   const location = useMemo(() => {
+    if (!mounted) return null;
     const stored = readStoredLocation();
     const lat = Number.isFinite(Number(latitude)) ? Number(latitude) : stored?.latitude;
     const lon = Number.isFinite(Number(longitude)) ? Number(longitude) : stored?.longitude;
@@ -227,6 +229,11 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
     : null;
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     if (!location) {
       setError("No location found. Complete RoofRay location analysis first.");
       return;
@@ -277,7 +284,7 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
     return () => {
       cancelled = true;
     };
-  }, [location]);
+  }, [mounted, location]);
 
   if (!location) {
     return (
