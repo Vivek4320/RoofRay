@@ -210,15 +210,21 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
   const [status, setStatus] = useState("Preparing your location-based solar visual...");
   const [error, setError] = useState("");
 
+  const storedLocation = useMemo(() => (mounted ? readStoredLocation() : null), [mounted]);
+  const [browserLocation, setBrowserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
   const location = useMemo(() => {
     if (!mounted) return null;
-    const stored = readStoredLocation();
-    const lat = Number.isFinite(Number(latitude)) ? Number(latitude) : stored?.latitude;
-    const lon = Number.isFinite(Number(longitude)) ? Number(longitude) : stored?.longitude;
+    const lat = Number.isFinite(Number(latitude))
+      ? Number(latitude)
+      : storedLocation?.latitude ?? browserLocation?.latitude;
+    const lon = Number.isFinite(Number(longitude))
+      ? Number(longitude)
+      : storedLocation?.longitude ?? browserLocation?.longitude;
     return Number.isFinite(lat) && Number.isFinite(lon)
       ? { latitude: Number(lat), longitude: Number(lon) }
       : null;
-  }, [latitude, longitude]);
+  }, [mounted, latitude, longitude, storedLocation, browserLocation]);
 
   const analysis = useMemo(() => readStoredAnalysis(), []);
   const planning = (analysis?.planningEstimate ?? {}) as Record<string, unknown>;
@@ -231,6 +237,27 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted || latitude != null || longitude != null || storedLocation) return;
+    if (!navigator.geolocation) {
+      setError("Location is unavailable. Complete the RoofRay location analysis first.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setBrowserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      () => {
+        setError("Location permission is required. Complete the RoofRay location analysis first.");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
+  }, [mounted, latitude, longitude, storedLocation]);
 
   useEffect(() => {
     if (!mounted) return;
