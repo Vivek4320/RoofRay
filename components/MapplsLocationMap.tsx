@@ -23,6 +23,7 @@ const SCRIPT_ID = "roofray-mappls-sdk";
 export default function MapplsLocationMap({ latitude, longitude, className = "h-[240px] w-full" }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
+  const markerRef = useRef<{ remove?: () => void } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -47,6 +48,25 @@ export default function MapplsLocationMap({ latitude, longitude, className = "h-
       });
 
       mapRef.current = map;
+
+      // Keep a clear house/location marker on top of the map. The map center
+      // alone is easy to lose visually, especially when 3D mode is enabled.
+      if (window.mappls.Marker) {
+        try {
+          markerRef.current = new window.mappls.Marker({
+            map,
+            position: { lat: latitude, lng: longitude },
+            html: '<div style="width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#2563eb;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:16px;line-height:1;color:#fff;">⌂</span></div>',
+            width: 34,
+            height: 34,
+            offset: [0, -17],
+            popupOptions: true,
+            popupHtml: "Your house / selected location",
+          });
+        } catch {
+          markerRef.current = null;
+        }
+      }
 
       if (window.mappls.add3DModel) {
         try {
@@ -73,6 +93,8 @@ export default function MapplsLocationMap({ latitude, longitude, className = "h-
 
     return () => {
       cancelled = true;
+      markerRef.current?.remove?.();
+      markerRef.current = null;
       mapRef.current = null;
     };
   }, [latitude, longitude]);
