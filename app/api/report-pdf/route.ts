@@ -1130,7 +1130,8 @@ function roofVisualCommands({
         -Math.cos(shadowBearing) * shadowMeters * pixelsPerMeterY;
 
       commands.push(
-        "0.65 0.08 0.08 rg",
+        "0.95 0.62 0.08 RG",
+        "0.55 w",
         base[0].x.toFixed(1) + " " + base[0].y.toFixed(1) + " m",
       );
       for (let i = 1; i < base.length; i += 1) {
@@ -1144,7 +1145,7 @@ function roofVisualCommands({
             " l",
         );
       }
-      commands.push("h f");
+      commands.push("h S");
 
       if (heightMeters >= 9) {
         const center = base.reduce(
@@ -1575,7 +1576,7 @@ function roofVisualCommands({
     ...letterhead,
     "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 503 Td (3D Building Map & Nearby Shading Analysis) Tj ET",
     "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 490 Td (Real aerial imagery + 3D mapped buildings + roof panels + calculated sun path) Tj ET",
-    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 470 Td (Blue = other buildings | Green = your house | Amber = planning fallback | Yellow = sun path) Tj ET",
+    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 470 Td (Blue = other buildings | Green = your house | Amber = planning fallback | Yellow = sun path | Amber outline = shadow) Tj ET",
   ];
 }
 
