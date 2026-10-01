@@ -259,64 +259,61 @@ function webMercatorPixel(latitude: number, longitude: number, zoom: number) {
   return { x, y, size };
 }
 
+function inverseWebMercatorPixel(x: number, y: number, zoom: number) {
+  const size = 256 * 2 ** zoom;
+  const longitude = (x / size) * 360 - 180;
+  const n = Math.PI - (2 * Math.PI * y) / size;
+  const latitude = (180 / Math.PI) * Math.atan(Math.sinh(n));
+  return { latitude, longitude };
+}
+
 async function fetchSatelliteTiles(
   latitude: number,
   longitude: number,
   zoom = 19,
 ): Promise<SatelliteTile[]> {
+  // Fetch one complete World Imagery export. This is more reliable in PDFs
+  // than embedding many cached tile JPEGs.
   const center = webMercatorPixel(latitude, longitude, zoom);
-  const centerTileX = Math.floor(center.x / 256);
-  const centerTileY = Math.floor(center.y / 256);
-  const startX = centerTileX - 1;
-  const startY = centerTileY - 1;
-  const hosts = [
-    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile",
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile",
-  ];
-  const tiles: SatelliteTile[] = [];
-  const jobs: Array<Promise<void>> = [];
+  const startX = Math.floor(center.x / 256) - 2;
+  const startY = Math.floor(center.y / 256) - 1;
+  const endX = startX + 4;
+  const endY = startY + 3;
+  const nw = inverseWebMercatorPixel(startX * 256, startY * 256, zoom);
+  const se = inverseWebMercatorPixel(endX * 256, endY * 256, zoom);
+  const bbox = [nw.longitude, se.latitude, se.longitude, nw.latitude].join(",");
 
-  for (let row = 0; row < 3; row += 1) {
-    for (let col = 0; col < 4; col += 1) {
-      const tileX = startX + col;
-      const tileY = startY + row;
-      jobs.push(
-        (async () => {
-          for (const host of hosts) {
-            const url = host + "/" + zoom + "/" + tileY + "/" + tileX;
-            try {
-              const response = await fetch(url, {
-                cache: "no-store",
-                headers: { Accept: "image/jpeg,image/*" },
-                signal: AbortSignal.timeout(10000),
-              });
-              if (!response.ok) continue;
-              const bytes = new Uint8Array(await response.arrayBuffer());
-              if (bytes.length < 1000) continue;
-              tiles.push({
-                name: "ImSat" + row + "_" + col,
-                bytes,
-                // PDF coordinates grow upward, so the northern/top tile row
-                // is placed at the top of the 3-row mosaic.
-                x: col * 256,
-                y: (2 - row) * 256,
-                w: 256,
-                h: 256,
-              });
-              return;
-            } catch {
-              // Try the next ArcGIS host.
-            }
-          }
-        })(),
-      );
+  const hosts = [
+    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export",
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export",
+  ];
+
+  for (const host of hosts) {
+    try {
+      const params = new URLSearchParams({
+        bbox,
+        bboxSR: "4326",
+        imageSR: "4326",
+        size: "1024,768",
+        format: "jpg",
+        f: "image",
+        transparent: "false",
+      });
+      const response = await fetch(host + "?" + params.toString(), {
+        cache: "no-store",
+        headers: { Accept: "image/jpeg,image/*" },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!response.ok) continue;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length < 5000 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) continue;
+      return [{ name: "ImSatSite", bytes, x: 0, y: 0, w: 1024, h: 768 }];
+    } catch {
+      // Try the next ArcGIS host.
     }
   }
-
-  await Promise.all(jobs);
-  return tiles.sort((a, b) => a.name.localeCompare(b.name));
+  return [];
 }
-
 function pointInPolygon(
   point: { x: number; y: number },
   polygon: Array<{ x: number; y: number }>,
@@ -631,14 +628,24 @@ function roofVisualCommands({
     const tileW = mapW / 4;
     const tileH = mapH / 3;
     for (const tile of satelliteTiles) {
-      commands.push(
-        "q",
-        tileW.toFixed(2) + " 0 0 " + tileH.toFixed(2) + " " +
-          (mapX + (tile.x / 256) * tileW).toFixed(2) + " " +
-          (mapY + (tile.y / 256) * tileH).toFixed(2) + " cm",
-        "/" + tile.name + " Do",
-        "Q",
-      );
+      if (tile.w === 1024 && tile.h === 768) {
+        commands.push(
+          "q",
+          mapW.toFixed(2) + " 0 0 " + mapH.toFixed(2) + " " +
+            mapX.toFixed(2) + " " + mapY.toFixed(2) + " cm",
+          "/" + tile.name + " Do",
+          "Q",
+        );
+      } else {
+        commands.push(
+          "q",
+          tileW.toFixed(2) + " 0 0 " + tileH.toFixed(2) + " " +
+            (mapX + (tile.x / 256) * tileW).toFixed(2) + " " +
+            (mapY + (tile.y / 256) * tileH).toFixed(2) + " cm",
+          "/" + tile.name + " Do",
+          "Q",
+        );
+      }
     }
     commands.push("Q");
   }
