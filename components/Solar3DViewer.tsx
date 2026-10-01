@@ -58,8 +58,8 @@ function readStoredAnalysis() {
 
 async function fetchBrowserSatelliteReference(latitude: number, longitude: number) {
   const metersPerDegreeLat = 111320;
-  const halfWidthMeters = 170;
-  const halfHeightMeters = 120;
+  const halfWidthMeters = 280;
+  const halfHeightMeters = 200;
   const latDelta = halfHeightMeters / metersPerDegreeLat;
   const lonDelta =
     halfWidthMeters /
@@ -119,8 +119,8 @@ function projectPoint(
   const xMeters = (point.longitude - center.longitude) * metersLon;
   const yMeters = (point.latitude - center.latitude) * metersLat;
   return {
-    x: width / 2 + (xMeters / 340) * width,
-    y: height / 2 - (yMeters / 240) * height,
+    x: width / 2 + (xMeters / 560) * width,
+    y: height / 2 - (yMeters / 400) * height,
   };
 }
 
@@ -238,9 +238,16 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
       setStatus("Loading satellite reference and mapped buildings...");
 
       const [satelliteResult, buildingsResult] = await Promise.allSettled([
-        fetchBrowserSatelliteReference(location.latitude, location.longitude),
         fetch(
-          `/api/map-buildings?latitude=${location.latitude}&longitude=${location.longitude}&radius=180`,
+          `/api/satellite-reference?latitude=${location.latitude}&longitude=${location.longitude}`,
+          { cache: "no-store" },
+        ).then(async (response) => {
+          if (!response.ok) return null;
+          const data = await response.json();
+          return typeof data?.image === "string" ? data.image : null;
+        }),
+        fetch(
+          `/api/map-buildings?latitude=${location.latitude}&longitude=${location.longitude}&radius=240`,
           { cache: "no-store" },
         ).then((response) => (response.ok ? response.json() : null)),
       ]);
@@ -438,8 +445,8 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
         </p>
         <h1 className="mt-1 text-lg font-semibold">Your location, roof & sun path</h1>
         <p className="mt-1 text-xs leading-relaxed text-slate-300">
-          Satellite reference with deterministic RoofRay overlays. Green is your house, blue is
-          nearby buildings and yellow is the calculated sun path.
+          Real satellite imagery centered on your GPS location with deterministic RoofRay
+          overlays. Green is your house, blue is nearby buildings and yellow is the calculated sun path.
         </p>
       </div>
 
@@ -458,6 +465,20 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
           <div><span className="text-slate-400">Solar noon</span><br />{solarNoon}</div>
           <div><span className="text-slate-400">Sunset</span><br />{sunset}</div>
           <div><span className="text-slate-400">Mapped roof</span><br />{targetArea > 0 ? `${targetArea.toFixed(0)} m²` : "--"}</div>
+        </div>
+      </div>
+
+
+      <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 rounded-2xl border border-emerald-300/20 bg-[#07111c]/95 px-5 py-3 text-center text-xs text-slate-200 shadow-2xl backdrop-blur-xl">
+        <div className="flex items-center justify-center gap-2 font-semibold text-emerald-300">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
+          Real Satellite Reference
+        </div>
+        <div className="mt-1 text-[11px] text-slate-400">
+          Esri World Imagery • centered on your GPS • {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+        </div>
+        <div className="mt-1 text-[10px] text-slate-500">
+          Green target = mapped building footprint from OpenStreetMap
         </div>
       </div>
 
