@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Solar3DViewerProps = {
   latitude?: number | null;
   longitude?: number | null;
 };
 
-type MapLibreLike = any;
+type Building = {
+  polygon: Array<{ latitude: number; longitude: number }>;
+  heightMeters: number;
+  levels: number;
+  containsTarget: boolean;
+};
+
+type Point = { x: number; y: number };
 
 function readStoredLocation() {
   if (typeof window === "undefined") return null;
@@ -49,268 +56,182 @@ function readStoredAnalysis() {
   }
 }
 
-function loadMapLibre(): Promise<MapLibreLike> {
-  const win = window as typeof window & { maplibregl?: MapLibreLike };
-  if (win.maplibregl) return Promise.resolve(win.maplibregl);
+async function fetchBrowserSatelliteReference(latitude: number, longitude: number) {
+  const metersPerDegreeLat = 111320;
+  const halfWidthMeters = 280;
+  const halfHeightMeters = 200;
+  const latDelta = halfHeightMeters / metersPerDegreeLat;
+  const lonDelta =
+    halfWidthMeters /
+    Math.max(1, metersPerDegreeLat * Math.cos((latitude * Math.PI) / 180));
 
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(
-      'script[data-roofray-maplibre="true"]',
-    ) as HTMLScriptElement | null;
+  const bbox = [
+    longitude - lonDelta,
+    latitude - latDelta,
+    longitude + lonDelta,
+    latitude + latDelta,
+  ].join(",");
 
-    const finish = () => {
-      if (win.maplibregl) resolve(win.maplibregl);
-      else reject(new Error("MapLibre loaded but the map engine is unavailable."));
-    };
+  const hosts = [
+    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export",
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export",
+  ];
 
-    if (existing) {
-      existing.addEventListener("load", finish, { once: true });
-      existing.addEventListener(
-        "error",
-        () => reject(new Error("MapLibre could not be loaded.")),
-        { once: true },
-      );
-      return;
-    }
+  for (const host of hosts) {
+    try {
+      const params = new URLSearchParams({
+        bbox,
+        bboxSR: "4326",
+        imageSR: "4326",
+        size: "1600,900",
+        format: "jpg",
+        f: "image",
+        transparent: "false",
+      });
+      const response = await fetch(`${host}?${params.toString()}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) continue;
 
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.js";
-    script.async = true;
-    script.dataset.roofrayMaplibre = "true";
-    script.onload = finish;
-    script.onerror = () => reject(new Error("MapLibre could not be loaded."));
-    document.head.appendChild(script);
-  });
-}
+      const blob = await response.blob();
+      if (!blob.type.startsWith("image/") || blob.size < 5000) continue;
 
-function ensureMapLibreCss() {
-  if (document.querySelector('link[data-roofray-maplibre-css="true"]')) return;
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = "https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.css";
-  link.dataset.roofrayMaplibreCss = "true";
-  document.head.appendChild(link);
-}
-
-async function getBuildings(latitude: number, longitude: number) {
-  const response = await fetch(
-    "/api/map-buildings?latitude=" +
-      encodeURIComponent(latitude) +
-      "&longitude=" +
-      encodeURIComponent(longitude) +
-      "&radius=180",
-    { cache: "no-store" },
-  );
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.ok || !Array.isArray(data.buildings)) {
-    throw new Error(
-      typeof data.error === "string"
-        ? data.error
-        : "Building map data could not be loaded.",
-    );
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(reader.error ?? new Error("Unable to read satellite image."));
+        reader.readAsDataURL(blob);
+      });
+    } catch {}
   }
 
+  return null;
+}
+
+function projectPoint(
+  point: { latitude: number; longitude: number },
+  center: { latitude: number; longitude: number },
+  width: number,
+  height: number,
+): Point {
+  const metersLat = 111320;
+  const metersLon = 111320 * Math.cos((center.latitude * Math.PI) / 180);
+  const xMeters = (point.longitude - center.longitude) * metersLon;
+  const yMeters = (point.latitude - center.latitude) * metersLat;
   return {
-    type: "FeatureCollection",
-    features: data.buildings.map((building: any, index: number) => ({
-      type: "Feature",
-      id: index,
-      properties: {
-        height: Math.max(3, Number(building.heightMeters) || 3),
-        target: building.containsTarget === true,
-      },
-      geometry: {
-        type: "Polygon",
-        coordinates: [
-          building.polygon.map((point: any) => [
-            Number(point.longitude),
-            Number(point.latitude),
-          ]),
-        ],
-      },
-    })),
+    x: width / 2 + (xMeters / 560) * width,
+    y: height / 2 - (yMeters / 400) * height,
   };
 }
 
-function addSolarOverlays(map: MapLibreLike, latitude: number, longitude: number, analysis: any) {
-  const planning = analysis?.planningEstimate ?? {};
-  const roof = analysis?.roof?.polygon;
-  const roofCoordinates =
-    Array.isArray(roof) && roof.length >= 3
-      ? roof.map((point: any) => [Number(point.longitude), Number(point.latitude)])
-      : [];
+function polygonCenter(polygon: Array<{ latitude: number; longitude: number }>) {
+  if (!polygon.length) return null;
+  const latitude = polygon.reduce((sum, p) => sum + p.latitude, 0) / polygon.length;
+  const longitude = polygon.reduce((sum, p) => sum + p.longitude, 0) / polygon.length;
+  return { latitude, longitude };
+}
 
-  if (map.getSource("roofray-roof")) {
-    map.removeLayer("roofray-roof-fill");
-    map.removeLayer("roofray-roof-line");
-    map.removeSource("roofray-roof");
+function polygonAreaSqM(polygon: Array<{ latitude: number; longitude: number }>) {
+  if (polygon.length < 3) return 0;
+  const center = polygonCenter(polygon);
+  if (!center) return 0;
+  const metersLat = 111320;
+  const metersLon = 111320 * Math.cos((center.latitude * Math.PI) / 180);
+  let area = 0;
+  for (let i = 0; i < polygon.length; i += 1) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+    const ax = (a.longitude - center.longitude) * metersLon;
+    const ay = (a.latitude - center.latitude) * metersLat;
+    const bx = (b.longitude - center.longitude) * metersLon;
+    const by = (b.latitude - center.latitude) * metersLat;
+    area += ax * by - bx * ay;
   }
+  return Math.abs(area) / 2;
+}
 
-  if (roofCoordinates.length >= 3) {
-    const closed = [...roofCoordinates, roofCoordinates[0]];
-    map.addSource("roofray-roof", {
-      type: "geojson",
-      data: {
-        type: "Feature",
-        properties: {},
-        geometry: { type: "Polygon", coordinates: [closed] },
-      },
-    });
-    map.addLayer({
-      id: "roofray-roof-fill",
-      type: "fill",
-      source: "roofray-roof",
-      paint: { "fill-color": "#22d3ee", "fill-opacity": 0.18 },
-    });
-    map.addLayer({
-      id: "roofray-roof-line",
-      type: "line",
-      source: "roofray-roof",
-      paint: { "line-color": "#22d3ee", "line-width": 4 },
-    });
-  }
+function fallbackBuilding(
+  center: { latitude: number; longitude: number },
+  roofAreaSqFt: number,
+): Building {
+  const area = Math.max(20, roofAreaSqFt * 0.092903);
+  const width = Math.max(5, Math.sqrt(area * 1.35));
+  const depth = Math.max(4, area / width);
+  const metersLat = 111320;
+  const metersLon = 111320 * Math.cos((center.latitude * Math.PI) / 180);
+  const latHalf = (depth / 2) / metersLat;
+  const lonHalf = (width / 2) / Math.max(1, metersLon);
 
-  if (map.getSource("roofray-sun")) {
-    map.removeLayer("roofray-sun-line");
-    map.removeLayer("roofray-sun-points");
-    map.removeSource("roofray-sun");
-  }
+  return {
+    polygon: [
+      { latitude: center.latitude - latHalf, longitude: center.longitude - lonHalf },
+      { latitude: center.latitude - latHalf, longitude: center.longitude + lonHalf },
+      { latitude: center.latitude + latHalf, longitude: center.longitude + lonHalf },
+      { latitude: center.latitude + latHalf, longitude: center.longitude - lonHalf },
+    ],
+    heightMeters: 4,
+    levels: 1,
+    containsTarget: true,
+  };
+}
 
-  const samples = Array.isArray(analysis?.sunCycle?.next12Hours)
-    ? analysis.sunCycle.next12Hours
+function sunPoints(
+  analysis: Record<string, unknown> | null,
+  center: { x: number; y: number },
+  width: number,
+  height: number,
+) {
+  const sun = (analysis?.sunCycle ?? {}) as Record<string, unknown>;
+  const samples = Array.isArray(sun.next12Hours)
+    ? (sun.next12Hours as Array<Record<string, unknown>>)
     : [];
-  const sunCoordinates = samples
-    .filter(
-      (sample: any) =>
-        Number.isFinite(Number(sample.azimuthDeg)) &&
-        Number.isFinite(Number(sample.elevationDeg)),
-    )
-    .slice(0, 10)
-    .map((sample: any) => {
-      const az = (Number(sample.azimuthDeg) * Math.PI) / 180;
-      const elevation = Math.max(20, Number(sample.elevationDeg) || 20);
-      const radius = 0.0008 * Math.max(0.45, Math.cos((elevation * Math.PI) / 180));
-      const east = Math.sin(az) * radius;
-      const north = Math.cos(az) * radius;
-      return [longitude + east, latitude + north];
-    });
 
-  if (sunCoordinates.length >= 2) {
-    map.addSource("roofray-sun", {
-      type: "geojson",
-      data: {
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            properties: {},
-            geometry: { type: "LineString", coordinates: sunCoordinates },
-          },
-        ],
-      },
+  return samples
+    .filter((sample) => Number.isFinite(Number(sample.azimuthDeg)))
+    .slice(0, 12)
+    .map((sample, index) => {
+      const azimuth = (Number(sample.azimuthDeg) * Math.PI) / 180;
+      const elevation = Math.max(0, Number(sample.elevationDeg) || 0);
+      const radius = Math.min(width, height) * (0.16 + Math.min(1, elevation / 80) * 0.2);
+      return {
+        x: center.x + Math.sin(azimuth) * radius,
+        y: center.y - Math.cos(azimuth) * radius,
+        time: String(sample.timestamp ?? "").slice(11, 16),
+        elevation,
+        index,
+      };
     });
-    map.addLayer({
-      id: "roofray-sun-line",
-      type: "line",
-      source: "roofray-sun",
-      paint: {
-        "line-color": "#fbbf24",
-        "line-width": 4,
-        "line-dasharray": [2, 2],
-      },
-    });
-    map.addLayer({
-      id: "roofray-sun-points",
-      type: "circle",
-      source: "roofray-sun",
-      paint: {
-        "circle-radius": 7,
-        "circle-color": "#fbbf24",
-        "circle-stroke-color": "#ffffff",
-        "circle-stroke-width": 2,
-      },
-    });
-  }
-
-  const panelCount = Math.max(0, Math.min(40, Math.round(Number(planning.panelCount) || 0)));
-  if (panelCount > 0 && roofCoordinates.length >= 3) {
-    if (map.getSource("roofray-panels")) {
-      if (map.getLayer("roofray-panels-fill")) map.removeLayer("roofray-panels-fill");
-      if (map.getLayer("roofray-panels-line")) map.removeLayer("roofray-panels-line");
-      map.removeSource("roofray-panels");
-    }
-
-    const lons = roofCoordinates.map((p: number[]) => p[0]);
-    const lats = roofCoordinates.map((p: number[]) => p[1]);
-    const minLon = Math.min(...lons);
-    const maxLon = Math.max(...lons);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const cols = Math.min(8, Math.max(1, Math.ceil(Math.sqrt(panelCount))));
-    const rows = Math.ceil(panelCount / cols);
-    const cellLon = (maxLon - minLon) * 0.68 / cols;
-    const cellLat = (maxLat - minLat) * 0.68 / rows;
-    const gapLon = cellLon * 0.08;
-    const gapLat = cellLat * 0.08;
-    const features: any[] = [];
-
-    for (let i = 0; i < panelCount; i += 1) {
-      const row = Math.floor(i / cols);
-      const col = i % cols;
-      const centerLon = minLon + (maxLon - minLon) * 0.16 + col * cellLon;
-      const centerLat = maxLat - (maxLat - minLat) * 0.16 - row * cellLat;
-      const w = Math.max(0.00001, cellLon - gapLon);
-      const h = Math.max(0.00001, cellLat - gapLat);
-      features.push({
-        type: "Feature",
-        properties: {},
-        geometry: {
-          type: "Polygon",
-          coordinates: [[
-            [centerLon, centerLat],
-            [centerLon + w, centerLat],
-            [centerLon + w, centerLat - h],
-            [centerLon, centerLat - h],
-            [centerLon, centerLat],
-          ]],
-        },
-      });
-    }
-
-    map.addSource("roofray-panels", {
-      type: "geojson",
-      data: { type: "FeatureCollection", features },
-    });
-    map.addLayer({
-      id: "roofray-panels-fill",
-      type: "fill",
-      source: "roofray-panels",
-      paint: { "fill-color": "#164e9a", "fill-opacity": 0.92 },
-    });
-    map.addLayer({
-      id: "roofray-panels-line",
-      type: "line",
-      source: "roofray-panels",
-      paint: { "line-color": "#7dd3fc", "line-width": 1.5 },
-    });
-  }
 }
 
 export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<MapLibreLike | null>(null);
-  const pinModeRef = useRef(false);
-  const [status, setStatus] = useState("Loading satellite map...");
+  const [satellite, setSatellite] = useState<string | null>(null);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [status, setStatus] = useState("Preparing your location-based solar visual...");
   const [error, setError] = useState("");
-  const [pinMode, setPinMode] = useState(false);
-  const [pinStatus, setPinStatus] = useState("");
-  const [accuracy, setAccuracy] = useState<number | null>(null);
+
+  const location = useMemo(() => {
+    const stored = readStoredLocation();
+    const lat = Number.isFinite(Number(latitude)) ? Number(latitude) : stored?.latitude;
+    const lon = Number.isFinite(Number(longitude)) ? Number(longitude) : stored?.longitude;
+    return Number.isFinite(lat) && Number.isFinite(lon)
+      ? { latitude: Number(lat), longitude: Number(lon) }
+      : null;
+  }, [latitude, longitude]);
+
+  const analysis = useMemo(() => readStoredAnalysis(), []);
+  const planning = (analysis?.planningEstimate ?? {}) as Record<string, unknown>;
+  const roofAreaSqFt = Number(planning.roofAreaSqFt);
+  const panelCount = Number(planning.panelCount);
+  const targetFallback = location
+    ? fallbackBuilding(location, Number.isFinite(roofAreaSqFt) ? roofAreaSqFt : 350)
+    : null;
 
   useEffect(() => {
-    pinModeRef.current = pinMode;
-  }, [pinMode]);
+    if (!location) {
+      setError("No location found. Complete RoofRay location analysis first.");
+      return;
+    }
 
-  useEffect(() => {
     let cancelled = false;
 
     const start = async () => {
@@ -319,7 +240,7 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
         const lat = Number.isFinite(Number(latitude)) ? Number(latitude) : stored?.latitude;
         const lon = Number.isFinite(Number(longitude)) ? Number(longitude) : stored?.longitude;
 
-        if (lat === undefined || lon === undefined || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
           throw new Error("No location found. Return to RoofRay and complete location analysis first.");
         }
 
@@ -331,22 +252,31 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
           container: containerRef.current,
           style: {
             version: 8,
-            sources: {},
+            sources: {
+              satellite: {
+                type: "raster",
+                tiles: [
+                  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                ],
+                tileSize: 256,
+                maxzoom: 19,
+                attribution: "Esri World Imagery",
+              },
+            },
             layers: [
               {
-                id: "bg",
-                type: "background",
-                paint: { "background-color": "#e9e6df" },
+                id: "satellite",
+                type: "raster",
+                source: "satellite",
               },
             ],
           },
           center: [lon, lat],
-          zoom: 18.5,
-          pitch: 60,
-          bearing: -20,
+          zoom: 19,
+          pitch: 52,
+          bearing: 15,
           maxZoom: 21,
-          preserveDrawingBuffer: true,
-          attributionControl: false,
+          attributionControl: true,
         });
 
         mapRef.current = map;
@@ -375,14 +305,12 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
                   "fill-extrusion-color": [
                     "case",
                     ["get", "target"],
-                    "#3b82f6",
-                    [">", ["get", "height"], 10],
-                    "#f5b971",
-                    "#f1f1f1",
+                    "#22d3ee",
+                    "#64748b",
                   ],
                   "fill-extrusion-height": ["get", "height"],
                   "fill-extrusion-base": 0,
-                  "fill-extrusion-opacity": 0.95,
+                  "fill-extrusion-opacity": 0.62,
                 },
               });
             }
@@ -402,10 +330,10 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
               )
               .addTo(map);
 
-            setStatus("3D building map loaded. Drag, zoom, rotate and tilt.");
+            setStatus("Real satellite imagery loaded. Drag, zoom, rotate and tilt.");
           } catch (buildingError) {
             console.warn("[RoofRay] Building/overlay load failed:", buildingError);
-            setStatus("3D map loaded. Building data is unavailable at this location.");
+            setStatus("Satellite map loaded. Building data is unavailable at this location.");
           }
         });
 
@@ -516,77 +444,235 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
       }
     };
 
-    void start();
-
+    void load();
     return () => {
       cancelled = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
     };
-  }, [latitude, longitude]);
+  }, [location]);
 
-  const zoomIn = () => mapRef.current?.zoomIn();
-  const zoomOut = () => mapRef.current?.zoomOut();
-  const resetView = () => {
-    const stored = readStoredLocation();
-    if (!stored || !mapRef.current) return;
-    mapRef.current.flyTo({
-      center: [stored.longitude, stored.latitude],
-      zoom: 18,
-      pitch: 52,
-      bearing: 15,
-      duration: 900,
-    });
-  };
+  if (!location) {
+    return (
+      <section className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#050912] text-white">
+        <div className="rounded-2xl border border-white/10 bg-[#07111c]/90 px-6 py-5 text-center">
+          <p className="text-sm font-semibold">RoofRay Solar Visual</p>
+          <p className="mt-2 text-xs text-slate-300">Complete the location analysis first.</p>
+        </div>
+      </section>
+    );
+  }
+
+  const target =
+    buildings.find((building) => building.containsTarget) ??
+    buildings[0] ??
+    targetFallback;
+
+  const mappedBuildings = target ? [target, ...buildings.filter((b) => b !== target)] : buildings;
+  const W = 1600;
+  const H = 900;
+  const targetPoints = target
+    ? target.polygon.map((point) => projectPoint(point, location, W, H))
+    : [];
+  const targetCenter = targetPoints.length
+    ? {
+        x: targetPoints.reduce((sum, p) => sum + p.x, 0) / targetPoints.length,
+        y: targetPoints.reduce((sum, p) => sum + p.y, 0) / targetPoints.length,
+      }
+    : { x: W / 2, y: H / 2 };
+  const sun = sunPoints(analysis, targetCenter, W, H);
+  const sunPath = sun.map((p) => `${p.x},${p.y}`).join(" ");
+  const targetArea = target ? polygonAreaSqM(target.polygon) : 0;
+
+  const sunset = String((analysis?.sunCycle as Record<string, unknown> | undefined)?.sunset ?? "--");
+  const sunrise = String((analysis?.sunCycle as Record<string, unknown> | undefined)?.sunrise ?? "--");
+  const solarNoon = String((analysis?.sunCycle as Record<string, unknown> | undefined)?.solarNoon ?? "--");
+  const direction = String(planning.recommendedDirection ?? "--");
+  const slope = String(planning.recommendedSlopeDeg ?? "--");
 
   return (
-    <section className="relative h-[calc(100vh-64px)] min-h-[620px] w-full overflow-hidden bg-[#050912]">
-      <div ref={containerRef} className="absolute inset-0" />
+    <section className="relative min-h-[calc(100vh-64px)] w-full overflow-hidden bg-[#050912]">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="xMidYMid slice"
+        className="absolute inset-0 h-full w-full"
+        role="img"
+        aria-label="RoofRay deterministic solar site visual"
+      >
+        <defs>
+          <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="8" stdDeviation="12" floodOpacity="0.45" />
+          </filter>
+          <clipPath id="targetRoofClip">
+            <polygon points={targetPoints.map((p) => `${p.x},${p.y}`).join(" ")} />
+          </clipPath>
+          <linearGradient id="panelGradient" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#dff8ff" />
+            <stop offset="45%" stopColor="#1675a5" />
+            <stop offset="100%" stopColor="#071d31" />
+          </linearGradient>
+          <radialGradient id="vignette">
+            <stop offset="55%" stopColor="#000000" stopOpacity="0" />
+            <stop offset="100%" stopColor="#02050a" stopOpacity="0.72" />
+          </radialGradient>
+        </defs>
 
-      <div className="pointer-events-none absolute left-5 top-5 z-10 max-w-sm rounded-2xl border border-white/10 bg-[#07111c]/90 px-5 py-4 text-white shadow-2xl backdrop-blur-xl">
+        {satellite ? (
+          <image href={satellite} x="0" y="0" width={W} height={H} preserveAspectRatio="xMidYMid slice" />
+        ) : (
+          <>
+            <rect width={W} height={H} fill="#12202a" />
+            <path d={`M0 250 L1600 40 M0 650 L1600 430 M-200 900 L900 0 M500 900 L1600 300`} stroke="#28404b" strokeWidth="55" opacity="0.7" />
+            <path d={`M0 260 L1600 50 M0 660 L1600 440 M-200 900 L900 0 M500 900 L1600 300`} stroke="#657a80" strokeWidth="7" opacity="0.55" />
+            {Array.from({ length: 34 }).map((_, i) => (
+              <rect
+                key={`fallback-grid-${i}`}
+                x={(i * 157) % W}
+                y={(i * 71) % H}
+                width={90 + (i % 4) * 18}
+                height={50 + (i % 3) * 16}
+                rx="5"
+                fill={i % 2 ? "#344b4d" : "#273d43"}
+                opacity="0.7"
+              />
+            ))}
+          </>
+        )}
+
+        {mappedBuildings.map((building, index) => {
+          const points = building.polygon.map((point) => projectPoint(point, location, W, H));
+          if (points.length < 3) return null;
+          const isTarget = building === target;
+          return (
+            <g key={`building-${index}`}>
+              <polygon
+                points={points.map((p) => `${p.x},${p.y}`).join(" ")}
+                fill={isTarget ? "#18d98b" : "#2787ff"}
+                fillOpacity={isTarget ? 0.38 : 0.22}
+                stroke={isTarget ? "#29ff9d" : "#55a7ff"}
+                strokeWidth={isTarget ? 7 : 4}
+                filter={isTarget ? "url(#shadow)" : undefined}
+              />
+              {isTarget && (
+                <g clipPath="url(#targetRoofClip)" opacity="0.94">
+                  {Array.from({ length: Math.max(4, Math.min(10, Number.isFinite(panelCount) ? panelCount : 8)) }).map((_, panelIndex) => {
+                    const cols = 4;
+                    const rows = Math.ceil(Math.max(4, Math.min(10, Number.isFinite(panelCount) ? panelCount : 8)) / cols);
+                    const cellW = 34;
+                    const cellH = 25;
+                    const totalW = cols * cellW + (cols - 1) * 7;
+                    const totalH = rows * cellH + (rows - 1) * 7;
+                    const px = targetCenter.x - totalW / 2 + (panelIndex % cols) * (cellW + 7);
+                    const py = targetCenter.y - totalH / 2 + Math.floor(panelIndex / cols) * (cellH + 7);
+                    return (
+                      <rect
+                        key={`panel-${panelIndex}`}
+                        x={px}
+                        y={py}
+                        width={cellW}
+                        height={cellH}
+                        rx="2"
+                        fill="url(#panelGradient)"
+                        stroke="#d8f7ff"
+                        strokeWidth="1.5"
+                      />
+                    );
+                  })}
+                </g>
+              )}
+            </g>
+          );
+        })}
+
+        {sun.length >= 2 && (
+          <>
+            <polyline
+              points={sunPath}
+              fill="none"
+              stroke="#ffd21a"
+              strokeWidth="7"
+              strokeDasharray="18 13"
+              strokeLinecap="round"
+              filter="url(#shadow)"
+            />
+            {sun.map((point) => (
+              <g key={`sun-${point.index}`}>
+                <circle cx={point.x} cy={point.y} r="10" fill="#ffd21a" stroke="#fff3a3" strokeWidth="3" />
+                {point.time && (
+                  <text x={point.x + 15} y={point.y - 13} fill="#fff4a3" fontSize="20" fontWeight="700">
+                    {point.time}
+                  </text>
+                )}
+              </g>
+            ))}
+          </>
+        )}
+
+        <circle cx={targetCenter.x} cy={targetCenter.y} r="7" fill="#ffffff" stroke="#20ff9a" strokeWidth="5" />
+        <rect width={W} height={H} fill="url(#vignette)" pointerEvents="none" />
+      </svg>
+
+      <div className="pointer-events-none absolute left-5 top-5 z-10 max-w-md rounded-2xl border border-white/10 bg-[#07111c]/90 px-5 py-4 text-white shadow-2xl backdrop-blur-xl">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
-          RoofRay 3D Roof View
+          RoofRay Solar Site Analysis
         </p>
-        <h1 className="mt-1 text-lg font-semibold">3D building analysis</h1>
+        <h1 className="mt-1 text-lg font-semibold">See your actual house on satellite</h1>
         <p className="mt-1 text-xs leading-relaxed text-slate-300">
-          Map-derived 3D building footprints. Click “Set house”
+          Real aerial imagery with mapped OpenStreetMap buildings. Click “Set house”
           and select your exact roof if browser location is inaccurate.
         </p>
       </div>
 
-      <div className="absolute right-5 top-5 z-10 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#07111c]/90 shadow-xl backdrop-blur-xl">
-        <button type="button" onClick={zoomIn} className="h-11 w-11 text-lg font-semibold text-white hover:bg-white/10">+</button>
-        <button type="button" onClick={zoomOut} className="h-11 w-11 border-t border-white/10 text-lg font-semibold text-white hover:bg-white/10">−</button>
-        <button type="button" onClick={resetView} className="border-t border-white/10 px-3 py-2 text-[11px] font-semibold text-cyan-200 hover:bg-white/10">My roof</button>
-        <button
-          type="button"
-          onClick={() => {
-            setPinMode((value) => !value);
-            setPinStatus("");
-          }}
-          className={
-            "border-t border-white/10 px-3 py-2 text-[10px] font-semibold " +
-            (pinMode ? "bg-cyan-400/20 text-cyan-100" : "text-slate-200 hover:bg-white/10")
-          }
-        >
-          {pinMode ? "Click your roof" : "Set house"}
-        </button>
+      <div className="pointer-events-none absolute right-5 top-5 z-10 w-72 rounded-2xl border border-white/10 bg-[#07111c]/90 p-4 text-white shadow-2xl backdrop-blur-xl">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-cyan-300">
+          Live Solar Data
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+          <div><span className="text-slate-400">Latitude</span><br />{location.latitude.toFixed(6)}</div>
+          <div><span className="text-slate-400">Longitude</span><br />{location.longitude.toFixed(6)}</div>
+          <div><span className="text-slate-400">Roof area</span><br />{Number.isFinite(roofAreaSqFt) ? `${roofAreaSqFt.toFixed(0)} sq ft` : "--"}</div>
+          <div><span className="text-slate-400">Panels</span><br />{Number.isFinite(panelCount) ? panelCount : "--"}</div>
+          <div><span className="text-slate-400">Direction</span><br />{direction}</div>
+          <div><span className="text-slate-400">Tilt</span><br />{slope}°</div>
+          <div><span className="text-slate-400">Sunrise</span><br />{sunrise}</div>
+          <div><span className="text-slate-400">Solar noon</span><br />{solarNoon}</div>
+          <div><span className="text-slate-400">Sunset</span><br />{sunset}</div>
+          <div><span className="text-slate-400">Mapped roof</span><br />{targetArea > 0 ? `${targetArea.toFixed(0)} m²` : "--"}</div>
+        </div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-5 left-5 z-10 max-w-lg rounded-xl border border-white/10 bg-[#07111c]/90 px-4 py-3 text-xs text-slate-200 backdrop-blur-xl">
-        <div>{pinStatus || status || error}</div>
+
+      <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#07111c]/95 px-5 py-3 text-center text-xs text-slate-200 shadow-2xl backdrop-blur-xl">
+        <div className={`flex items-center justify-center gap-2 font-semibold ${satellite ? "text-emerald-300" : "text-amber-300"}`}>
+          <span className={`h-2.5 w-2.5 rounded-full ${satellite ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" : "bg-amber-400"}`} />
+          {satellite ? "Real Satellite Reference" : "Planning Visualization"}
+        </div>
+        <div className="mt-1 text-[11px] text-slate-400">
+          {satellite
+            ? `Esri World Imagery • centered on your GPS • ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+            : `No satellite image loaded • GPS center • ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`}
+        </div>
+        <div className="mt-1 text-[10px] text-slate-500">
+          Green target = mapped building footprint from OpenStreetMap
+        </div>
+      </div>
+
+      <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-xl border border-white/10 bg-[#07111c]/90 px-4 py-3 text-xs text-slate-200 shadow-xl backdrop-blur-xl">
+        <div className="font-semibold text-white">RoofRay visual</div>
+        <div className="mt-2 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-400" />Your House</div>
+        <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-400" />Nearby Buildings</div>
+        <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Sun Path</div>
+      </div>
+
+      <div className="absolute bottom-5 right-5 z-10 flex items-center gap-2">
         {error && (
-          <div className="mt-1 text-[10px] text-amber-200">
-            If browser location is inaccurate, enable Precise Location or use “Set house”.
+          <div className="max-w-sm rounded-xl border border-amber-300/20 bg-[#07111c]/90 px-4 py-3 text-xs text-amber-100 shadow-xl backdrop-blur-xl">
+            {error}
           </div>
         )}
       </div>
 
       <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-2xl border border-white/10 bg-[#07111c]/90 px-4 py-4 text-xs text-slate-200 backdrop-blur-xl">
         <div className="font-semibold text-white">RoofRay overlay</div>
-        <div className="mt-2 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />Other / mapped building</div>
+        <div className="mt-2 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />Mapped building</div>
         <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-blue-500" />Solar panels</div>
         <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Sun path</div>
       </div>
