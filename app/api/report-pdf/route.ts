@@ -333,6 +333,52 @@ function pointInPolygon(
   return inside;
 }
 
+function mappedBuildingFromRoofContext(
+  roof: Record<string, unknown> | null,
+  latitude: number,
+  longitude: number,
+): MappedBuilding | null {
+  const polygon = Array.isArray(roof?.polygon)
+    ? (roof.polygon as Array<Record<string, unknown>>)
+        .map((point) => ({
+          latitude: numberValue(point.latitude),
+          longitude: numberValue(point.longitude),
+        }))
+        .filter(
+          (point): point is { latitude: number; longitude: number } =>
+            point.latitude !== null && point.longitude !== null,
+        )
+    : [];
+
+  if (polygon.length < 3) return null;
+
+  const mLat = 111320;
+  const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
+  const projected = polygon.map((point) => ({
+    x: (point.longitude - longitude) * mLon,
+    y: (point.latitude - latitude) * mLat,
+  }));
+  let areaM2 = 0;
+  for (let i = 0; i < projected.length; i += 1) {
+    const next = projected[(i + 1) % projected.length];
+    areaM2 += projected[i].x * next.y - next.x * projected[i].y;
+  }
+  areaM2 = Math.abs(areaM2) / 2;
+  if (areaM2 < 12 || areaM2 > 100000) return null;
+
+  const levels = Math.max(1, numberValue(roof?.levels) ?? numberValue(roof?.["building:levels"]) ?? 1);
+  const height = Math.max(3, numberValue(roof?.heightMeters) ?? levels * 3);
+
+  return {
+    polygon,
+    areaM2,
+    containsTarget: true,
+    distanceMeters: 0,
+    heightMeters: height,
+    levels,
+  };
+}
+
 async function fetchMappedBuildings(
   latitude: number,
   longitude: number,
@@ -1557,7 +1603,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const mappedBuildings = await fetchMappedBuildings(lat, lon);
+    let mappedBuildings = await fetchMappedBuildings(lat, lon);
+
+    // Reuse the exact roof footprint already obtained during solar analysis when
+    // the PDF's independent Overpass request is unavailable. This prevents a
+    // valid mapped roof from turning into an empty 3D scene just because a
+    // second map request timed out or hit an Overpass rate limit.
+    if (!mappedBuildings.length) {
+      const contextRoof = (context.roof ?? null) as Record<string, unknown> | null;
+      const fallbackRoof = mappedBuildingFromRoofContext(contextRoof, lat, lon);
+      if (fallbackRoof) mappedBuildings = [fallbackRoof];
+    }
+
     const satelliteTiles = await fetchSatelliteTiles(lat, lon);
     const roofPhoto = decodeJpegDataUrl(
       body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
