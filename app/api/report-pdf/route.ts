@@ -445,6 +445,99 @@ out geom tags qt;`;
     if (data?.elements?.length) break;
   }
 
+  // If Overpass is unavailable in the deployed runtime, use Nominatim's
+  // reverse OSM lookup as a second building-footprint source. This only accepts
+  // a polygon that Nominatim itself identifies as a building/house.
+  if (!data?.elements?.length) {
+    try {
+      const nominatimUrl =
+        "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=" +
+        encodeURIComponent(String(latitude)) +
+        "&lon=" +
+        encodeURIComponent(String(longitude)) +
+        "&zoom=18&addressdetails=1&polygon_geojson=1";
+      const response = await fetch(nominatimUrl, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "RoofRay solar feasibility report",
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(12000),
+      });
+      if (response.ok) {
+        const reverse = (await response.json()) as {
+          category?: string;
+          type?: string;
+          geometry?: { type?: string; coordinates?: unknown };
+        };
+        const isBuilding =
+          reverse.category === "building" ||
+          ["house", "residential", "apartments", "detached", "terrace"].includes(
+            String(reverse.type ?? "").toLowerCase(),
+          );
+        const coordinates = reverse.geometry?.coordinates;
+        const ring =
+          reverse.geometry?.type === "Polygon" &&
+          Array.isArray(coordinates) &&
+          Array.isArray(coordinates[0])
+            ? coordinates[0]
+            : null;
+
+        if (isBuilding && ring && ring.length >= 3) {
+          const polygon = ring
+            .map((point) =>
+              Array.isArray(point) && point.length >= 2
+                ? {
+                    latitude: Number(point[1]),
+                    longitude: Number(point[0]),
+                  }
+                : null,
+            )
+            .filter(
+              (point): point is { latitude: number; longitude: number } =>
+                point !== null &&
+                Number.isFinite(point.latitude) &&
+                Number.isFinite(point.longitude),
+            );
+
+          if (polygon.length >= 3) {
+            const mLat = 111320;
+            const mLon =
+              111320 * Math.cos((latitude * Math.PI) / 180);
+            const projected = polygon.map((point) => ({
+              x: (point.longitude - longitude) * mLon,
+              y: (point.latitude - latitude) * mLat,
+            }));
+            let areaM2 = 0;
+            for (let i = 0; i < projected.length; i += 1) {
+              const next = projected[(i + 1) % projected.length];
+              areaM2 +=
+                projected[i].x * next.y - next.x * projected[i].y;
+            }
+            areaM2 = Math.abs(areaM2) / 2;
+            if (areaM2 >= 12 && areaM2 <= 100000) {
+              return [
+                {
+                  polygon,
+                  areaM2,
+                  containsTarget: pointInPolygon(
+                    { x: 0, y: 0 },
+                    projected,
+                  ),
+                  distanceMeters: 0,
+                  heightMeters: 3,
+                  levels: 1,
+                },
+              ];
+            }
+          }
+        }
+      }
+    } catch {
+      // Keep the existing roof-context fallback if Nominatim is unavailable.
+    }
+  }
+
   if (!data) return [];
 
   const mLat = 111320;
