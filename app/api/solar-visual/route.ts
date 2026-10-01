@@ -4,6 +4,7 @@ type SolarVisualBody = {
   latitude?: number;
   longitude?: number;
   analysis?: Record<string, unknown> | null;
+  satelliteReferenceDataUrl?: string | null;
 };
 
 function finiteCoordinate(value: unknown, min: number, max: number): number | null {
@@ -134,12 +135,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const satelliteBase64 = await fetchSatelliteReference(latitude, longitude);
+    // Prefer a browser-fetched satellite reference. This avoids deployments where
+    // outbound requests to ArcGIS imagery are blocked. If the browser could not
+    // fetch it, keep trying server-side, but do not fail the whole AI visual.
+    let satelliteBase64: string | null = null;
+    const clientReference = typeof body.satelliteReferenceDataUrl === "string"
+      ? body.satelliteReferenceDataUrl.trim()
+      : "";
+    if (clientReference.startsWith("data:image/") && clientReference.length < 8_000_000) {
+      const comma = clientReference.indexOf(",");
+      if (comma > 0) {
+        satelliteBase64 = clientReference.slice(comma + 1);
+      }
+    }
+
     if (!satelliteBase64) {
-      return NextResponse.json(
-        { ok: false, error: "Satellite reference imagery could not be loaded for this location." },
-        { status: 502 },
-      );
+      satelliteBase64 = await fetchSatelliteReference(latitude, longitude);
     }
 
     const summary = sunSummary(body.analysis);
@@ -147,9 +158,13 @@ export async function POST(request: Request) {
     const panelCount = Number((body.analysis?.planningEstimate as any)?.panelCount);
 
     const prompt = [
-      "Create a polished RoofRay solar feasibility visual using the supplied satellite image as the geographic reference.",
-      "The supplied image is centered exactly on the user's GPS coordinate. Preserve the real neighborhood layout, roads, building arrangement, and overall viewpoint from the reference image as much as possible.",
-      "Do not invent a different city or a generic house scene.",
+      satelliteBase64
+        ? "Create a polished RoofRay solar feasibility visual using the supplied satellite image as the geographic reference."
+        : "Create a polished RoofRay solar feasibility visual centered on the supplied GPS coordinate. No satellite reference image is available, so create a plausible aerial neighborhood visualization rather than claiming exact building geometry.",
+      satelliteBase64
+        ? "The supplied image is centered exactly on the user's GPS coordinate. Preserve the real neighborhood layout, roads, building arrangement, and overall viewpoint from the reference image as much as possible."
+        : "Use the GPS coordinate and solar data to make the scene geographically plausible, but do not claim that the generated building geometry is survey-grade exact.",
+      "Do not invent a different city or unrelated landscape.",
       "Identify the building closest to the exact image center as the target house and highlight ONLY that target building with a green translucent outline/fill.",
       "Highlight surrounding buildings with a subtle blue outline so the target house is visually distinct.",
       "Place a realistic solar panel array on the target roof only when the roof area and panel count indicate one is planned.",
@@ -183,11 +198,15 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           model: "gemini-3.1-flash-image",
           input: [
-            {
-              type: "image",
-              mime_type: "image/jpeg",
-              data: satelliteBase64,
-            },
+            ...(satelliteBase64
+              ? [
+                  {
+                    type: "image",
+                    mime_type: "image/jpeg",
+                    data: satelliteBase64,
+                  },
+                ]
+              : []),
             {
               type: "text",
               text: prompt,
@@ -229,7 +248,7 @@ export async function POST(request: Request) {
       ok: true,
       image: "data:image/jpeg;base64," + imageBase64,
       generatedBy: "Gemini 3.1 Flash Image",
-      reference: "Esri World Imagery",
+      reference: satelliteBase64 ? "Esri World Imagery" : "GPS + RoofRay solar analysis",
     });
   } catch (error) {
     console.error("[RoofRay] Solar visual generation failed:", error);
