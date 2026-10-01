@@ -537,7 +537,7 @@ function roofVisualCommands({
   // building rather than producing an empty roof panel card.
   const mappedTarget =
     exactTarget ??
-    mappedBuildings.find((building) => building.distanceMeters <= 150) ??
+    mappedBuildings.find((building) => building.distanceMeters <= 450) ??
     null;
   const actualRoofPolygon =
     roofPolygon.length >= 3 ? roofPolygon : (mappedTarget?.polygon ?? []);
@@ -750,7 +750,7 @@ function roofVisualCommands({
       (target.x + 8).toFixed(1) + " " + (target.y + 6).toFixed(1) + " 72 14 re f",
       "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
         (target.x + 11).toFixed(1) + " " + (target.y + 10).toFixed(1) +
-        " Td (LOCATION - NO MAPPED BUILDING WITHIN 150M) Tj ET",
+        " Td (LOCATION - NO MAPPED BUILDING WITHIN 450M) Tj ET",
     );
   }
 
