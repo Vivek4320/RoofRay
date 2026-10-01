@@ -80,6 +80,7 @@ type MappedBuilding = {
   distanceMeters: number;
   heightMeters: number;
   levels: number;
+  source?: "osm" | "planning";
 };
 
 type SatelliteTile = {
@@ -404,6 +405,7 @@ function mappedBuildingFromRoofContext(
 
   return {
     polygon,
+    source: "planning",
     areaM2,
     containsTarget: true,
     distanceMeters: 0,
@@ -873,7 +875,7 @@ function roofVisualCommands({
     if (building === mappedTarget) {
       const cx = roof.reduce((sum, p) => sum + p.x, 0) / roof.length;
       const cy = roof.reduce((sum, p) => sum + p.y, 0) / roof.length;
-      const label = building.containsTarget ? "YOUR HOUSE" : "NEAREST MAPPED BUILDING";
+      const label = building.source === "planning" ? "PLANNING ROOF AREA" : building.containsTarget ? "YOUR HOUSE" : "NEAREST MAPPED BUILDING";
       commands.push(
         "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
           (cx - 25).toFixed(1) + " " + (cy + 5).toFixed(1) +
