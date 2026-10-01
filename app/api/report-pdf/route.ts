@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
+<<<<<<< HEAD
 import { gunzipSync } from "node:zlib";
+=======
+import { readFile } from "node:fs/promises";
+import { deflateSync, inflateSync } from "node:zlib";
+import { join } from "node:path";
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
 
 type PdfBody = {
   report?: unknown;
@@ -102,6 +108,125 @@ type RoofPhoto = {
   width: number;
   height: number;
 };
+
+
+type LogoImage = {
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+};
+
+function decodeRoofRayLogo(buffer: Uint8Array): LogoImage | null {
+  try {
+    if (buffer.length < 33) return null;
+    const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+    for (let i = 0; i < signature.length; i += 1) {
+      if (buffer[i] !== signature[i]) return null;
+    }
+
+    let offset = 8;
+    let width = 0;
+    let height = 0;
+    let bitDepth = 0;
+    let colorType = 0;
+    const idat: Uint8Array[] = [];
+
+    while (offset + 8 <= buffer.length) {
+      const length =
+        buffer[offset] * 0x1000000 +
+        buffer[offset + 1] * 0x10000 +
+        buffer[offset + 2] * 0x100 +
+        buffer[offset + 3];
+      const type = String.fromCharCode(
+        buffer[offset + 4],
+        buffer[offset + 5],
+        buffer[offset + 6],
+        buffer[offset + 7],
+      );
+      const dataStart = offset + 8;
+      const dataEnd = dataStart + length;
+      if (dataEnd > buffer.length) return null;
+      const data = buffer.subarray(dataStart, dataEnd);
+
+      if (type === "IHDR" && length >= 13) {
+        width = data[0] * 0x1000000 + data[1] * 0x10000 + data[2] * 0x100 + data[3];
+        height = data[4] * 0x1000000 + data[5] * 0x10000 + data[6] * 0x100 + data[7];
+        bitDepth = data[8];
+        colorType = data[9];
+      } else if (type === "IDAT") {
+        idat.push(data);
+      } else if (type === "IEND") {
+        break;
+      }
+      offset = dataEnd + 4;
+    }
+
+    if (!width || !height || bitDepth !== 8 || !idat.length) return null;
+    const channels =
+      colorType === 6 ? 4 :
+      colorType === 2 ? 3 :
+      colorType === 4 ? 2 :
+      colorType === 0 ? 1 : 0;
+    if (!channels) return null;
+
+    const filtered = inflateSync(Buffer.concat(idat.map((part) => Buffer.from(part))));
+    const rowBytes = width * channels;
+    if (filtered.length < (rowBytes + 1) * height) return null;
+    const raw = new Uint8Array(rowBytes * height);
+
+    const paeth = (a: number, b: number, c: number) => {
+      const p = a + b - c;
+      const pa = Math.abs(p - a);
+      const pb = Math.abs(p - b);
+      const pc = Math.abs(p - c);
+      return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+    };
+
+    for (let y = 0; y < height; y += 1) {
+      const filter = filtered[y * (rowBytes + 1)];
+      const srcStart = y * (rowBytes + 1) + 1;
+      const dstStart = y * rowBytes;
+      for (let x = 0; x < rowBytes; x += 1) {
+        const left = x >= channels ? raw[dstStart + x - channels] : 0;
+        const up = y > 0 ? raw[dstStart - rowBytes + x] : 0;
+        const upLeft = y > 0 && x >= channels ? raw[dstStart - rowBytes + x - channels] : 0;
+        const value = filtered[srcStart + x];
+        raw[dstStart + x] =
+          filter === 0 ? value :
+          filter === 1 ? (value + left) & 255 :
+          filter === 2 ? (value + up) & 255 :
+          filter === 3 ? (value + Math.floor((left + up) / 2)) & 255 :
+          filter === 4 ? (value + paeth(left, up, upLeft)) & 255 :
+          value;
+      }
+    }
+
+    const rgb = Buffer.alloc(width * height * 3);
+    const bg = [4, 21, 43];
+    let out = 0;
+    for (let i = 0; i < width * height; i += 1) {
+      const src = i * channels;
+      let r = 0, g = 0, b = 0, a = 255;
+      if (colorType === 6) {
+        r = raw[src]; g = raw[src + 1]; b = raw[src + 2]; a = raw[src + 3];
+      } else if (colorType === 2) {
+        r = raw[src]; g = raw[src + 1]; b = raw[src + 2];
+      } else if (colorType === 4) {
+        r = g = b = raw[src]; a = raw[src + 1];
+      } else {
+        r = g = b = raw[src];
+      }
+      const alpha = a / 255;
+      rgb[out++] = Math.round(r * alpha + bg[0] * (1 - alpha));
+      rgb[out++] = Math.round(g * alpha + bg[1] * (1 - alpha));
+      rgb[out++] = Math.round(b * alpha + bg[2] * (1 - alpha));
+    }
+
+    return { bytes: new Uint8Array(deflateSync(rgb)), width, height };
+  } catch {
+    return null;
+  }
+}
 
 function decodeJpegDataUrl(dataUrl: unknown): RoofPhoto | null {
   if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/jpeg;base64,")) return null;
@@ -998,9 +1123,9 @@ function roofVisualCommands({
   const sideW = 164;
   const sideH = 559;
   const mapX = 190;
-  const mapY = 250;
+  const mapY = 215;
   const mapW = 634;
-  const mapH = 310;
+  const mapH = 295;
 
   // Use a local metre projection for the PDF scene. This is more
   // reliable than a fixed Web-Mercator tile window because Microsoft
@@ -1132,7 +1257,11 @@ function roofVisualCommands({
         ? (isTarget ? "0.10 0.34 0.76 rg" : isTall ? "0.78 0.48 0.10 rg" : "0.76 0.79 0.82 rg")
         : (isTarget ? "0.14 0.43 0.88 rg" : isTall ? "0.88 0.57 0.14 rg" : "0.84 0.86 0.88 rg");
       commands.push(
+<<<<<<< HEAD
         sideTone,
+=======
+        building.containsTarget ? "0.02 0.45 0.78 rg" : "0.12 0.38 0.70 rg",
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
         face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
         face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
         face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
@@ -1141,9 +1270,15 @@ function roofVisualCommands({
     }
 
     commands.push(
+<<<<<<< HEAD
       isTarget ? "0.34 0.68 1.00 rg" : isTall ? "0.98 0.74 0.30 rg" : "0.96 0.97 0.98 rg",
       isTarget ? "0.06 0.30 0.72 RG" : isTall ? "0.78 0.48 0.10 RG" : "0.62 0.66 0.70 RG",
       "0.9 w",
+=======
+      building.containsTarget ? "0.04 0.62 0.95 rg" : "0.20 0.52 0.86 rg",
+      building.containsTarget ? "0.45 0.90 1.00 RG" : "0.45 0.82 1.00 RG",
+      "1 w",
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
       roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
     );
     for (let i = 1; i < roof.length; i += 1) {
@@ -1413,8 +1548,8 @@ function roofVisualCommands({
   );
 
   // Bottom analysis cards.
-  const cardY = 30;
-  const cardH = 198;
+  const cardY = 18;
+  const cardH = 180;
   const cardGap = 10;
   const cardW = (mapW - cardGap * 2) / 3;
   const cardXs = [mapX, mapX + cardW + cardGap, mapX + (cardW + cardGap) * 2];
@@ -1749,12 +1884,34 @@ function roofVisualCommands({
     "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 88 Td (Aerial: available imagery | 3D: mapped building geometry.) Tj ET",
   );
 
+  const letterhead = [
+    "0.02 0.07 0.14 rg",
+    "18 523 806 54 re f",
+    "0.10 0.58 0.95 rg",
+    "18 521 806 2 re f",
+    "BT /F2 16 Tf 0.98 0.98 0.98 rg 150 551 Td (RoofRay Solar Feasibility Report) Tj ET",
+    "BT /F1 7 Tf 0.68 0.82 0.95 rg 150 537 Td (LOCATION-BASED ROOFTOP SOLAR SITE ASSESSMENT) Tj ET",
+    "BT /F1 6 Tf 0.70 0.78 0.86 rg 676 551 Td (CONFIDENTIAL) Tj ET",
+  ];
+  if (logoImage) {
+    letterhead.push("q", "100 0 0 36 34 532 cm", "/RoofRayLogo Do", "Q");
+  } else {
+    letterhead.push("BT /F2 15 Tf 0.98 0.98 0.98 rg 34 551 Td (RoofRay) Tj ET");
+  }
+
   return [
     ...commands,
+<<<<<<< HEAD
     "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 578 Td (3D SITE VIEW - BUILDING ANALYSIS) Tj ET",
     "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 565 Td (Clean 3D building map + target-house highlight + nearby building shading analysis) Tj ET",
     "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 536 Td (Blue = your house | Amber = nearby tall building | White/grey = other buildings | Yellow = sun path) Tj ET",
     "BT /F1 7 Tf 0.82 0.86 0.90 rg 208 522 Td (3D geometry is map-derived; building heights are estimates where source heights are unavailable.) Tj ET",
+=======
+    ...letterhead,
+    "BT /F2 17 Tf 0.98 0.98 0.98 rg 190 503 Td (3D Building Map & Nearby Shading Analysis) Tj ET",
+    "BT /F1 8 Tf 0.70 0.78 0.84 rg 190 490 Td (Real aerial imagery + 3D mapped buildings + roof panels + calculated sun path) Tj ET",
+    "BT /F2 8 Tf 0.98 0.98 0.98 rg 208 470 Td (Blue = nearby mapped buildings | Bright blue = target roof | Yellow = sun path) Tj ET",
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
   ];
 }
 
@@ -1780,7 +1937,11 @@ function buildPdf(lines: string[], visual: {
   satelliteZoom: number;
   roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
+<<<<<<< HEAD
   reportLocation: { latitude: number; longitude: number };
+=======
+  logoImage: LogoImage | null;
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
 }): Uint8Array {
   const pageWidth = 842, pageHeight = 595, margin = 42, lineHeight = 15, linesPerPage = 32;
   const pages: string[][] = [];
@@ -1789,9 +1950,16 @@ function buildPdf(lines: string[], visual: {
 
   const visualPageIndex = pages.length;
   const totalPages = pages.length + 1;
+<<<<<<< HEAD
   const roofPhotoObject = 5 + visual.satelliteTiles.length;
   const aerialObject = roofPhotoObject + (visual.roofPhoto ? 1 : 0);
   const pageObjectStart = 5 + visual.satelliteTiles.length + (visual.roofPhoto ? 1 : 0) + (visual.roofAerialImage ? 1 : 0);
+=======
+  const logoObject = 5;
+  const satelliteObjectStart = 6;
+  const roofPhotoObject = satelliteObjectStart + visual.satelliteTiles.length;
+  const pageObjectStart = satelliteObjectStart + visual.satelliteTiles.length + (visual.roofPhoto ? 1 : 0);
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
   const objects: Array<string | Buffer> = [];
 
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
@@ -1800,6 +1968,30 @@ function buildPdf(lines: string[], visual: {
     "] /Count " + totalPages + " >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+
+  if (visual.logoImage) {
+    const logo = visual.logoImage;
+    objects.push(
+      Buffer.concat([
+        Buffer.from(
+          "<< /Type /XObject /Subtype /Image /Width " + logo.width +
+          " /Height " + logo.height +
+          " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length " +
+          logo.bytes.length + " >>\\nstream\\n",
+          "ascii",
+        ),
+        Buffer.from(logo.bytes),
+        Buffer.from("\\nendstream", "ascii"),
+      ]),
+    );
+  } else {
+    objects.push(
+      Buffer.from(
+        "<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length 3 >>\\nstream\\n\\x00\\x00\\x00\\nendstream",
+        "binary",
+      ),
+    );
+  }
 
   for (let i = 0; i < visual.satelliteTiles.length; i += 1) {
     const tile = visual.satelliteTiles[i];
@@ -1857,6 +2049,7 @@ function buildPdf(lines: string[], visual: {
   for (let i = 0; i < totalPages; i += 1) {
     const pageObject = pageObjectStart + i * 2;
     const contentObject = pageObject + 1;
+<<<<<<< HEAD
     const xObjectEntries = i === visualPageIndex && (visual.satelliteTiles.length || visual.roofPhoto || visual.roofAerialImage)
       ? " /XObject << " +
         visual.satelliteTiles.map((tile) => "/" + tile.name + " " + (5 + visual.satelliteTiles.indexOf(tile)) + " 0 R").join(" ") +
@@ -1864,10 +2057,33 @@ function buildPdf(lines: string[], visual: {
         (visual.roofAerialImage ? " /RoofAerial " + aerialObject + " 0 R" : "") +
         " >>"
       : "";
+=======
+    const visualXObjects = visual.satelliteTiles.map((tile) =>
+      "/" + tile.name + " " + (satelliteObjectStart + visual.satelliteTiles.indexOf(tile)) + " 0 R"
+    ).join(" ");
+    const xObjectEntries =
+      " /XObject << /RoofRayLogo " + logoObject + " 0 R " +
+      visualXObjects +
+      (visual.roofPhoto ? " /RoofPhoto " + roofPhotoObject + " 0 R" : "") +
+      " >>";
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
     const contentLines = i === visualPageIndex
       ? roofVisualCommands(visual)
-      : ["BT", "/F2 18 Tf", margin + " " + (pageHeight - 58) + " Td", "(RoofRay Solar Feasibility Report) Tj", "/F1 10 Tf", "0 -28 Td",
-        ...pages[i].flatMap((line, index) => ["(" + text(line) + ") Tj", ...(index === pages[i].length - 1 ? [] : ["0 -" + lineHeight + " Td"])]), "ET"];
+      : [
+        "0.02 0.07 0.14 rg",
+        "0 535 842 60 re f",
+        "0.10 0.58 0.95 rg",
+        "0 533 842 2 re f",
+        "q", "100 0 0 36 42 546 cm", "/RoofRayLogo Do", "Q",
+        "BT", "/F2 16 Tf", "0.98 0.98 0.98 rg", "155 563 Td", "(RoofRay Solar Feasibility Report) Tj",
+        "/F1 7 Tf", "0 -15 Td", "(LOCATION-BASED ROOFTOP SOLAR FEASIBILITY) Tj", "ET",
+        "BT", "/F2 11 Tf", "0.02 0.07 0.14 rg", margin + " " + (pageHeight - 92) + " Td", "(Site Analysis Summary) Tj",
+        "/F1 10 Tf", "0 -22 Td",
+        ...pages[i].flatMap((line, index) => ["(" + text(line) + ") Tj", ...(index === pages[i].length - 1 ? [] : ["0 -" + lineHeight + " Td"])]),
+        "ET",
+        "0.10 0.58 0.95 rg", "42 34 758 1 re f",
+        "BT", "/F1 7 Tf", "0.35 0.43 0.52 rg", "42 22 Td", "(RoofRay | Solar Feasibility Report | Preliminary planning estimate) Tj", "ET",
+      ];
 
     const stream = contentLines.join("\n");
     objects[pageObject - 1] =
@@ -1973,6 +2189,13 @@ export async function POST(request: Request) {
     const roofPhoto = decodeJpegDataUrl(
       body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
     );
+    let logoImage: LogoImage | null = null;
+    try {
+      const logoPath = join(process.cwd(), "public", "Logo-removebg-preview.png");
+      logoImage = decodeRoofRayLogo(new Uint8Array(await readFile(logoPath)));
+    } catch (logoError) {
+      console.warn("[RoofRay] Report logo could not be loaded:", logoError);
+    }
     console.info("[RoofRay] PDF visual data", {
       latitude: lat,
       longitude: lon,
@@ -1981,7 +2204,11 @@ export async function POST(request: Request) {
       satelliteTiles: satelliteTiles.length,
       roofAerialImage: Boolean(roofAerialImage),
       roofPhoto: Boolean(roofPhoto),
+<<<<<<< HEAD
       reportCenter: { latitude: lat, longitude: lon },
+=======
+      roofRayLogo: Boolean(logoImage),
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
     });
     const reportText = String(body.report ?? "");
     const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
@@ -2059,7 +2286,11 @@ export async function POST(request: Request) {
       satelliteZoom,
       roofAerialImage,
       roofPhoto,
+<<<<<<< HEAD
       reportLocation: { latitude: lat, longitude: lon },
+=======
+      logoImage,
+>>>>>>> 346802a9f1096c94ed1323f50bce7611e7e63e93
     });
     return new NextResponse(Buffer.from(pdf), {
       status: 200,
