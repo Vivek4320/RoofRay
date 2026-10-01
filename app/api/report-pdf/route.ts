@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { deflateSync, inflateSync } from "node:zlib";
+import { join } from "node:path";
 
 type PdfBody = {
   report?: unknown;
@@ -1456,8 +1457,21 @@ function buildPdf(lines: string[], visual: {
       " >>";
     const contentLines = i === visualPageIndex
       ? roofVisualCommands(visual)
-      : ["BT", "/F2 18 Tf", margin + " " + (pageHeight - 58) + " Td", "(RoofRay Solar Feasibility Report) Tj", "/F1 10 Tf", "0 -28 Td",
-        ...pages[i].flatMap((line, index) => ["(" + text(line) + ") Tj", ...(index === pages[i].length - 1 ? [] : ["0 -" + lineHeight + " Td"])]), "ET"];
+      : [
+        "0.02 0.07 0.14 rg",
+        "0 535 842 60 re f",
+        "0.10 0.58 0.95 rg",
+        "0 533 842 2 re f",
+        "q", "100 0 0 36 42 546 cm", "/RoofRayLogo Do", "Q",
+        "BT", "/F2 16 Tf", "0.98 0.98 0.98 rg", "155 563 Td", "(RoofRay Solar Feasibility Report) Tj",
+        "/F1 7 Tf", "0 -15 Td", "(LOCATION-BASED ROOFTOP SOLAR FEASIBILITY) Tj", "ET",
+        "BT", "/F2 11 Tf", "0.02 0.07 0.14 rg", margin + " " + (pageHeight - 92) + " Td", "(Site Analysis Summary) Tj",
+        "/F1 10 Tf", "0 -22 Td",
+        ...pages[i].flatMap((line, index) => ["(" + text(line) + ") Tj", ...(index === pages[i].length - 1 ? [] : ["0 -" + lineHeight + " Td"])]),
+        "ET",
+        "0.10 0.58 0.95 rg", "42 34 758 1 re f",
+        "BT", "/F1 7 Tf", "0.35 0.43 0.52 rg", "42 22 Td", "(RoofRay | Solar Feasibility Report | Preliminary planning estimate) Tj", "ET",
+      ];
 
     const stream = contentLines.join("\n");
     objects[pageObject - 1] =
@@ -1546,7 +1560,7 @@ export async function POST(request: Request) {
     );
     let logoImage: LogoImage | null = null;
     try {
-      const logoPath = new URL("../../../public/Logo-removebg-preview.png", import.meta.url);
+      const logoPath = join(process.cwd(), "public", "Logo-removebg-preview.png");
       logoImage = decodeRoofRayLogo(new Uint8Array(await readFile(logoPath)));
     } catch (logoError) {
       console.warn("[RoofRay] Report logo could not be loaded:", logoError);
