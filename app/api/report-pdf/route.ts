@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
-import { deflateSync, inflateSync } from "node:zlib";
+import { gunzipSync, deflateSync, inflateSync } from "node:zlib";
 import { join } from "node:path";
 
 type PdfBody = {
   report?: unknown;
   solarContext?: Record<string, unknown> | null;
   userInputs?: Record<string, unknown> | null;
+  roofPhotoDataUrl?: unknown;
 };
 
 function text(value: unknown): string {
@@ -89,6 +90,13 @@ type SatelliteTile = {
   y: number;
   w: number;
   h: number;
+};
+
+type RoofAerialImage = {
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+  source: "mappls" | "esri";
 };
 
 type RoofPhoto = {
@@ -259,6 +267,66 @@ function webMercatorPixel(latitude: number, longitude: number, zoom: number) {
   return { x, y, size };
 }
 
+async function fetchMapplsStillImage(
+  latitude: number,
+  longitude: number,
+): Promise<RoofAerialImage | null> {
+  const restKey = process.env.MAPPLS_REST_KEY;
+  if (!restKey) return null;
+
+  const urls = [
+    "https://apis.mapmyindia.com/advancedmaps/v1/" +
+      encodeURIComponent(restKey) +
+      "/still_image?center=" +
+      encodeURIComponent(latitude + "," + longitude) +
+      "&zoom=18&size=1000x700&ssf=1&markers=" +
+      encodeURIComponent(latitude + "," + longitude),
+    "https://apis.mappls.com/advancedmaps/v1/" +
+      encodeURIComponent(restKey) +
+      "/still_image?center=" +
+      encodeURIComponent(latitude + "," + longitude) +
+      "&zoom=18&size=1000x700&ssf=1&markers=" +
+      encodeURIComponent(latitude + "," + longitude),
+  ];
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "image/*" },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) continue;
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("image")) continue;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length < 1000) continue;
+      return { bytes, width: 1000, height: 700, source: "mappls" };
+    } catch {
+      // Try the next Mappls host, then fall back to Esri imagery.
+    }
+  }
+  return null;
+}
+
+function satelliteTileFingerprint(bytes: Uint8Array): string {
+  // We do not need to decode JPEGs server-side. Esri's no-imagery response
+  // is commonly the same placeholder image repeated across the whole tile
+  // window. Sampling deterministic byte positions lets us reject a window
+  // made entirely from identical placeholder tiles while keeping real
+  // satellite imagery fast.
+  if (bytes.length < 1200) return "tiny";
+  const positions = [
+    2,
+    Math.floor(bytes.length * 0.1),
+    Math.floor(bytes.length * 0.25),
+    Math.floor(bytes.length * 0.5),
+    Math.floor(bytes.length * 0.75),
+    bytes.length - 3,
+  ];
+  return positions.map((p) => bytes[Math.max(0, Math.min(bytes.length - 1, p))]).join(",");
+}
+
 async function fetchSatelliteTiles(
   latitude: number,
   longitude: number,
@@ -267,7 +335,7 @@ async function fetchSatelliteTiles(
   const center = webMercatorPixel(latitude, longitude, zoom);
   const centerTileX = Math.floor(center.x / 256);
   const centerTileY = Math.floor(center.y / 256);
-  const startX = centerTileX - 1;
+  const startX = centerTileX - 2;
   const startY = centerTileY - 1;
   const hosts = [
     "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile",
@@ -276,8 +344,11 @@ async function fetchSatelliteTiles(
   const tiles: SatelliteTile[] = [];
   const jobs: Array<Promise<void>> = [];
 
+  // Five columns x three rows gives a wider high-resolution site window
+  // around the exact GPS coordinate. The renderer scales this complete
+  // mosaic into the PDF map frame.
   for (let row = 0; row < 3; row += 1) {
-    for (let col = 0; col < 4; col += 1) {
+    for (let col = 0; col < 5; col += 1) {
       const tileX = startX + col;
       const tileY = startY + row;
       jobs.push(
@@ -296,16 +367,16 @@ async function fetchSatelliteTiles(
               tiles.push({
                 name: "ImSat" + row + "_" + col,
                 bytes,
-                // PDF coordinates grow upward, so the northern/top tile row
-                // is placed at the top of the 3-row mosaic.
+                // Keep source-image coordinates in ordinary screen order:
+                // row 0 is the northern/top row.
                 x: col * 256,
-                y: (2 - row) * 256,
+                y: row * 256,
                 w: 256,
                 h: 256,
               });
               return;
             } catch {
-              // Try the next ArcGIS host.
+              // Try the next imagery host.
             }
           }
         })(),
@@ -314,7 +385,40 @@ async function fetchSatelliteTiles(
   }
 
   await Promise.all(jobs);
+
+  // Do not accept an entire mosaic made from the same "Map data not
+  // available" placeholder. A successful HTTP 200 alone is not evidence
+  // that satellite imagery exists at this zoom level.
+  const fingerprints = new Set(
+    tiles.map((tile) => satelliteTileFingerprint(tile.bytes)),
+  );
+  if (tiles.length >= 8 && fingerprints.size < Math.min(3, tiles.length)) {
+    console.warn("[RoofRay] Satellite tile window appears to be placeholder imagery", {
+      zoom,
+      tiles: tiles.length,
+      uniqueTileFingerprints: fingerprints.size,
+    });
+    return [];
+  }
+
   return tiles.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function fetchRoofAerialImage(
+  latitude: number,
+  longitude: number,
+): Promise<RoofAerialImage | null> {
+  const mappls = await fetchMapplsStillImage(latitude, longitude);
+  if (mappls) return mappls;
+
+  for (const zoom of [20, 19, 18, 17]) {
+    const tiles = await fetchSatelliteTiles(latitude, longitude, zoom);
+    if (tiles.length >= 4) {
+      // Keep the existing tile renderer as the fallback path.
+      return null;
+    }
+  }
+  return null;
 }
 
 function pointInPolygon(
@@ -333,6 +437,332 @@ function pointInPolygon(
   return inside;
 }
 
+
+type PanelRect = { x: number; y: number; w: number; h: number };
+
+function fitPanelsToPolygon(
+  polygon: Array<{ x: number; y: number }>,
+  requestedPanels: number,
+): PanelRect[] {
+  if (polygon.length < 3 || requestedPanels <= 0) return [];
+
+  const minX = Math.min(...polygon.map((p) => p.x));
+  const maxX = Math.max(...polygon.map((p) => p.x));
+  const minY = Math.min(...polygon.map((p) => p.y));
+  const maxY = Math.max(...polygon.map((p) => p.y));
+  const roofW = maxX - minX;
+  const roofH = maxY - minY;
+  if (roofW < 8 || roofH < 8) return [];
+
+  const target = Math.min(40, Math.max(1, Math.round(requestedPanels)));
+  const aspect = 1.72;
+  let best: PanelRect[] = [];
+
+  // Try several real rectangular panel-grid configurations. A panel is
+  // accepted only when all four corners are inside the mapped roof polygon.
+  // This prevents panels from being drawn over roads/outside the roof.
+  for (const rotated of [false, true]) {
+    for (let cols = 1; cols <= Math.min(12, target); cols += 1) {
+      const rows = Math.ceil(target / cols);
+      const gap = Math.max(1.2, Math.min(3.5, Math.min(roofW, roofH) * 0.035));
+      const usableW = roofW * 0.86;
+      const usableH = roofH * 0.86;
+      const cellW = usableW / cols;
+      const cellH = usableH / rows;
+      let panelW = rotated ? cellH * aspect : cellW * 0.82;
+      let panelH = rotated ? cellW / aspect : cellH * 0.82;
+
+      if (rotated) {
+        panelW = Math.min(panelW, cellW * 0.82);
+        panelH = Math.min(panelH, cellH * 0.82);
+      } else {
+        const ratio = panelW / Math.max(panelH, 1);
+        if (ratio > aspect) panelW = panelH * aspect;
+        else panelH = panelW / aspect;
+      }
+
+      panelW = Math.max(4.5, panelW);
+      panelH = Math.max(3.5, panelH);
+
+      const rects: PanelRect[] = [];
+      const startX = minX + roofW * 0.07 + Math.max(0, (cellW - panelW) / 2);
+      const startY = minY + roofH * 0.07 + Math.max(0, (cellH - panelH) / 2);
+
+      for (let row = 0; row < rows && rects.length < target; row += 1) {
+        for (let col = 0; col < cols && rects.length < target; col += 1) {
+          const x = startX + col * cellW;
+          const y = startY + row * cellH;
+          const corners = [
+            { x, y },
+            { x: x + panelW, y },
+            { x: x + panelW, y: y + panelH },
+            { x, y: y + panelH },
+          ];
+          if (corners.every((corner) => pointInPolygon(corner, polygon))) {
+            rects.push({ x, y, w: panelW, h: panelH });
+          }
+        }
+      }
+
+      if (
+        rects.length > best.length ||
+        (rects.length === best.length && rects.length > 0 &&
+          rects[0].w * rects[0].h > best[0].w * best[0].h)
+      ) {
+        best = rects;
+      }
+      if (best.length >= target) return best;
+    }
+  }
+
+  return best;
+}
+
+function bingQuadKey(latitude: number, longitude: number, level = 9): string {
+  const n = 2 ** level;
+  const x = Math.floor(((longitude + 180) / 360) * n);
+  const sinLat = Math.sin((latitude * Math.PI) / 180);
+  const y = Math.floor(
+    ((0.5 - Math.log((1 + sinLat) / Math.max(1e-12, 1 - sinLat)) / (4 * Math.PI)) * n),
+  );
+  let quadKey = "";
+  for (let i = level; i > 0; i -= 1) {
+    const mask = 1 << (i - 1);
+    let digit = 0;
+    if (x & mask) digit += 1;
+    if (y & mask) digit += 2;
+    quadKey += String(digit);
+  }
+  return quadKey;
+}
+
+function parseSimpleCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (quoted && line[i + 1] === '"') {
+        field += '"';
+        i += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === "," && !quoted) {
+      fields.push(field.trim());
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+  fields.push(field.trim());
+  return fields;
+}
+
+function neighboringQuadKeys(latitude: number, longitude: number, level = 9): string[] {
+  const n = 2 ** level;
+  const x = Math.floor(((longitude + 180) / 360) * n);
+  const sinLat = Math.sin((latitude * Math.PI) / 180);
+  const y = Math.floor(
+    (0.5 - Math.log((1 + sinLat) / Math.max(1e-12, 1 - sinLat)) / (4 * Math.PI)) * n,
+  );
+  const keys: string[] = [];
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      const nx = Math.max(0, Math.min(n - 1, x + dx));
+      const ny = Math.max(0, Math.min(n - 1, y + dy));
+      let key = "";
+      for (let i = level; i > 0; i -= 1) {
+        const mask = 1 << (i - 1);
+        let digit = 0;
+        if (nx & mask) digit += 1;
+        if (ny & mask) digit += 2;
+        key += String(digit);
+      }
+      if (!keys.includes(key)) keys.push(key);
+    }
+  }
+  return keys;
+}
+
+async function fetchMicrosoftBuildingFootprints(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+): Promise<Array<{
+  polygon: Array<{ latitude: number; longitude: number }>;
+  heightMeters: number;
+}>> {
+  try {
+    const linksUrl = "https://bfppub.blob.core.windows.net/%24web/2026-08-13/dataset-links.csv";
+    const linksResponse = await fetch(linksUrl, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!linksResponse.ok) {
+      console.warn("[RoofRay] Microsoft links HTTP", linksResponse.status);
+      return [];
+    }
+
+    const lines = (await linksResponse.text()).split(/\r?\n/).filter(Boolean);
+    if (!lines.length) return [];
+
+    const header = parseSimpleCsvLine(lines[0]).map((value) => value.toLowerCase());
+    const locationIndex = header.indexOf("location");
+    const quadIndex = header.indexOf("quadkey");
+    const urlIndex = header.indexOf("url");
+    if (locationIndex < 0 || quadIndex < 0 || urlIndex < 0) {
+      console.warn("[RoofRay] Microsoft links CSV headers not found", header);
+      return [];
+    }
+
+    const rows = new Map<string, string>();
+    for (let i = 1; i < lines.length; i += 1) {
+      const fields = parseSimpleCsvLine(lines[i]);
+      const location = fields[locationIndex]?.toLowerCase();
+      const quad = fields[quadIndex];
+      const url = fields[urlIndex];
+      if (location === "india" && quad && url) rows.set(quad, url);
+    }
+
+    const quadKeys = neighboringQuadKeys(latitude, longitude, 9);
+    console.info("[RoofRay] Microsoft footprint lookup", {
+      quadKey: bingQuadKey(latitude, longitude, 9),
+      candidateTiles: quadKeys.length,
+      matchedTiles: quadKeys.filter((key) => rows.has(key)).length,
+    });
+
+    const latDelta = radiusMeters / 111320;
+    const lonDelta = radiusMeters / Math.max(1, 111320 * Math.cos((latitude * Math.PI) / 180));
+    const minLat = latitude - latDelta;
+    const maxLat = latitude + latDelta;
+    const minLon = longitude - lonDelta;
+    const maxLon = longitude + lonDelta;
+
+    const results: Array<{
+      polygon: Array<{ latitude: number; longitude: number }>;
+      heightMeters: number;
+    }> = [];
+
+    const orderedQuadKeys = [
+      quadKeys.find((key) => key === bingQuadKey(latitude, longitude, 9)) ?? quadKeys[0],
+      ...quadKeys.filter((key) => key !== bingQuadKey(latitude, longitude, 9)),
+    ];
+
+    for (const quadKey of orderedQuadKeys) {
+      const dataUrl = rows.get(quadKey);
+      if (!dataUrl) continue;
+
+      try {
+        console.info("[RoofRay] Microsoft footprint tile download", { quadKey });
+        const dataResponse = await fetch(dataUrl, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(
+            quadKey === bingQuadKey(latitude, longitude, 9) ? 120000 : 30000,
+          ),
+        });
+        if (!dataResponse.ok) {
+          console.warn("[RoofRay] Microsoft footprint tile HTTP", {
+            quadKey,
+            status: dataResponse.status,
+          });
+          continue;
+        }
+
+        const compressed = Buffer.from(await dataResponse.arrayBuffer());
+        const raw = gunzipSync(compressed).toString("utf8");
+        let parsedFeatures = 0;
+        let nearbyFeatures = 0;
+
+        for (const line of raw.split(/\r?\n/)) {
+          if (!line.trim()) continue;
+          try {
+            const feature = JSON.parse(line) as {
+              geometry?: { type?: string; coordinates?: unknown };
+              properties?: Record<string, unknown>;
+            };
+            parsedFeatures += 1;
+            const geometry = feature.geometry;
+            if (!geometry?.coordinates) continue;
+
+            let ring: unknown[] | null = null;
+            if (geometry.type === "Polygon") {
+              const coordinates = geometry.coordinates as unknown[];
+              ring = Array.isArray(coordinates?.[0]) ? coordinates[0] as unknown[] : null;
+            } else if (geometry.type === "MultiPolygon") {
+              const polygons = geometry.coordinates as unknown[];
+              const firstPolygon = polygons.find(
+                (polygon) => Array.isArray(polygon) && Array.isArray((polygon as unknown[])[0]),
+              );
+              ring = firstPolygon ? (firstPolygon as unknown[])[0] as unknown[] : null;
+            }
+            if (!ring || ring.length < 4) continue;
+
+            const polygon = ring
+              .map((point) =>
+                Array.isArray(point)
+                  ? { longitude: Number(point[0]), latitude: Number(point[1]) }
+                  : null,
+              )
+              .filter(
+                (point): point is { latitude: number; longitude: number } =>
+                  point !== null &&
+                  Number.isFinite(point.latitude) &&
+                  Number.isFinite(point.longitude),
+              );
+            if (polygon.length < 4) continue;
+
+            const pMinLat = Math.min(...polygon.map((p) => p.latitude));
+            const pMaxLat = Math.max(...polygon.map((p) => p.latitude));
+            const pMinLon = Math.min(...polygon.map((p) => p.longitude));
+            const pMaxLon = Math.max(...polygon.map((p) => p.longitude));
+            if (
+              pMaxLat < minLat || pMinLat > maxLat ||
+              pMaxLon < minLon || pMinLon > maxLon
+            ) continue;
+
+            const rawHeight = Number(
+              feature.properties?.height ??
+              feature.properties?.Height ??
+              feature.properties?.height_m ??
+              feature.properties?.heightMeters ??
+              -1,
+            );
+            const heightMeters =
+              Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 6;
+
+            results.push({ polygon, heightMeters });
+            nearbyFeatures += 1;
+            if (results.length >= 500) break;
+          } catch {
+            // Ignore malformed GeoJSONL records.
+          }
+        }
+
+        console.info("[RoofRay] Microsoft footprint tile parsed", {
+          quadKey,
+          parsedFeatures,
+          nearbyFeatures,
+          compressedBytes: compressed.length,
+        });
+
+        // The center tile is the only tile expected to contain the exact GPS
+        // neighbourhood. Stop immediately once it produced buildings.
+        if (nearbyFeatures > 0 || results.length >= 500) break;
+      } catch (error) {
+        console.warn("[RoofRay] Microsoft footprint tile failed", {
+          quadKey,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return results;
+  } catch (error) {
+    console.warn("[RoofRay] Microsoft building footprint fallback failed:", error);
+    return [];
+  }
+}
 async function fetchMappedBuildings(
   latitude: number,
   longitude: number,
@@ -341,6 +771,64 @@ async function fetchMappedBuildings(
   // GPS on desktop can easily be off by 50-150m. Keep a wider search area so
   // a nearby mapped building can still be used for the site model.
   const safeRadius = Math.min(Math.max(radiusMeters, 120), 700);
+
+  // Prefer the satellite-derived Microsoft footprint dataset for the PDF.
+  // It is deterministic for a given GPS/quadkey and avoids sparse OSM
+  // coverage causing the PDF to randomly collapse to zero buildings.
+  const microsoftPrimary = await fetchMicrosoftBuildingFootprints(
+    latitude,
+    longitude,
+    safeRadius,
+  );
+  console.info("[RoofRay] Microsoft primary PDF buildings", {
+    footprints: microsoftPrimary.length,
+    latitude,
+    longitude,
+    radiusMeters: safeRadius,
+  });
+  if (microsoftPrimary.length > 0) {
+    const mLatPrimary = 111320;
+    const mLonPrimary = 111320 * Math.cos((latitude * Math.PI) / 180);
+    const primaryArea = (points: Array<{ x: number; y: number }>) => {
+      let sum = 0;
+      for (let i = 0; i < points.length; i += 1) {
+        const n = points[(i + 1) % points.length];
+        sum += points[i].x * n.y - n.x * points[i].y;
+      }
+      return Math.abs(sum) / 2;
+    };
+    return microsoftPrimary
+      .map((building) => {
+        const projected = building.polygon.map((p) => ({
+          x: (p.longitude - longitude) * mLonPrimary,
+          y: (p.latitude - latitude) * mLatPrimary,
+        }));
+        const containsTarget = pointInPolygon({ x: 0, y: 0 }, projected);
+        const centroid = projected.reduce(
+          (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+          { x: 0, y: 0 },
+        );
+        if (projected.length) {
+          centroid.x /= projected.length;
+          centroid.y /= projected.length;
+        }
+        return {
+          polygon: building.polygon,
+          areaM2: primaryArea(projected),
+          containsTarget,
+          distanceMeters: Math.hypot(centroid.x, centroid.y),
+          heightMeters: Math.max(3, building.heightMeters),
+          levels: Math.max(1, Math.round(building.heightMeters / 3)),
+        };
+      })
+      .filter((item) => item.areaM2 >= 12 && item.areaM2 <= 100000)
+      .sort((a, b) => {
+        if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+        return a.distanceMeters - b.distanceMeters;
+      })
+      .slice(0, 40);
+  }
+
   const query = `[out:json][timeout:25];
 way["building"](around:${safeRadius},${latitude},${longitude});
 out geom tags qt;`;
@@ -385,7 +873,53 @@ out geom tags qt;`;
     }
   }
 
-  if (!data) return [];
+  if (!data || !Array.isArray(data.elements) || data.elements.length === 0) {
+    const microsoftBuildings = await fetchMicrosoftBuildingFootprints(
+      latitude,
+      longitude,
+      safeRadius,
+    );
+    const mLat = 111320;
+    const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
+    const polygonArea = (points: Array<{ x: number; y: number }>) => {
+      let sum = 0;
+      for (let i = 0; i < points.length; i += 1) {
+        const n = points[(i + 1) % points.length];
+        sum += points[i].x * n.y - n.x * points[i].y;
+      }
+      return Math.abs(sum) / 2;
+    };
+    return microsoftBuildings
+      .map((building) => {
+        const projected = building.polygon.map((p) => ({
+          x: (p.longitude - longitude) * mLon,
+          y: (p.latitude - latitude) * mLat,
+        }));
+        const containsTarget = pointInPolygon({ x: 0, y: 0 }, projected);
+        const centroid = projected.reduce(
+          (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+          { x: 0, y: 0 },
+        );
+        if (projected.length) {
+          centroid.x /= projected.length;
+          centroid.y /= projected.length;
+        }
+        return {
+          polygon: building.polygon,
+          areaM2: polygonArea(projected),
+          containsTarget,
+          distanceMeters: Math.hypot(centroid.x, centroid.y),
+          heightMeters: Math.max(3, building.heightMeters),
+          levels: Math.max(1, Math.round(building.heightMeters / 3)),
+        };
+      })
+      .filter((item) => item.areaM2 >= 12 && item.areaM2 <= 100000)
+      .sort((a, b) => {
+        if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+        return a.distanceMeters - b.distanceMeters;
+      })
+      .slice(0, 40);
+  }
 
   const mLat = 111320;
   const mLon = 111320 * Math.cos((latitude * Math.PI) / 180);
@@ -398,7 +932,7 @@ out geom tags qt;`;
     return Math.abs(sum) / 2;
   };
 
-  return (data.elements ?? [])
+  const mappedBuildings = (data.elements ?? [])
     .map((element) => {
       const geo = element.geometry ?? [];
       const projected = geo.map((p) => ({
@@ -452,6 +986,71 @@ out geom tags qt;`;
       );
     })
     .slice(0, 40);
+
+  // OSM coverage can be sparse even when the endpoint returns successfully.
+  // For the PDF neighborhood model, use Microsoft footprints whenever OSM
+  // provides fewer than 5 usable buildings so the scene does not randomly
+  // collapse to a GPS marker on different runs.
+  if (mappedBuildings.length >= 5) return mappedBuildings;
+
+  console.info("[RoofRay] OSM building coverage sparse; using Microsoft footprints", {
+    osmBuildings: mappedBuildings.length,
+  });
+
+  // OSM can return successfully while having no building polygons in this
+  // neighbourhood. Fall back to Microsoft's satellite-derived footprints.
+  const microsoftBuildings = await fetchMicrosoftBuildingFootprints(
+    latitude,
+    longitude,
+    safeRadius,
+  );
+  const mLatFallback = 111320;
+  const mLonFallback = 111320 * Math.cos((latitude * Math.PI) / 180);
+  const fallbackArea = (points: Array<{ x: number; y: number }>) => {
+    let sum = 0;
+    for (let i = 0; i < points.length; i += 1) {
+      const n = points[(i + 1) % points.length];
+      sum += points[i].x * n.y - n.x * points[i].y;
+    }
+    return Math.abs(sum) / 2;
+  };
+  console.info("[RoofRay] Microsoft PDF fallback result", {
+    footprints: microsoftBuildings.length,
+    latitude,
+    longitude,
+    radiusMeters: safeRadius,
+  });
+
+  return microsoftBuildings
+    .map((building) => {
+      const projected = building.polygon.map((p) => ({
+        x: (p.longitude - longitude) * mLonFallback,
+        y: (p.latitude - latitude) * mLatFallback,
+      }));
+      const containsTarget = pointInPolygon({ x: 0, y: 0 }, projected);
+      const centroid = projected.reduce(
+        (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+        { x: 0, y: 0 },
+      );
+      if (projected.length) {
+        centroid.x /= projected.length;
+        centroid.y /= projected.length;
+      }
+      return {
+        polygon: building.polygon,
+        areaM2: fallbackArea(projected),
+        containsTarget,
+        distanceMeters: Math.hypot(centroid.x, centroid.y),
+        heightMeters: Math.max(3, building.heightMeters),
+        levels: Math.max(1, Math.round(building.heightMeters / 3)),
+      };
+    })
+    .filter((item) => item.areaM2 >= 12 && item.areaM2 <= 100000)
+    .sort((a, b) => {
+      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+      return a.distanceMeters - b.distanceMeters;
+    })
+    .slice(0, 40);
 }
 
 
@@ -467,8 +1066,9 @@ function roofVisualCommands({
   sunCycle,
   mappedBuildings,
   satelliteTiles,
+  satelliteZoom,
+  roofAerialImage,
   roofPhoto,
-  logoImage,
 }: {
   roofAreaSqFt: number | null;
   roofType: string;
@@ -481,8 +1081,9 @@ function roofVisualCommands({
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
+  satelliteZoom: number;
+  roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
-  logoImage: LogoImage | null;
 }): string[] {
   const safePanels = Math.max(0, Math.min(40, Math.round(panelCount ?? 0)));
   const roofPolygon = Array.isArray(roofFootprint?.polygon)
@@ -494,17 +1095,17 @@ function roofVisualCommands({
   // building rather than producing an empty roof panel card.
   const mappedTarget =
     exactTarget ??
-    mappedBuildings.find((building) => building.distanceMeters <= 150) ??
+    mappedBuildings
+      .filter((building) => building.distanceMeters <= 150)
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)[0] ??
     null;
   const actualRoofPolygon =
     roofPolygon.length >= 3 ? roofPolygon : (mappedTarget?.polygon ?? []);
 
-  const roofLat = numberValue(roofFootprint?.latitude);
-  const roofLon = numberValue(roofFootprint?.longitude);
-  const centerLat =
-    roofLat ?? numberValue((actualRoofPolygon[0] ?? {}).latitude) ?? 0;
-  const centerLon =
-    roofLon ?? numberValue((actualRoofPolygon[0] ?? {}).longitude) ?? 0;
+  // The resolved report GPS is authoritative for every visual layer.
+  // Never let a stale/legacy roof object containing 0,0 recenter the PDF.
+  const centerLat = reportLocation.latitude;
+  const centerLon = reportLocation.longitude;
 
   // Landscape visual page, deliberately arranged like a professional solar
   // site-assessment sheet: dark information rail, large real aerial map and
@@ -520,18 +1121,41 @@ function roofVisualCommands({
   const mapW = 634;
   const mapH = 295;
 
-  const satelliteZoom = 19;
-  const centerPixel = webMercatorPixel(centerLat, centerLon, satelliteZoom);
-  const startTileX = Math.floor(centerPixel.x / 256) - 1;
-  const startTileY = Math.floor(centerPixel.y / 256) - 1;
+  // Use a local metre projection for the PDF scene. This is more
+  // reliable than a fixed Web-Mercator tile window because Microsoft
+  // footprints can span a different tile extent than the imagery window.
+  const metersLon = 111320 * Math.cos((centerLat * Math.PI) / 180);
+  const metersLat = 111320;
+  // Keep the 3D viewport centred on the actual GPS point. Using all
+  // mapped footprints for the scale makes the target tiny and allows distant
+  // buildings to dominate the page.
+  const sceneBuildings = (roofPhoto ? [] : mappedBuildings)
+    .filter((building) => building.polygon.length >= 3)
+    .filter((building) => building.distanceMeters <= 170)
+    .sort((a, b) => {
+      if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
+      return a.distanceMeters - b.distanceMeters;
+    })
+    .slice(0, 18);
+
+  const scenePoints = sceneBuildings.flatMap((building) =>
+    building.polygon.map((point) => ({
+      x: (point.longitude - centerLon) * metersLon,
+      y: (point.latitude - centerLat) * metersLat,
+    })),
+  );
+  const maxSceneDistance = Math.max(
+    70,
+    ...scenePoints.map((point) => Math.hypot(point.x, point.y)),
+  );
+  const sceneScale = Math.min(mapW - 34, mapH - 34) / (2 * maxSceneDistance * 1.08);
 
   const project = (lat: number, lon: number) => {
-    const pixel = webMercatorPixel(lat, lon, satelliteZoom);
-    const relativeX = pixel.x - startTileX * 256;
-    const relativeY = pixel.y - startTileY * 256;
+    const xMeters = (lon - centerLon) * metersLon;
+    const yMeters = (lat - centerLat) * metersLat;
     return {
-      x: mapX + (relativeX / 1024) * mapW,
-      y: mapY + mapH - (relativeY / 768) * mapH,
+      x: mapX + mapW / 2 + xMeters * sceneScale,
+      y: mapY + mapH / 2 - yMeters * sceneScale,
     };
   };
 
@@ -549,6 +1173,15 @@ function roofVisualCommands({
     "0.035 0.075 0.115 rg",
     mapX + " " + mapY + " " + mapW + " " + mapH + " re f",
   ];
+
+  // The PDF site-view is intentionally a clean map-style 3D diagram:
+  // blue nearby buildings with a brighter blue target house.
+  // Satellite imagery is kept out of this panel so the geometry remains
+  // visually clear and matches the interactive 3D building-map experience.
+  commands.push(
+    "0.94 0.95 0.96 rg",
+    (mapX + 2).toFixed(1) + " " + (mapY + 2).toFixed(1) + " " + (mapW - 4).toFixed(1) + " " + (mapH - 4).toFixed(1) + " re f",
+  );
 
   if (roofPhoto) {
     const photoW = mapW - 28;
@@ -573,28 +1206,6 @@ function roofVisualCommands({
         (photoX + 10).toFixed(1) + " " + (photoY + photoH - 18).toFixed(1) +
         " Td (PHOTO-BASED ROOF 3D MODEL) Tj ET",
     );
-  } else if (satelliteTiles.length) {
-    commands.push(
-      "q",
-      mapX + " " + mapY + " " + mapW + " " + mapH + " re W n",
-    );
-    // The fetched tiles are 4 columns x 3 rows (1024 x 768 source pixels).
-    // Scale that complete mosaic into the actual map frame. Previously the
-    // raw 256px tiles were drawn at 1:1, so most of the imagery landed outside
-    // the 634 x 310pt map viewport and the report looked like an empty grey map.
-    const tileW = mapW / 4;
-    const tileH = mapH / 3;
-    for (const tile of satelliteTiles) {
-      commands.push(
-        "q",
-        tileW.toFixed(2) + " 0 0 " + tileH.toFixed(2) + " " +
-          (mapX + (tile.x / 256) * tileW).toFixed(2) + " " +
-          (mapY + (tile.y / 256) * tileH).toFixed(2) + " cm",
-        "/" + tile.name + " Do",
-        "Q",
-      );
-    }
-    commands.push("Q");
   }
 
   commands.push(
@@ -603,23 +1214,13 @@ function roofVisualCommands({
     mapX + " " + mapY + " " + mapW + " " + mapH + " re S",
   );
 
-  if (!satelliteTiles.length && !roofPhoto) {
-    commands.push(
-      "0.02 0.04 0.07 rg",
-      (mapX + 18).toFixed(1) + " " + (mapY + mapH - 34).toFixed(1) + " 250 22 re f",
-      "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
-        (mapX + 26).toFixed(1) + " " + (mapY + mapH - 27).toFixed(1) +
-        " Td (Satellite imagery unavailable - mapped buildings remain visible) Tj ET",
-    );
-  }
-
   // Real-location 3D site model: every mapped OSM building is extruded from
   // its actual footprint. Height comes from OSM height/building:levels, with
   // 3m per level as the documented fallback. This is a map-based 3D
   // visualization, not a photogrammetric claim.
   // Always render mapped buildings. A user roof photo is an additional visual,
   // not a reason to remove the real OSM building geometry from the 3D map.
-  const siteBuildings3d = mappedBuildings
+  const sceneBuildings = mappedBuildings
     .filter((building) => building.polygon.length >= 3)
     .sort((a, b) => {
       if (a.containsTarget !== b.containsTarget) return a.containsTarget ? -1 : 1;
@@ -630,28 +1231,29 @@ function roofVisualCommands({
   const projectGround = (point: { latitude: number; longitude: number }) =>
     project(point.latitude, point.longitude);
 
-  for (const building of siteBuildings3d) {
+  for (const building of sceneBuildings) {
     const ground = building.polygon
       .map(projectGround)
       .filter((p): p is { x: number; y: number } => Boolean(p));
     if (ground.length < 3) continue;
 
-    const height = Math.max(3, Math.min(30, building.heightMeters || 3));
-    const liftX = -height * 1.15;
-    const liftY = height * 0.72;
-    const roof = ground.map((p) => ({ x: p.x + liftX, y: p.y - liftY }));
+    const height = Math.max(3, Math.min(18, building.heightMeters || 3));
+    const lift = Math.max(5, height * sceneScale);
+    const roof = ground.map((p) => ({
+      x: p.x - lift * 0.62,
+      y: p.y - lift * 0.38,
+    }));
+    const isTarget = building === exactTarget;
+    const isTall = !isTarget && height >= 10;
 
-    // Building side faces, ordered around the footprint.
     for (let i = 0; i < ground.length; i += 1) {
       const j = (i + 1) % ground.length;
-      const face = [
-        ground[i],
-        ground[j],
-        roof[j],
-        roof[i],
-      ];
+      const face = [ground[i], ground[j], roof[j], roof[i]];
+      const sideTone = i % 2 === 0
+        ? (isTarget ? "0.10 0.34 0.76 rg" : isTall ? "0.78 0.48 0.10 rg" : "0.76 0.79 0.82 rg")
+        : (isTarget ? "0.14 0.43 0.88 rg" : isTall ? "0.88 0.57 0.14 rg" : "0.84 0.86 0.88 rg");
       commands.push(
-        building.containsTarget ? "0.02 0.45 0.78 rg" : "0.12 0.38 0.70 rg",
+        sideTone,
         face[0].x.toFixed(1) + " " + face[0].y.toFixed(1) + " m",
         face[1].x.toFixed(1) + " " + face[1].y.toFixed(1) + " l",
         face[2].x.toFixed(1) + " " + face[2].y.toFixed(1) + " l",
@@ -659,11 +1261,10 @@ function roofVisualCommands({
       );
     }
 
-    // Roof surface follows the real mapped polygon.
     commands.push(
-      building.containsTarget ? "0.04 0.62 0.95 rg" : "0.20 0.52 0.86 rg",
-      building.containsTarget ? "0.45 0.90 1.00 RG" : "0.45 0.82 1.00 RG",
-      "1 w",
+      isTarget ? "0.34 0.68 1.00 rg" : isTall ? "0.20 0.52 0.86 rg" : "0.20 0.52 0.86 rg",
+      isTarget ? "0.06 0.30 0.72 RG" : isTall ? "0.45 0.82 1.00 RG" : "0.45 0.82 1.00 RG",
+      "0.9 w",
       roof[0].x.toFixed(1) + " " + roof[0].y.toFixed(1) + " m",
     );
     for (let i = 1; i < roof.length; i += 1) {
@@ -671,37 +1272,45 @@ function roofVisualCommands({
     }
     commands.push("h f S");
 
-    if (building === mappedTarget) {
+    if (isTarget) {
       const cx = roof.reduce((sum, p) => sum + p.x, 0) / roof.length;
       const cy = roof.reduce((sum, p) => sum + p.y, 0) / roof.length;
-      const label = building.containsTarget ? "YOUR HOUSE" : "NEAREST MAPPED BUILDING";
       commands.push(
+        "0.03 0.08 0.13 rg",
+        (cx - 38).toFixed(1) + " " + (cy + 8).toFixed(1) + " 76 18 re f",
         "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
-          (cx - 25).toFixed(1) + " " + (cy + 5).toFixed(1) +
-          " Td (" + label + ") Tj ET",
-        "BT /F1 5.5 Tf 0.80 0.92 0.98 rg " +
-          (cx - 20).toFixed(1) + " " + (cy - 5).toFixed(1) +
+          (cx - 29).toFixed(1) + " " + (cy + 14).toFixed(1) +
+          " Td (YOUR HOUSE) Tj ET",
+        "BT /F1 5.2 Tf 0.76 0.88 0.96 rg " +
+          (cx - 24).toFixed(1) + " " + (cy + 3).toFixed(1) +
           " Td (" + height.toFixed(0) + "m / " + String(building.levels) + " levels) Tj ET",
       );
     }
   }
 
-  // If the exact GPS point is not inside an OSM building, show the
-  // real location marker instead of drawing a fake house footprint.
-  if (!mappedTarget) {
-    const target = project(centerLat, centerLon);
-    commands.push(
-      "0.10 0.75 1.00 rg",
-      (target.x - 6).toFixed(1) + " " + (target.y - 6).toFixed(1) + " 12 12 re f",
-      "0.05 0.12 0.20 rg",
-      (target.x + 8).toFixed(1) + " " + (target.y + 6).toFixed(1) + " 72 14 re f",
-      "BT /F2 6.5 Tf 0.98 0.98 0.98 rg " +
-        (target.x + 11).toFixed(1) + " " + (target.y + 10).toFixed(1) +
-        " Td (LOCATION - NO MAPPED BUILDING WITHIN 150M) Tj ET",
-    );
-  }
+  // Exact GPS house marker. This is rendered independently from mapped
+  // building coverage, so the report always shows the device GPS location.
+  const gpsHousePoint = project(centerLat, centerLon);
 
-  // Actual mapped target roof outline + clipped panel placement.
+  // Prominent red location pin at the exact device GPS point.
+  commands.push(
+    "0.90 0.12 0.12 rg",
+    (gpsHousePoint.x - 6).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 12 12 re f",
+    "0.98 0.98 1.00 RG",
+    "1.2 w",
+    (gpsHousePoint.x - 6).toFixed(1) + " " + (gpsHousePoint.y - 4).toFixed(1) + " 12 12 re S",
+    "0.90 0.12 0.12 rg",
+    (gpsHousePoint.x - 2.5).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " m",
+    (gpsHousePoint.x + 2.5).toFixed(1) + " " + (gpsHousePoint.y - 11).toFixed(1) + " l",
+    gpsHousePoint.x.toFixed(1) + " " + (gpsHousePoint.y - 18).toFixed(1) + " l h f",
+    "BT /F2 6.5 Tf 0.98 0.98 1.00 rg " +
+      (gpsHousePoint.x + 10).toFixed(1) + " " + (gpsHousePoint.y + 2).toFixed(1) +
+      " Td (GPS LOCATION) Tj ET",
+  );
+
+  // Actual mapped target roof outline + geometry-validated panel placement.
+  // Panels are generated only from the detected roof polygon; no generic
+  // rectangle is used as a substitute for the real roof.
   if (roofPoints.length >= 3) {
     commands.push(
       "0.20 0.90 1.00 RG",
@@ -709,55 +1318,21 @@ function roofVisualCommands({
       roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m",
     );
     for (let i = 1; i < roofPoints.length; i += 1) {
-      commands.push(
-        roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l",
-      );
+      commands.push(roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l");
     }
     commands.push("h S");
 
-    if (safePanels > 0) {
-      const minX = Math.min(...roofPoints.map((p) => p.x));
-      const maxX = Math.max(...roofPoints.map((p) => p.x));
-      const minY = Math.min(...roofPoints.map((p) => p.y));
-      const maxY = Math.max(...roofPoints.map((p) => p.y));
-      const roofW = Math.max(24, maxX - minX);
-      const roofH = Math.max(24, maxY - minY);
-      const cols = Math.max(
-        1,
-        Math.min(8, Math.ceil(Math.sqrt(safePanels * roofW / Math.max(roofH, 1)))),
-      );
-      const rows = Math.max(1, Math.ceil(safePanels / cols));
-      const gap = Math.max(1.5, Math.min(4, Math.min(roofW, roofH) * 0.025));
-      const cellW = Math.max(5, (roofW * 0.76 - gap * (cols - 1)) / cols);
-      const cellH = Math.max(5, (roofH * 0.70 - gap * (rows - 1)) / rows);
-
-      commands.push("q");
+    const fittedPanels = fitPanelsToPolygon(roofPoints, safePanels);
+    for (const panel of fittedPanels) {
       commands.push(
-        roofPoints[0].x.toFixed(1) + " " + roofPoints[0].y.toFixed(1) + " m",
+        "0.02 0.17 0.34 rg",
+        panel.x.toFixed(1) + " " + panel.y.toFixed(1) + " " +
+          panel.w.toFixed(1) + " " + panel.h.toFixed(1) + " re f",
+        "0.35 0.82 1.00 RG",
+        "0.55 w",
+        panel.x.toFixed(1) + " " + panel.y.toFixed(1) + " " +
+          panel.w.toFixed(1) + " " + panel.h.toFixed(1) + " re S",
       );
-      for (let i = 1; i < roofPoints.length; i += 1) {
-        commands.push(
-          roofPoints[i].x.toFixed(1) + " " + roofPoints[i].y.toFixed(1) + " l",
-        );
-      }
-      commands.push("h W n");
-
-      for (let i = 0; i < safePanels; i += 1) {
-        const row = Math.floor(i / cols);
-        const col = i % cols;
-        const x = minX + roofW * 0.12 + col * (cellW + gap);
-        const y = maxY - roofH * 0.15 - (row + 1) * cellH - row * gap;
-        commands.push(
-          "0.025 0.15 0.32 rg",
-          x.toFixed(1) + " " + y.toFixed(1) + " " +
-            cellW.toFixed(1) + " " + cellH.toFixed(1) + " re f",
-          "0.35 0.75 1.00 RG",
-          "0.55 w",
-          x.toFixed(1) + " " + y.toFixed(1) + " " +
-            cellW.toFixed(1) + " " + cellH.toFixed(1) + " re S",
-        );
-      }
-      commands.push("Q");
     }
 
     const houseCenter = {
@@ -768,10 +1343,10 @@ function roofVisualCommands({
       "0.10 0.55 1.00 rg",
       (houseCenter.x - 5).toFixed(1) + " " + (houseCenter.y - 5).toFixed(1) + " 10 10 re f",
       "0.05 0.12 0.20 rg",
-      (houseCenter.x + 5).toFixed(1) + " " + (houseCenter.y + 4).toFixed(1) + " 56 16 re f",
-      "BT /F2 8 Tf 0.98 0.98 0.98 rg " +
+      (houseCenter.x + 5).toFixed(1) + " " + (houseCenter.y + 4).toFixed(1) + " 92 18 re f",
+      "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
         (houseCenter.x + 9).toFixed(1) + " " + (houseCenter.y + 8).toFixed(1) +
-        " Td (Your mapped roof) Tj ET",
+        " Td (Mapped roof - " + fittedPanels.length + " panels fit) Tj ET",
     );
   }
 
@@ -907,7 +1482,7 @@ function roofVisualCommands({
     const sunElevation = numberValue(sample.elevationDeg) ?? 20;
     const shadowBearing = ((sunAzimuth + 180) * Math.PI) / 180;
 
-    for (const building of siteBuildings3d) {
+    for (const building of sceneBuildings) {
       if (building.containsTarget) continue;
       const base = building.polygon
         .map(projectGround)
@@ -984,7 +1559,28 @@ function roofVisualCommands({
     }
   }
 
-  // North compass.
+  // Technical 3D site-view legend: blue = target house, amber = taller
+  // nearby buildings that may contribute to shading, grey = other mapped
+  // buildings, yellow = calculated sun direction/path.
+  const legendX = mapX + 14;
+  const legendY = mapY + mapH - 74;
+  commands.push(
+    "0.02 0.05 0.08 rg",
+    legendX.toFixed(1) + " " + legendY.toFixed(1) + " 174 58 re f",
+    "0.10 0.55 1.00 rg",
+    (legendX + 8).toFixed(1) + " " + (legendY + 37).toFixed(1) + " 10 10 re f",
+    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 39).toFixed(1) + " Td (Your house / GPS) Tj ET",
+    "0.92 0.63 0.22 rg",
+    (legendX + 8).toFixed(1) + " " + (legendY + 21).toFixed(1) + " 10 10 re f",
+    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 23).toFixed(1) + " Td (Nearby tall building / shading risk) Tj ET",
+    "1.00 0.62 0.00 RG",
+    "2 w",
+    (legendX + 8).toFixed(1) + " " + (legendY + 8).toFixed(1) + " m",
+    (legendX + 18).toFixed(1) + " " + (legendY + 8).toFixed(1) + " l S",
+    "BT /F1 6.5 Tf 0.98 0.98 0.98 rg " + (legendX + 24).toFixed(1) + " " + (legendY + 6).toFixed(1) + " Td (Sun direction / rays) Tj ET",
+  );
+
+  // North compass and a compact 3D-view orientation marker.
   const compassX = mapX + mapW - 34;
   const compassY = mapY + mapH - 28;
   commands.push(
@@ -1019,8 +1615,8 @@ function roofVisualCommands({
 
   commands.push(
     "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[0] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Sun Path & Shading Analysis) Tj ET",
-    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[1] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Roof Layout - Top View) Tj ET",
-    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[2] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (Suggested Installation) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[1] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (YOUR ROOFTOP - SOLAR PANEL PLACEMENT) Tj ET",
+    "BT /F2 10 Tf 0.98 0.98 0.98 rg " + (cardXs[2] + 10).toFixed(1) + " " + (cardY + cardH - 16) + " Td (3D INSTALLATION VIEW) Tj ET",
   );
 
   // Card 1: a measured site-geometry diagram. This deliberately does not
@@ -1165,7 +1761,7 @@ function roofVisualCommands({
 
   commands.push(
     "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c1x + 8).toFixed(1) + " " + (c1y + c1h - 12).toFixed(1) + " Td (SUN + SURROUNDING BUILDING GEOMETRY) Tj ET",
-    "BT /F1 5.5 Tf 0.65 0.72 0.78 rg " + (c1x + 8).toFixed(1) + " " + (c1y + 6).toFixed(1) + " Td (Orange = building | label = distance / height | yellow path = calculated sun azimuth) Tj ET",
+    "BT /F1 5.5 Tf 0.65 0.72 0.78 rg " + (c1x + 8).toFixed(1) + " " + (c1y + 6).toFixed(1) + " Td (White = other buildings | Blue = your house | Amber = tall building | Yellow = sun path) Tj ET",
   );
 
   // Card 2: true roof footprint top view, not a generic rectangle.
@@ -1197,48 +1793,40 @@ function roofVisualCommands({
       commands.push(mapped[i].x.toFixed(1) + " " + mapped[i].y.toFixed(1) + " l");
     }
     commands.push("h S");
-    const pMinX = Math.min(...mapped.map((p) => p.x));
-    const pMaxX = Math.max(...mapped.map((p) => p.x));
-    const pMinY = Math.min(...mapped.map((p) => p.y));
-    const pMaxY = Math.max(...mapped.map((p) => p.y));
-    const cols = Math.max(1, Math.min(8, Math.ceil(Math.sqrt(safePanels || 1))));
-    const rows = Math.max(1, Math.ceil((safePanels || 1) / cols));
-    const pw = Math.max(5, (pMaxX - pMinX) * 0.72 / cols);
-    const ph = Math.max(5, (pMaxY - pMinY) * 0.70 / rows);
-    commands.push("q");
-    commands.push(mapped[0].x.toFixed(1) + " " + mapped[0].y.toFixed(1) + " m");
-    for (let i = 1; i < mapped.length; i += 1) commands.push(mapped[i].x.toFixed(1) + " " + mapped[i].y.toFixed(1) + " l");
-    commands.push("h W n");
-    for (let i = 0; i < (safePanels || 0); i += 1) {
-      const row = Math.floor(i / cols);
-      const col = i % cols;
-      const x = pMinX + (pMaxX - pMinX) * 0.14 + col * (pw + 2);
-      const y = pMaxY - (pMaxY - pMinY) * 0.15 - (row + 1) * ph - row * 2;
+    const fittedCardPanels = fitPanelsToPolygon(mapped, safePanels);
+    for (const panel of fittedCardPanels) {
       commands.push(
-        "0.025 0.15 0.32 rg",
-        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re f",
-        "0.35 0.75 1.00 RG",
-        "0.4 w",
-        x.toFixed(1) + " " + y.toFixed(1) + " " + pw.toFixed(1) + " " + ph.toFixed(1) + " re S",
+        "0.02 0.17 0.34 rg",
+        panel.x.toFixed(1) + " " + panel.y.toFixed(1) + " " +
+          panel.w.toFixed(1) + " " + panel.h.toFixed(1) + " re f",
+        "0.35 0.82 1.00 RG",
+        "0.45 w",
+        panel.x.toFixed(1) + " " + panel.y.toFixed(1) + " " +
+          panel.w.toFixed(1) + " " + panel.h.toFixed(1) + " re S",
       );
     }
-    commands.push("Q");
     commands.push(
-      "BT /F2 7 Tf 0.98 0.98 0.98 rg " + (c2x + c2w - 74).toFixed(1) + " " + (c2y + 7).toFixed(1) +
-        " Td (" + (safePanels || 0) + " panels | " + (panelPowerW ?? 450) + " W) Tj ET",
+      "BT /F2 7 Tf 0.98 0.98 0.98 rg " +
+        (c2x + 8).toFixed(1) + " " + (c2y + 7).toFixed(1) +
+        " Td (" + fittedCardPanels.length + "/" + (safePanels || 0) +
+        " requested panels fit inside mapped roof) Tj ET",
     );
   } else {
     commands.push(
-      "BT /F1 8 Tf 0.95 0.95 0.95 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 40).toFixed(1) +
-        " Td (Building footprint not mapped.) Tj ET",
-      "BT /F1 7 Tf 0.75 0.78 0.82 rg " + (c2x + 8).toFixed(1) + " " + (c2y + 25).toFixed(1) +
-        " Td (No fake roof geometry is shown.) Tj ET",
+      "0.10 0.55 1.00 rg",
+      (c2x + c2w / 2 - 7).toFixed(1) + " " + (c2y + 64).toFixed(1) + " 14 14 re f",
+      "BT /F2 9 Tf 0.98 0.98 0.98 rg " + (c2x + 18).toFixed(1) + " " + (c2y + 43).toFixed(1) +
+        " Td (YOUR HOUSE - GPS LOCATION) Tj ET",
+      "BT /F1 7 Tf 0.75 0.78 0.82 rg " + (c2x + 18).toFixed(1) + " " + (c2y + 28).toFixed(1) +
+        " Td (Exact coordinates are marked on the aerial map.) Tj ET",
+      "BT /F1 6.5 Tf 0.65 0.72 0.78 rg " + (c2x + 18).toFixed(1) + " " + (c2y + 15).toFixed(1) +
+        " Td (Roof footprint is not available from the map source.) Tj ET",
     );
   }
 
-  // Card 3: 3D-style installation sketch built from the actual mapped roof
-  // footprint. It is a visualization, not a claim that the source imagery is
-  // photogrammetric 3D.
+  // Card 3: only show an installation model when an actual mapped roof
+  // polygon exists. Never draw a generic house/panel model when the roof
+  // footprint has not been verified.
   const c3x = cardXs[2] + 14;
   const c3y = cardY + 30;
   const c3w = cardW - 28;
@@ -1247,6 +1835,8 @@ function roofVisualCommands({
   const baseY = c3y + 35;
   const baseW = c3w * 0.68;
   const baseH = c3h * 0.42;
+
+  if (roofPoints.length >= 3) {
   commands.push(
     "0.10 0.18 0.22 rg",
     baseX.toFixed(1) + " " + baseY.toFixed(1) + " " + baseW.toFixed(1) + " " + baseH.toFixed(1) + " re f",
@@ -1273,6 +1863,27 @@ function roofVisualCommands({
       "0.35 0.75 1.00 RG",
       "0.35 w",
       x.toFixed(1) + " " + y.toFixed(1) + " " + pw3.toFixed(1) + " " + ph3.toFixed(1) + " re S",
+    );
+  }
+
+  commands.push(
+    "BT /F1 5.5 Tf 0.65 0.72 0.78 rg " +
+      (c3x + 10).toFixed(1) + " " + (c3y + 8).toFixed(1) +
+      " Td (3D sketch based on mapped roof footprint) Tj ET",
+  );
+  } else {
+    commands.push(
+      "0.08 0.12 0.16 rg",
+      c3x.toFixed(1) + " " + c3y.toFixed(1) + " " + c3w.toFixed(1) + " " + c3h.toFixed(1) + " re f",
+      "BT /F2 8 Tf 0.98 0.98 0.98 rg " +
+        (c3x + 14).toFixed(1) + " " + (c3y + 92).toFixed(1) +
+        " Td (3D installation view unavailable) Tj ET",
+      "BT /F1 6.5 Tf 0.65 0.72 0.78 rg " +
+        (c3x + 14).toFixed(1) + " " + (c3y + 76).toFixed(1) +
+        " Td (A verified roof footprint is required.) Tj ET",
+      "BT /F1 6 Tf 0.55 0.65 0.72 rg " +
+        (c3x + 14).toFixed(1) + " " + (c3y + 62).toFixed(1) +
+        " Td (No generic roof geometry has been substituted.) Tj ET",
     );
   }
 
@@ -1319,7 +1930,7 @@ function roofVisualCommands({
   commands.push(
     "BT /F1 7 Tf 0.55 0.65 0.72 rg 30 120 Td (" + text(monthlyText) + ") Tj ET",
     "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 102 Td (OSM footprint is not survey-grade; imagery availability varies.) Tj ET",
-    "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 88 Td (Satellite: Esri World Imagery | Map: OpenStreetMap.) Tj ET",
+    "BT /F1 6 Tf 0.45 0.58 0.66 rg 30 88 Td (Aerial: available imagery | 3D: mapped building geometry.) Tj ET",
   );
 
   const letterhead = [
@@ -1332,7 +1943,7 @@ function roofVisualCommands({
     "BT /F1 6 Tf 0.70 0.78 0.86 rg 676 551 Td (CONFIDENTIAL) Tj ET",
   ];
   if (logoImage) {
-    letterhead.push("q", "52 0 0 52 34 525 cm", "/RoofRayLogo Do", "Q");
+    letterhead.push("q", "100 0 0 36 34 532 cm", "/RoofRayLogo Do", "Q");
   } else {
     letterhead.push("BT /F2 15 Tf 0.98 0.98 0.98 rg 34 551 Td (RoofRay) Tj ET");
   }
@@ -1365,7 +1976,10 @@ function buildPdf(lines: string[], visual: {
   sunCycle: Record<string, unknown> | null;
   mappedBuildings: MappedBuilding[];
   satelliteTiles: SatelliteTile[];
+  satelliteZoom: number;
+  roofAerialImage: RoofAerialImage | null;
   roofPhoto: RoofPhoto | null;
+  reportLocation: { latitude: number; longitude: number };
   logoImage: LogoImage | null;
 }): Uint8Array {
   const pageWidth = 842, pageHeight = 595, margin = 42, lineHeight = 15, linesPerPage = 32;
@@ -1378,7 +1992,12 @@ function buildPdf(lines: string[], visual: {
   const logoObject = 5;
   const satelliteObjectStart = 6;
   const roofPhotoObject = satelliteObjectStart + visual.satelliteTiles.length;
-  const pageObjectStart = satelliteObjectStart + visual.satelliteTiles.length + (visual.roofPhoto ? 1 : 0);
+  const aerialObject = roofPhotoObject + (visual.roofPhoto ? 1 : 0);
+  const pageObjectStart =
+    satelliteObjectStart +
+    visual.satelliteTiles.length +
+    (visual.roofPhoto ? 1 : 0) +
+    (visual.roofAerialImage ? 1 : 0);
   const objects: Array<string | Buffer> = [];
 
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
@@ -1448,6 +2067,23 @@ function buildPdf(lines: string[], visual: {
     );
   }
 
+  if (visual.roofAerialImage) {
+    const aerial = visual.roofAerialImage;
+    objects.push(
+      Buffer.concat([
+        Buffer.from(
+          "<< /Type /XObject /Subtype /Image /Width " + aerial.width +
+          " /Height " + aerial.height +
+          " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " +
+          aerial.bytes.length + " >>\nstream\n",
+          "ascii",
+        ),
+        Buffer.from(aerial.bytes),
+        Buffer.from("\nendstream", "ascii"),
+      ]),
+    );
+  }
+
   for (let i = 0; i < totalPages; i += 1) {
     const pageObject = pageObjectStart + i * 2;
     const contentObject = pageObject + 1;
@@ -1458,6 +2094,7 @@ function buildPdf(lines: string[], visual: {
       " /XObject << /RoofRayLogo " + logoObject + " 0 R " +
       visualXObjects +
       (visual.roofPhoto ? " /RoofPhoto " + roofPhotoObject + " 0 R" : "") +
+      (visual.roofAerialImage ? " /RoofAerial " + aerialObject + " 0 R" : "") +
       " >>";
     const contentLines = i === visualPageIndex
       ? roofVisualCommands(visual)
@@ -1558,7 +2195,26 @@ export async function POST(request: Request) {
     }
 
     const mappedBuildings = await fetchMappedBuildings(lat, lon);
-    const satelliteTiles = await fetchSatelliteTiles(lat, lon);
+
+    // Use verified satellite imagery first. Mappls Still Map is a map-image
+    // API and can return a styled/vector basemap; using it as the first
+    // source made the PDF look like an empty dark map even though the request
+    // succeeded. Esri World Imagery is the explicit satellite fallback.
+    let satelliteTiles: SatelliteTile[] = [];
+    let satelliteZoom = 20;
+    for (const zoom of [20, 19, 18]) {
+      const candidate = await fetchSatelliteTiles(lat, lon, zoom);
+      if (candidate.length >= 8) {
+        satelliteTiles = candidate;
+        satelliteZoom = zoom;
+        break;
+      }
+    }
+
+    // Mappls remains the secondary imagery source when satellite tiles are
+    // unavailable. The exact GPS is still drawn independently on top.
+    const roofAerialImage =
+      satelliteTiles.length >= 8 ? null : await fetchMapplsStillImage(lat, lon);
     const roofPhoto = decodeJpegDataUrl(
       body.userInputs?.roofPhotoDataUrl ?? body.roofPhotoDataUrl,
     );
@@ -1575,7 +2231,9 @@ export async function POST(request: Request) {
       mappedBuildings: mappedBuildings.length,
       targetBuildingMapped: mappedBuildings.some((building) => building.containsTarget),
       satelliteTiles: satelliteTiles.length,
+      roofAerialImage: Boolean(roofAerialImage),
       roofPhoto: Boolean(roofPhoto),
+      reportCenter: { latitude: lat, longitude: lon },
       roofRayLogo: Boolean(logoImage),
     });
     const reportText = String(body.report ?? "");
@@ -1604,7 +2262,7 @@ export async function POST(request: Request) {
       "",
       "Solar feasibility",
       ...wrap(`Recommended system size: ${(reportSize ?? size) !== null ? (reportSize ?? size)!.toFixed(2) + " kW" : "Unavailable"}`),
-      ...wrap(`Estimated panels: ${(reportPanels ?? panels) !== null ? Math.round(reportPanels ?? panels) : "Unavailable"}`),
+      ...wrap(`Estimated panels: ${(reportPanels ?? panels) !== null ? Math.round((reportPanels ?? panels)!) : "Unavailable"}`),
       ...wrap(`Estimated generation: ${(reportMonthly ?? monthly) !== null ? (reportMonthly ?? monthly) + " kWh/month" : "Unavailable"}${(reportAnnual ?? annual) !== null ? " | " + (reportAnnual ?? annual) + " kWh/year" : ""}`),
       ...wrap(`Average expected generation: ${dailyGeneration !== null ? dailyGeneration.toFixed(1) + " kWh/day" : "Unavailable"}`),
       ...wrap(`Estimated shading: ${(reportShade ?? shade) !== null ? (reportShade ?? shade)!.toFixed(1) + "%" : "Unavailable"}`),
@@ -1651,7 +2309,10 @@ export async function POST(request: Request) {
       sunCycle: (context.sunCycle ?? null) as Record<string, unknown> | null,
       mappedBuildings,
       satelliteTiles,
+      satelliteZoom,
+      roofAerialImage,
       roofPhoto,
+      reportLocation: { latitude: lat, longitude: lon },
       logoImage,
     });
     return new NextResponse(Buffer.from(pdf), {

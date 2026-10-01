@@ -1548,8 +1548,11 @@ export default function RoofRayChat() {
     }
   }
 
-  async function ensureReportPdf(reportOverride?: string) {
-    if (reportPdfUrl) return reportPdfUrl;
+  async function ensureReportPdf(reportOverride?: string, forceRegenerate = false) {
+    // Preview must be able to regenerate the PDF after the report renderer
+    // changes. Otherwise the existing in-memory Blob URL keeps showing the
+    // PDF generated before the latest rooftop/aerial-map changes.
+    if (reportPdfUrl && !forceRegenerate) return reportPdfUrl;
     try {
       let raw =
         sessionStorage.getItem("roofray_report_data") ||
@@ -1672,7 +1675,7 @@ export default function RoofRayChat() {
   }
 
   async function previewReportPdf(reportOverride?: string) {
-    const url = await ensureReportPdf(reportOverride);
+    const url = await ensureReportPdf(reportOverride, true);
     if (!url) return;
     setReportPdfPreviewOpen(true);
   }

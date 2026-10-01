@@ -6,6 +6,12 @@ declare global {
   interface Window {
     mappls?: {
       Map: new (id: string, options?: Record<string, unknown>) => unknown;
+      Marker?: new (options: {
+        map: unknown;
+        position: { lat: number; lng: number };
+        fitbounds?: boolean;
+        icon_url?: string;
+      }) => unknown;
       add3DModel?: (options: { map: unknown }) => void;
     };
     initRoofRayMappls?: () => void;
@@ -47,6 +53,23 @@ export default function MapplsLocationMap({ latitude, longitude, className = "h-
       });
 
       mapRef.current = map;
+
+      // Always mark the exact GPS point supplied by RoofRay. The marker is
+      // deliberately independent of the building dataset so the user can see
+      // "this is my house" even when the map provider has not mapped the
+      // building footprint yet.
+      if (window.mappls.Marker) {
+        try {
+          new window.mappls.Marker({
+            map,
+            position: { lat: latitude, lng: longitude },
+            fitbounds: false,
+            icon_url: "https://apis.mappls.com/map_v3/1.png",
+          });
+        } catch {
+          // Keep the map usable if marker rendering is unavailable.
+        }
+      }
 
       if (window.mappls.add3DModel) {
         try {
