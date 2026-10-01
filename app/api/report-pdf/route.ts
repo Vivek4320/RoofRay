@@ -1580,13 +1580,26 @@ export async function POST(request: Request) {
     const dailyWeather = (weather.daily ?? {}) as Record<string, unknown>;
     const inputs = body.userInputs ?? {};
 
-    const size = numberValue(planning.systemSizeKw);
-    const panels = numberValue(planning.panelCount);
-    const monthly = numberValue(planning.averageMonthlyGenerationKwh);
-    const annual = numberValue(planning.annualGenerationAfterEstimatedShadingKwh);
-    const shade = numberValue(planning.estimatedShadingPercent);
-    const roof = numberValue(planning.roofAreaSqFt);
-    const bill = numberValue(inputs.monthlyBillInr);
+    const reportText = String(body.report ?? "");
+
+    // Use the finished deterministic report as a fallback for older/partial
+    // solarContext payloads. If the chat already showed a real number, the PDF
+    // should not replace it with "Unavailable".
+    const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\\d,.]+)\\s*kW/i);
+    const reportPanels = reportNumber(reportText, /Panels:\s*([\\d,.]+)\\s*[×x]/i);
+    const reportMonthly = reportNumber(reportText, /Expected generation:\s*~?([\\d,.]+)\\s*kWh\\/month/i);
+    const reportAnnual = reportNumber(reportText, /[|]\\s*~?([\\d,.]+)\\s*kWh\\/year/i);
+    const reportShade = reportNumber(reportText, /Estimated shading:\s*~?([\\d,.]+)%/i);
+    const reportRoof = reportNumber(reportText, /Roof area:\s*~?([\\d,.]+)\\s*sq ft/i);
+    const reportBill = reportNumber(reportText, /Current electricity bill:\s*₹?([\\d,.]+)\\s*\\/month/i);
+
+    const size = reportSize ?? numberValue(planning.systemSizeKw);
+    const panels = reportPanels ?? numberValue(planning.panelCount);
+    const monthly = reportMonthly ?? numberValue(planning.averageMonthlyGenerationKwh);
+    const annual = reportAnnual ?? numberValue(planning.annualGenerationAfterEstimatedShadingKwh);
+    const shade = reportShade ?? numberValue(planning.estimatedShadingPercent);
+    const roof = reportRoof ?? numberValue(planning.roofAreaSqFt) ?? numberValue(inputs.roofAreaSqFt);
+    const bill = reportBill ?? numberValue(inputs.monthlyBillInr);
     const resolvedLocation = resolveReportLocation(context, planning);
     const lat = resolvedLocation?.latitude ?? null;
     const lon = resolvedLocation?.longitude ?? null;
@@ -1635,12 +1648,6 @@ export async function POST(request: Request) {
       roofPhoto: Boolean(roofPhoto),
       roofRayLogo: Boolean(logoImage),
     });
-    const reportText = String(body.report ?? "");
-    const reportSize = reportNumber(reportText, /Recommended capacity:\s*~?([\d,.]+)\s*kW/i);
-    const reportPanels = reportNumber(reportText, /Panels:\s*([\d,.]+)\s*[×x]/i);
-    const reportMonthly = reportNumber(reportText, /Expected generation:\s*~?([\d,.]+)\s*kWh\/month/i);
-    const reportAnnual = reportNumber(reportText, /\|\s*~?([\d,.]+)\s*kWh\/year/i);
-    const reportShade = reportNumber(reportText, /Estimated shading:\s*~?([\d,.]+)%/i);
     const dailyGeneration = numberValue(planning.averageDailyGenerationKwh);
     const monthlyGeneration = Array.isArray(planning.monthlyGenerationKwh)
       ? planning.monthlyGenerationKwh as Array<Record<string, unknown>>
@@ -1655,16 +1662,16 @@ export async function POST(request: Request) {
       "",
       ...wrap(`Customer: ${inputs.name ?? "Not provided"}`),
       ...wrap(`Location: ${lat !== null && lon !== null ? lat.toFixed(5) + ", " + lon.toFixed(5) : "Detected location"}`),
-      ...wrap(`Roof area: ${roof !== null ? roof + " sq ft" : "Not available"}`),
+      ...wrap(`Roof area: ${roof !== null ? roof + " sq ft" : "Not provided"}`),
       ...wrap(`Roof type: ${inputs.roofType ?? "Not provided"}`),
       ...wrap(`Monthly electricity bill: ${bill !== null ? "Rs. " + Math.round(bill) : "Not provided"}`),
       "",
       "Solar feasibility",
-      ...wrap(`Recommended system size: ${(reportSize ?? size) !== null ? (reportSize ?? size)!.toFixed(2) + " kW" : "Unavailable"}`),
-      ...wrap(`Estimated panels: ${(reportPanels ?? panels) !== null ? Math.round(reportPanels ?? panels) : "Unavailable"}`),
-      ...wrap(`Estimated generation: ${(reportMonthly ?? monthly) !== null ? (reportMonthly ?? monthly) + " kWh/month" : "Unavailable"}${(reportAnnual ?? annual) !== null ? " | " + (reportAnnual ?? annual) + " kWh/year" : ""}`),
+      ...wrap(`Recommended system size: ${size !== null ? size.toFixed(2) + " kW" : "Not provided"}`),
+      ...wrap(`Estimated panels: ${panels !== null ? Math.round(panels) : "Not provided"}`),
+      ...wrap(`Estimated generation: ${monthly !== null ? monthly + " kWh/month" : "Not provided"}${annual !== null ? " | " + annual + " kWh/year" : ""}`),
       ...wrap(`Average expected generation: ${dailyGeneration !== null ? dailyGeneration.toFixed(1) + " kWh/day" : "Unavailable"}`),
-      ...wrap(`Estimated shading: ${(reportShade ?? shade) !== null ? (reportShade ?? shade)!.toFixed(1) + "%" : "Unavailable"}`),
+      ...wrap(`Estimated shading: ${shade !== null ? shade.toFixed(1) + "%" : "Not provided"}`),
       "",
       "Expected monthly generation",
       ...monthlyGeneration.map((item) => {
@@ -1698,7 +1705,7 @@ export async function POST(request: Request) {
       roofAreaSqFt: roof,
       roofType: String(inputs.roofType ?? "Roof type unavailable"),
       panelCount: panels,
-      panelPowerW: numberValue(planning.panelPowerW),
+      panelPowerW: numberValue(planning.panelPowerW) ?? 450,
       direction: String(planning.recommendedDirection ?? "Unavailable"),
       slopeDeg: numberValue(planning.recommendedSlopeDeg),
       roofFootprint: (context.roof ?? null) as Record<string, unknown> | null,
