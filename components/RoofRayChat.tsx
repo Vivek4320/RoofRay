@@ -425,7 +425,7 @@ function ChatHeader({ onReset, onClose }: { onReset: () => void; onClose: () => 
   return (
     <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
       <div className="flex min-w-0 items-center gap-2.5">
-        <Image src="/favicon.ico" alt="RoofRay" width={100} height={100} priority className="h-28 w-28 shrink-0 object-contain" />
+        <Image src="/favicon.ico" alt="RoofRay" width={100} height={100} priority className="h-12 w-12 shrink-0 object-contain" />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <button type="button" onClick={onReset} aria-label="Start new chat" title="New chat" className="group rr-icon-btn">
@@ -442,7 +442,7 @@ function ChatHeader({ onReset, onClose }: { onReset: () => void; onClose: () => 
 function EmptyState() {
   return (
     <div className="flex min-h-[65vh] flex-col items-center justify-center px-6 py-16 text-center">
-      <Image src="/favicon.ico" alt="RoofRay logo" width={110} height={110} priority className="h-32 w-32 object-contain sm:h-48 sm:w-48" />
+      <Image src="/favicon.ico" alt="RoofRay logo" width={110} height={110} priority className="h-12 w-12 object-contain sm:h-48 sm:w-48" />
     </div>
   );
 }

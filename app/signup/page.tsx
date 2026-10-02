@@ -80,7 +80,7 @@ export default function SignupPage() {
       <div className="w-full max-w-5xl grid lg:grid-cols-2 overflow-hidden rounded-[2rem] border border-[#1E293B] bg-[#0D1424]/95 shadow-2xl shadow-black/30">
         <section className="hidden lg:flex relative flex-col justify-between p-12 bg-[#101827] border-r border-[#1E293B]">
           <Link href="/" className="inline-flex w-fit">
-            <Image src="/favicon.ico" alt="RoofRay" width={260} height={90} className="h-16 w-auto object-contain" priority />
+            <Image src="/favicon.ico" alt="RoofRay" width={260} height={90} className="h-12 w-auto object-contain" priority />
           </Link>
           <div>
             <p className="section-label mb-4">Start with RoofRay</p>
@@ -101,7 +101,7 @@ export default function SignupPage() {
         <section className="p-6 sm:p-10 lg:p-12">
           <div className="mb-6 lg:hidden">
             <Link href="/" className="inline-flex">
-              <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={220} height={80} className="h-16 w-auto object-contain" priority />
+              <Image src="/favicon.ico" alt="RoofRay" width={220} height={80} className="h-12 w-auto object-contain" priority />
             </Link>
           </div>
 
