@@ -546,7 +546,7 @@ function AssistantMessage({
           alt="RoofRay"
           width={100}
           height={100}
-          className="h-[38px] w-[38px] object-contain"
+          className="h-[34px] w-[34px] object-contain"
         />
       </div>
 
@@ -704,7 +704,7 @@ function AssistantMessage({
 function ThinkingIndicator() {
   return (
     <div className="rr-msg-in flex items-center gap-3" role="status" aria-live="polite" aria-label="RoofRay is preparing a response">
-      <Image src="/favicon.ico" alt="" width={100} height={100} className="h-[43px] w-[43px] object-contain" aria-hidden="true" />
+      <Image src="/favicon.ico" alt="" width={100} height={100} className="h-[35px] w-[35px] object-contain" aria-hidden="true" />
       <span className="flex items-center gap-[5px] pt-0.5">
         <span className="rr-dot rr-dot-1 h-1.5 w-1.5 rounded-full bg-slate-500" />
         <span className="rr-dot rr-dot-2 h-1.5 w-1.5 rounded-full bg-slate-500" />
