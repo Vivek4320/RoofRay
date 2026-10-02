@@ -431,6 +431,11 @@ function buildPdf(data: SummaryData): Uint8Array {
     }
 
     commands.push(...footerCommands());
+    if (pageIndex === 1) {
+      commands.push(
+        "BT /F1 6 Tf 0.42 0.49 0.56 rg 500 48 Td (* Note: Report may contain estimation errors. Manual testing is recommended.) Tj ET",
+      );
+    }
 
     const stream = commands.join("\n");
     objects[pageObject - 1] =
