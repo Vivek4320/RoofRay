@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, UserRound, Sun } from "lucide-react";
+import { LuArrowLeft, LuArrowRight, LuCheck, LuEye, LuEyeOff, LuLockKeyhole, LuMail, LuSun, LuUserRound } from "react-icons/lu";
 import { saveSession, supabaseAuth } from "@/lib/supabase";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -83,7 +83,7 @@ export default function SignupPage() {
           </Link>
           <div>
             <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-400/20">
-              <Sun className="h-7 w-7 text-blue-400" />
+              <LuSun className="h-7 w-7 text-blue-400" aria-hidden="true" />
             </div>
             <p className="section-label mb-4">Start with RoofRay</p>
             <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold leading-tight text-white">
@@ -95,7 +95,7 @@ export default function SignupPage() {
           </div>
           <div className="space-y-3 text-xs text-slate-500">
             {["Simple rooftop analysis", "Clear solar feasibility insights", "One account for your RoofRay experience"].map((item) => (
-              <div key={item} className="flex items-center gap-3"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-blue-400"><Check className="h-3 w-3" /></span>{item}</div>
+              <div key={item} className="flex items-center gap-3"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-blue-400"><LuCheck className="h-3 w-3" aria-hidden="true" /></span>{item}</div>
             ))}
           </div>
         </section>
@@ -108,7 +108,7 @@ export default function SignupPage() {
           </div>
 
           <div className="max-w-md mx-auto">
-            <Link href="/" className="text-xs font-medium text-slate-500 hover:text-blue-400 transition-colors">← Back to RoofRay</Link>
+            <Link href="/" className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-400 transition-colors"><LuArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />Back to RoofRay</Link>
             <p className="section-label mt-8 mb-3">Create account</p>
             <h2 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl font-bold text-white">Join RoofRay.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-400">Create your account to start using your RoofRay solar assistant.</p>
@@ -117,7 +117,7 @@ export default function SignupPage() {
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Full name</span>
                 <div className="relative">
-                  <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <LuUserRound className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden="true" />
                   <input className="auth-input pl-12" type="text" required autoComplete="name" maxLength={80} value={name} onChange={(e) => { setName(e.target.value); setError(""); }} placeholder="Your name" />
                 </div>
               </label>
@@ -125,7 +125,7 @@ export default function SignupPage() {
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Email address</span>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <LuMail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden="true" />
                   <input className="auth-input pl-12" type="email" required autoComplete="email" maxLength={254} value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@example.com" />
                 </div>
               </label>
@@ -133,10 +133,10 @@ export default function SignupPage() {
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Password</span>
                 <div className="relative">
-                  <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <LuLockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden="true" />
                   <input className="auth-input pl-12 pr-12" type={showPassword ? "text" : "password"} required autoComplete="new-password" maxLength={72} value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} placeholder="Create a password" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:text-blue-400" aria-label={showPassword ? "Hide password" : "Show password"}>
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? <LuEyeOff className="h-4 w-4" aria-hidden="true" /> : <LuEye className="h-4 w-4" aria-hidden="true" />}
                   </button>
                 </div>
               </label>
@@ -144,7 +144,7 @@ export default function SignupPage() {
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Confirm password</span>
                 <div className="relative">
-                  <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <LuLockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden="true" />
                   <input className="auth-input pl-12" type="password" required autoComplete="new-password" maxLength={72} value={confirm} onChange={(e) => { setConfirm(e.target.value); setError(""); }} placeholder="Repeat your password" />
                 </div>
               </label>
@@ -154,7 +154,7 @@ export default function SignupPage() {
 
               <button disabled={loading} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" type="submit">
                 {loading ? "Creating account..." : "Create account"}
-                {!loading && <ArrowRight className="h-4 w-4" />}
+                {!loading && <LuArrowRight className="h-4 w-4" aria-hidden="true" />}
               </button>
             </form>
 

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sun } from "lucide-react";
+import { LuArrowLeft, LuArrowRight, LuEye, LuEyeOff, LuLockKeyhole, LuMail, LuShieldCheck, LuSun } from "react-icons/lu";
 import { requestPasswordReset, saveSession, supabaseAuth } from "@/lib/supabase";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -92,20 +92,20 @@ export default function LoginPage() {
           </Link>
           <div>
             <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-400/20">
-              <Sun className="h-7 w-7 text-blue-400" />
+              <LuSun className="h-7 w-7 text-blue-400" aria-hidden="true" />
             </div>
             <p className="section-label mb-4">Welcome back</p>
             <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold leading-tight text-white">Continue your solar journey with RoofRay.</h1>
             <p className="mt-5 max-w-md text-sm leading-7 text-slate-400">Sign in to keep your rooftop analysis experience connected and ready for your next solar decision.</p>
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-500"><ShieldCheck className="h-4 w-4 text-blue-400" />Secure authentication powered by Supabase</div>
+          <div className="flex items-center gap-3 text-xs text-slate-500"><LuShieldCheck className="h-4 w-4 text-blue-400" aria-hidden="true" />Secure authentication powered by Supabase</div>
         </section>
 
         <section className="p-6 sm:p-10 lg:p-12">
           <div className="mb-8 lg:hidden"><Link href="/" className="inline-flex"><Image src="/Logo-removebg-preview.png" alt="RoofRay" width={220} height={80} className="h-16 w-auto object-contain" priority /></Link></div>
 
           <div className="max-w-md mx-auto">
-            <Link href="/" className="text-xs font-medium text-slate-500 hover:text-blue-400 transition-colors">← Back to RoofRay</Link>
+            <Link href="/" className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-400 transition-colors"><LuArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />Back to RoofRay</Link>
             <p className="section-label mt-8 mb-3">Account access</p>
             <h2 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl font-bold text-white">Welcome back.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-400">Enter your details to continue to your RoofRay solar assistant.</p>
@@ -113,7 +113,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Email address</span>
-                <div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" /><input className="auth-input pl-12" type="email" required autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setResetMessage(""); }} placeholder="you@example.com" /></div>
+                <div className="relative"><LuMail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden="true" /><input className="auth-input pl-12" type="email" required autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); setResetMessage(""); }} placeholder="you@example.com" /></div>
               </label>
 
               <label className="block">
@@ -121,13 +121,13 @@ export default function LoginPage() {
                   <span className="text-sm font-medium text-slate-300">Password</span>
                   <button type="button" disabled={resetLoading} className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50" onClick={handleForgotPassword}>{resetLoading ? "Sending..." : "Forgot password?"}</button>
                 </div>
-                <div className="relative"><LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" /><input className="auth-input pl-12 pr-12" type={showPassword ? "text" : "password"} required autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); setResetMessage(""); }} placeholder="Enter your password" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:text-blue-400" aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                <div className="relative"><LuLockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden="true" /><input className="auth-input pl-12 pr-12" type={showPassword ? "text" : "password"} required autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); setResetMessage(""); }} placeholder="Enter your password" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:text-blue-400" aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <LuEyeOff className="h-4 w-4" aria-hidden="true" /> : <LuEye className="h-4 w-4" aria-hidden="true" />}</button></div>
               </label>
 
               {error && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
               {resetMessage && <p role="status" className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">{resetMessage}</p>}
 
-              <button disabled={loading} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" type="submit">{loading ? "Signing in..." : "Log in"}{!loading && <ArrowRight className="h-4 w-4" />}</button>
+              <button disabled={loading} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" type="submit">{loading ? "Signing in..." : "Log in"}{!loading && <LuArrowRight className="h-4 w-4" aria-hidden="true" />}</button>
             </form>
 
             <p className="mt-7 text-center text-sm text-slate-500">Don&apos;t have an account? <Link href="/signup" className="font-semibold text-blue-400 hover:text-blue-300">Create one</Link></p>

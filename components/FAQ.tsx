@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { LuChevronDown } from "react-icons/lu";
 
 const faqs = [
   {
@@ -87,7 +87,7 @@ export default function FAQ() {
                     {faq.question}
                   </span>
 
-                  <ChevronDown
+                  <LuChevronDown
                     className={`h-5 w-5 text-blue-400 transition-transform duration-300 ${
                       isOpen ? "rotate-180" : ""
                     }`}
@@ -99,7 +99,8 @@ export default function FAQ() {
                     isOpen
                       ? "grid-rows-[1fr]"
                       : "grid-rows-[0fr]"
-                  }`}
+                    }`}
+                    aria-hidden="true"
                 >
                   <div className="overflow-hidden">
                     <p className="px-5 sm:px-6 pb-5 sm:pb-6 text-sm sm:text-base text-slate-400 leading-6 sm:leading-7">

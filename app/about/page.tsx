@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
 import AnimateInView from '@/components/AnimateInView';
+import { LuArrowLeft, LuArrowRight, LuBot, LuChartNoAxesColumnIncreasing, LuChevronDown, LuCircleCheck, LuCloud, LuHouse, LuLeaf, LuLightbulb, LuMapPin, LuMessageCircle, LuMousePointer2, LuSun, LuTerminal, LuZap, LuCheck } from 'react-icons/lu';
 
 export const metadata: Metadata = {
   title: 'About RoofRay — Making Solar Decisions Smarter',
@@ -17,10 +18,7 @@ const HOW_STEPS = [
     title: 'Location',
     body: 'Understand the user\'s geographic location and assess local solar potential based on precise coordinates.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-      </svg>
+      <LuMapPin className="h-6 w-6" aria-hidden="true" />
     ),
   },
   {
@@ -28,9 +26,7 @@ const HOW_STEPS = [
     title: 'Roof Area',
     body: 'Analyze the total available rooftop space to determine how many solar panels can be installed effectively.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12 12 2.25l9.75 9.75M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-      </svg>
+      <LuHouse className="h-6 w-6" aria-hidden="true" />
     ),
   },
   {
@@ -38,9 +34,7 @@ const HOW_STEPS = [
     title: 'Electricity Usage',
     body: 'Use the monthly electricity bill to precisely understand energy requirements and calculate optimal solar capacity.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
-      </svg>
+      <LuZap className="h-6 w-6" aria-hidden="true" />
     ),
   },
   {
@@ -48,9 +42,7 @@ const HOW_STEPS = [
     title: 'Roof Shading',
     body: 'Consider whether the roof has no shade, partial shade, or heavy shade to accurately estimate energy generation.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-      </svg>
+      <LuSun className="h-6 w-6" aria-hidden="true" />
     ),
   },
   {
@@ -58,9 +50,7 @@ const HOW_STEPS = [
     title: 'AI Analysis',
     body: 'Process all collected information through intelligent solar feasibility algorithms to evaluate potential accurately.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-      </svg>
+      <LuBot className="h-6 w-6" aria-hidden="true" />
     ),
   },
   {
@@ -68,52 +58,42 @@ const HOW_STEPS = [
     title: 'Recommendation',
     body: 'Present results in a simple, understandable format — including feasibility verdict, estimated savings, and next steps.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-      </svg>
+      <LuCircleCheck className="h-6 w-6" aria-hidden="true" />
     ),
   },
 ];
 
 const WHY_CARDS = [
   {
-    emoji: '⚡',
+    badgeIcon: <LuZap className="h-6 w-6" aria-hidden="true" />,
     title: 'Quick Analysis',
     body: 'Get useful solar feasibility insights without complicated calculations or technical expertise.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
-      </svg>
+      <LuZap className="h-6 w-6" aria-hidden="true" />
     ),
   },
   {
-    emoji: '🤖',
+    badgeIcon: <LuBot className="h-6 w-6" aria-hidden="true" />,
     title: 'AI-Powered Assistance',
     body: 'An intelligent assistant guides users through the entire solar analysis process, step by step.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-      </svg>
+      <LuBot className="h-6 w-6" aria-hidden="true" />
     ),
   },
   {
-    emoji: '📊',
+    badgeIcon: <LuChartNoAxesColumnIncreasing className="h-6 w-6" aria-hidden="true" />,
     title: 'Simple Insights',
     body: 'Complex solar information is translated into clear, easy-to-understand insights anyone can act on.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-      </svg>
+      <LuChartNoAxesColumnIncreasing className="h-6 w-6" aria-hidden="true" />
     ),
   },
   {
-    emoji: '☀️',
+    badgeIcon: <LuSun className="h-6 w-6" aria-hidden="true" />,
     title: 'Renewable Energy Focus',
     body: 'Encouraging smarter decisions for clean and sustainable energy solutions for every Indian rooftop.',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-      </svg>
+      <LuSun className="h-6 w-6" aria-hidden="true" />
     ),
   },
 ];
@@ -123,55 +103,42 @@ const TECH_ITEMS = [
     label: 'Artificial Intelligence',
     sublabel: 'Intelligent solar analysis',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-      </svg>
+      <LuMessageCircle className="h-5 w-5" aria-hidden="true" />
     ),
   },
   {
     label: 'Location-Based Analysis',
     sublabel: 'Precise coordinate data',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-      </svg>
+      <LuMapPin className="h-5 w-5" aria-hidden="true" />
     ),
   },
   {
     label: 'Solar Feasibility Engine',
     sublabel: 'Real-world calculations',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-      </svg>
+      <LuSun className="h-5 w-5" aria-hidden="true" />
     ),
   },
   {
     label: 'Modern Web Technologies',
     sublabel: 'Fast, responsive interface',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
-      </svg>
+      <LuTerminal className="h-5 w-5" aria-hidden="true" />
     ),
   },
   {
     label: 'Data Processing',
     sublabel: 'Accurate energy modeling',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-      </svg>
+      <LuChartNoAxesColumnIncreasing className="h-5 w-5" aria-hidden="true" />
     ),
   },
   {
     label: 'Interactive Experience',
     sublabel: 'Human-friendly design',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.834.166-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243-1.59-1.59" />
-      </svg>
+      <LuMousePointer2 className="h-5 w-5" aria-hidden="true" />
     ),
   },
 ];
@@ -186,16 +153,7 @@ export default function AboutPage() {
           href="/"
           className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-5 py-3 text-sm font-medium text-blue-400 transition hover:bg-blue-500 hover:text-white"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
+          <LuArrowLeft className="h-5 w-5" aria-hidden="true" />
           Back to Home
         </Link>
       </div>
@@ -230,16 +188,7 @@ export default function AboutPage() {
           <div className="absolute bottom-40 left-[14%] h-2 w-2 rounded-full bg-primary/15 animate-float" style={{ animationDelay: '2s' }} />
           <div className="absolute top-[40%] left-[28%] h-1 w-1 rounded-full bg-primary/25 animate-float-slow" style={{ animationDelay: '4s' }} />
           {/* Dot grid */}
-          <div
-            className="absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage: 'radial-gradient(circle, #3B82F6 1px, transparent 1px)',
-              backgroundSize: '32px 32px',
-            }}
-          />
-        </div>
-
-        <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-10 w-full">
+          <LuArrowLeft className="h-5 w-5" aria-hidden="true" />
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
             {/* Left: Text */}
             <div className="animate-rise">
@@ -280,9 +229,7 @@ export default function AboutPage() {
                   id="about-hero-cta-primary"
                 >
                   Check Your Roof
-                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                    <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
-                  </svg>
+                  <LuArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
                 <Link
                   href="/contact"
@@ -340,9 +287,7 @@ export default function AboutPage() {
                   ].map((point) => (
                     <li key={point} className="flex items-start gap-3 text-sm text-muted">
                       <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                        <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3">
-                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                        </svg>
+                        <LuCheck className="h-3 w-3" aria-hidden="true" />
                       </span>
                       {point}
                     </li>
@@ -357,16 +302,16 @@ export default function AboutPage() {
                 </p>
                 <div className="space-y-3">
                   {[
-                    { label: 'Location', icon: '📍', desc: 'Where is your roof?' },
-                    { label: 'Roof Area', icon: '🏠', desc: 'How much space available?' },
-                    { label: 'Electricity Bill', icon: '⚡', desc: 'Monthly energy usage' },
-                    { label: 'Roof Shading', icon: '☁️', desc: 'Shade conditions' },
-                    { label: 'AI Analysis', icon: '🤖', desc: 'Processing data...' },
-                    { label: 'Solar Recommendation', icon: '☀️', desc: 'Your feasibility verdict' },
+                    { label: 'Location', icon: <LuMapPin className="h-5 w-5" aria-hidden="true" />, desc: 'Where is your roof?' },
+                    { label: 'Roof Area', icon: <LuHouse className="h-5 w-5" aria-hidden="true" />, desc: 'How much space available?' },
+                    { label: 'Electricity Bill', icon: <LuZap className="h-5 w-5" aria-hidden="true" />, desc: 'Monthly energy usage' },
+                    { label: 'Roof Shading', icon: <LuCloud className="h-5 w-5" aria-hidden="true" />, desc: 'Shade conditions' },
+                    { label: 'AI Analysis', icon: <LuBot className="h-5 w-5" aria-hidden="true" />, desc: 'Processing data...' },
+                    { label: 'Solar Recommendation', icon: <LuSun className="h-5 w-5" aria-hidden="true" />, desc: 'Your feasibility verdict' },
                   ].map((step, idx, arr) => (
                     <div key={step.label}>
                       <div className="flex items-center gap-4 rounded-xl bg-surface-blue border border-line p-3.5 transition-all duration-300 hover:border-primary/30 hover:bg-primary/5">
-                        <span className="text-xl" role="img" aria-label={step.label}>{step.icon}</span>
+                        <span className="text-xl" aria-hidden="true">{step.icon}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-white truncate">{step.label}</p>
                           <p className="text-xs text-muted truncate">{step.desc}</p>
@@ -402,9 +347,7 @@ export default function AboutPage() {
             <div className="mx-auto max-w-3xl text-center">
               {/* Mission icon */}
               <div className="mx-auto mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary">
-                <svg viewBox="0 0 24 24" fill="none" className="h-8 w-8" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-                </svg>
+                <LuSun className="h-8 w-8" aria-hidden="true" />
               </div>
 
               <p className="section-label mb-5 justify-center">Our Mission</p>
@@ -420,15 +363,15 @@ export default function AboutPage() {
               {/* Mission pillars */}
               <div className="mt-12 grid gap-5 sm:grid-cols-3">
                 {[
-                  { title: 'Simplify', desc: 'Make solar planning accessible to everyone, not just experts.', icon: '💡' },
-                  { title: 'Inform', desc: 'Give people the real data they need to make confident decisions.', icon: '📊' },
-                  { title: 'Empower', desc: 'Help individuals and businesses move towards clean energy.', icon: '🌿' },
+                  { title: 'Simplify', desc: 'Make solar planning accessible to everyone, not just experts.', icon: <LuLightbulb className="h-8 w-8" aria-hidden="true" /> },
+                  { title: 'Inform', desc: 'Give people the real data they need to make confident decisions.', icon: <LuChartNoAxesColumnIncreasing className="h-8 w-8" aria-hidden="true" /> },
+                  { title: 'Empower', desc: 'Help individuals and businesses move towards clean energy.', icon: <LuLeaf className="h-8 w-8" aria-hidden="true" /> },
                 ].map((pillar) => (
                   <div
                     key={pillar.title}
                     className="soft-card solar-shimmer group p-5 text-center transition-all duration-300"
                   >
-                    <span className="text-3xl mb-3 block" role="img" aria-label={pillar.title}>{pillar.icon}</span>
+                    <span className="text-3xl mb-3 block" aria-hidden="true">{pillar.icon}</span>
                     <h3 className="font-display text-base font-bold text-white mb-2">{pillar.title}</h3>
                     <p className="text-sm text-muted leading-relaxed">{pillar.desc}</p>
                   </div>
@@ -518,7 +461,7 @@ export default function AboutPage() {
                         {card.icon}
                       </div>
                       <div className="flex-1 pt-1">
-                        <span className="text-xl" role="img" aria-label={card.title}>{card.emoji}</span>
+                        <span className="text-xl" aria-hidden="true">{card.badgeIcon}</span>
                       </div>
                     </div>
 
@@ -573,9 +516,7 @@ export default function AboutPage() {
                     ].map((flow) => (
                       <div key={flow.top} className={`rounded-xl p-3 ${flow.color} border border-primary/10`}>
                         <p className="font-display text-sm font-bold">{flow.top}</p>
-                        <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3 mx-auto my-1 text-primary/50" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <LuChevronDown className="h-3 w-3 mx-auto my-1 text-primary/50" aria-hidden="true" />
                         <p className="font-mono text-[0.65rem] text-primary/70">{flow.bottom}</p>
                       </div>
                     ))}
@@ -678,9 +619,7 @@ export default function AboutPage() {
           <div className="relative mx-auto max-w-4xl px-6 py-24 text-center lg:px-10 lg:py-32">
             {/* Icon */}
             <div className="mx-auto mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary">
-              <svg viewBox="0 0 24 24" fill="none" className="h-8 w-8" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-              </svg>
+                <LuSun className="h-8 w-8" aria-hidden="true" />
             </div>
 
             <p className="mb-5 font-mono text-xs uppercase tracking-[0.15em] text-primary font-semibold">
@@ -704,9 +643,7 @@ export default function AboutPage() {
                 id="about-cta-primary"
               >
                 Check Your Roof
-                <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                  <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
-                </svg>
+                <LuArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link
                 href="/contact"
@@ -823,10 +760,10 @@ function HeroIllustration() {
 
       {/* Floating badges */}
       <div className="absolute top-4 right-2 rounded-xl bg-surface-soft border border-line px-3 py-2 shadow-lg animate-float">
-        <p className="font-mono text-[0.6rem] text-primary font-bold">☀️ Solar Ready</p>
+        <p className="font-mono text-[0.6rem] text-primary font-bold"><LuSun className="mr-1 inline h-3 w-3" aria-hidden="true" />Solar Ready</p>
       </div>
       <div className="absolute bottom-8 left-0 rounded-xl bg-surface-soft border border-line px-3 py-2 shadow-lg animate-float-slow" style={{ animationDelay: '1.5s' }}>
-        <p className="font-mono text-[0.6rem] text-primary font-bold">🤖 AI Analysis</p>
+        <p className="font-mono text-[0.6rem] text-primary font-bold"><LuBot className="mr-1 inline h-3 w-3" aria-hidden="true" />AI Analysis</p>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useRef, useState, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
+import { LuMove } from "react-icons/lu";
 
 const pillars = [
   { x: -1.3, z: -0.7, h: 0.87 }, // Front Left
@@ -243,9 +244,7 @@ export default function House3D() {
       </Canvas>
 
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-[#0F172A] border border-[var(--border)] text-[12px] text-[var(--white)] pointer-events-none flex items-center gap-2 shadow-lg">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
-          <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l3 3-3-3M19 9l3 3-3 3" />
-        </svg>
+        <LuMove className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} aria-hidden="true" />
         <span>3D Solar House | Drag to rotate 360°</span>
       </div>
     </div>

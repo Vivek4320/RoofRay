@@ -1,6 +1,7 @@
 import Navbar from '@/components/Navbar';
 import BottomNav from '@/components/BottomNav';
 import Footer from '@/components/Footer';
+import { LuClock, LuMail, LuMapPin, LuPhone } from 'react-icons/lu';
 
 export default function ContactPage() {
   return (
@@ -27,22 +28,22 @@ export default function ContactPage() {
 
             <div className="space-y-8">
               <div>
-                <h3 className="font-semibold text-blue-400">📧 Email</h3>
+                <h3 className="flex items-center gap-2 font-semibold text-blue-400"><LuMail className="h-4 w-4" aria-hidden="true" />Email</h3>
                 <p className="mt-2 text-slate-300">support@roofray.ai</p>
               </div>
 
               <div>
-                <h3 className="font-semibold text-blue-400">📞 Phone</h3>
+                <h3 className="flex items-center gap-2 font-semibold text-blue-400"><LuPhone className="h-4 w-4" aria-hidden="true" />Phone</h3>
                 <p className="mt-2 text-slate-300">+91 98765 43210</p>
               </div>
 
               <div>
-                <h3 className="font-semibold text-blue-400">📍 Location</h3>
+                <h3 className="flex items-center gap-2 font-semibold text-blue-400"><LuMapPin className="h-4 w-4" aria-hidden="true" />Location</h3>
                 <p className="mt-2 text-slate-300">Jamnagar, Gujarat, India</p>
               </div>
 
               <div>
-                <h3 className="font-semibold text-blue-400">⏰ Working Hours</h3>
+                <h3 className="flex items-center gap-2 font-semibold text-blue-400"><LuClock className="h-4 w-4" aria-hidden="true" />Working Hours</h3>
                 <p className="mt-2 text-slate-300">Monday - Saturday</p>
                 <p className="text-slate-300">9:00 AM - 6:00 PM</p>
               </div>

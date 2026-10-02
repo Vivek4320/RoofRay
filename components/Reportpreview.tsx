@@ -3,28 +3,35 @@
 import { useEffect, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import {
-  FileText,
-  Lock,
-  ArrowRight,
-  Sparkles,
-  X,
-  Mail,
-  LockKeyhole,
-  Eye,
-  EyeOff,
-  Download,
-  CheckCircle2,
-  ExternalLink
-} from 'lucide-react';
+  LuFileText,
+  LuLock,
+  LuArrowRight,
+  LuSparkles,
+  LuX,
+  LuMail,
+  LuLockKeyhole,
+  LuEye,
+  LuEyeOff,
+  LuDownload,
+  LuCircleCheck,
+  LuExternalLink,
+  LuZap,
+  LuSun,
+  LuCircleDollarSign,
+  LuChartNoAxesColumnIncreasing,
+  LuClock3,
+  LuCloudSun,
+  LuCheck,
+} from 'react-icons/lu';
 import { saveSession, supabaseAuth } from '@/lib/supabase';
 
 const METRICS = [
-  {label: 'System size', value: '0.kW', sub: '0 panels', icon: '⚡' },
-  { label: 'Est. generation', value: '0 units', sub: 'per day, avg.', icon: '☀️' },
-  { label: 'Investment', value: '₹0', sub: 'before subsidy', icon: '💰' },
-  { label: 'Monthly savings', value: '₹0', sub: 'at current tariff', icon: '📉' },
-  { label: 'Payback period', value: '0 yrs', sub: 'vs 25-yr panel life', icon: '⏱️' },
-  { label: 'Sun-hours', value: '0 / day', sub: 'long-term avg, this point', icon: '🌤️' },
+  { label: 'System size', value: '0.kW', sub: '0 panels', icon: <LuZap className="h-5 w-5" aria-hidden="true" /> },
+  { label: 'Est. generation', value: '0 units', sub: 'per day, avg.', icon: <LuSun className="h-5 w-5" aria-hidden="true" /> },
+  { label: 'Investment', value: '₹0', sub: 'before subsidy', icon: <LuCircleDollarSign className="h-5 w-5" aria-hidden="true" /> },
+  { label: 'Monthly savings', value: '₹0', sub: 'at current tariff', icon: <LuChartNoAxesColumnIncreasing className="h-5 w-5" aria-hidden="true" /> },
+  { label: 'Payback period', value: '0 yrs', sub: 'vs 25-yr panel life', icon: <LuClock3 className="h-5 w-5" aria-hidden="true" /> },
+  { label: 'Sun-hours', value: '0 / day', sub: 'long-term avg, this point', icon: <LuCloudSun className="h-5 w-5" aria-hidden="true" /> },
 ];
 
 export default function ReportPreview() {
@@ -67,7 +74,7 @@ export default function ReportPreview() {
           label: "System size",
           value: metricNumber(reportMetrics.systemSizeKw, planning.systemSizeKw) !== null ? metricNumber(reportMetrics.systemSizeKw, planning.systemSizeKw)!.toFixed(2) + " kW" : "—",
           sub: metricNumber(reportMetrics.panelCount, planning.panelCount) !== null ? Math.round(metricNumber(reportMetrics.panelCount, planning.panelCount)!) + " panels" : "live analysis",
-          icon: "⚡",
+          icon: <LuZap className="h-5 w-5" aria-hidden="true" />,
         },
         {
           label: "Est. generation",
@@ -77,25 +84,25 @@ export default function ReportPreview() {
               ? Math.round(metricNumber(reportMetrics.monthlyGenerationKwh, planning.averageMonthlyGenerationKwh)!) + " units"
               : "—",
           sub: "per day, avg.",
-          icon: "☀️",
+          icon: <LuSun className="h-5 w-5" aria-hidden="true" />,
         },
         {
           label: "Investment",
           value: "—",
           sub: "site-specific quote",
-          icon: "💰",
+          icon: <LuCircleDollarSign className="h-5 w-5" aria-hidden="true" />,
         },
         {
           label: "Monthly savings",
           value: "—",
           sub: "depends on tariff and net metering",
-          icon: "📉",
+          icon: <LuChartNoAxesColumnIncreasing className="h-5 w-5" aria-hidden="true" />,
         },
         {
           label: "Payback period",
           value: "—",
           sub: "calculated after tariff/quote",
-          icon: "⏱️",
+          icon: <LuClock3 className="h-5 w-5" aria-hidden="true" />,
         },
         {
           label: "Sun-hours",
@@ -103,7 +110,7 @@ export default function ReportPreview() {
             ? Number(reportData.solarContext.weather.daily.sunshineDurationHours).toFixed(1) + " / day"
             : "—",
           sub: "Open-Meteo current forecast",
-          icon: "🌤️",
+          icon: <LuCloudSun className="h-5 w-5" aria-hidden="true" />,
         },
       ]
     : METRICS;
@@ -195,7 +202,7 @@ export default function ReportPreview() {
           {isUnlocked && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 px-4 sm:px-6 py-3 text-xs sm:text-sm text-emerald-300 backdrop-blur-md">
               <div className="flex items-center gap-2 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <LuCircleCheck className="h-4 w-4 text-emerald-400" aria-hidden="true" />
                 <span>Sample Report Unlocked</span>
               </div>
               <div className="flex items-center gap-3">
@@ -203,7 +210,7 @@ export default function ReportPreview() {
                   onClick={handleDownloadSample}
                   className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3.5 py-1.5 font-semibold text-emerald-200 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors cursor-pointer"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <LuDownload className="h-3.5 w-3.5" aria-hidden="true" />
                   {downloadSuccess ? 'Downloaded PDF!' : 'Download Sample PDF'}
                 </button>
                 <button
@@ -230,7 +237,7 @@ export default function ReportPreview() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-emerald-500/10 px-4 py-1.5 font-mono text-[0.72rem] font-semibold text-emerald-400 border border-emerald-500/20">
-                  {reportData ? "LIVE REPORT ✓" : "SAMPLE REPORT"}
+                  {reportData ? <>LIVE REPORT <LuCheck aria-hidden="true" /></> : "SAMPLE REPORT"}
                 </span>
               </div>
             </div>
@@ -269,9 +276,9 @@ export default function ReportPreview() {
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 sm:p-10 text-center bg-[#0B0F1A]/75 backdrop-blur-md transition-all duration-500">
                   {/* Glowing Icon Badge */}
                   <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600/15 border border-blue-500/30 shadow-lg shadow-blue-500/20">
-                    <Sparkles className="h-8 w-8 text-blue-400 animate-pulse" />
+                    <LuSparkles className="h-8 w-8 text-blue-400 animate-pulse" aria-hidden="true" />
                     <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] text-white">
-                      <Lock className="h-2.5 w-2.5" />
+                      <LuLock className="h-2.5 w-2.5" aria-hidden="true" />
                     </span>
                   </div>
 
@@ -292,15 +299,15 @@ export default function ReportPreview() {
                     }}
                   >
                     <span className="relative z-10 flex items-center gap-2.5">
-                      <FileText className="h-5 w-5 text-blue-200 transition-transform group-hover:scale-110" />
+                      <LuFileText className="h-5 w-5 text-blue-200 transition-transform group-hover:scale-110" aria-hidden="true" />
                       Get Sample Report
-                      <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                      <LuArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </span>
                     <span className="absolute inset-0 bg-white/20 opacity-0 transition-opacity group-hover:opacity-100" />
                   </button>
 
                   <p className="mt-5 text-xs text-slate-400 flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5 text-blue-400" />
+                    <LuLock className="h-3.5 w-3.5 text-blue-400" aria-hidden="true" />
                     <span>Please log in first to view or download the report</span>
                   </p>
                 </div>
@@ -328,12 +335,12 @@ export default function ReportPreview() {
               className="absolute top-5 right-5 rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
               aria-label="Close modal"
             >
-              <X className="h-5 w-5" />
+              <LuX className="h-5 w-5" aria-hidden="true" />
             </button>
 
             <div className="mb-6">
               <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-400/20">
-                <LockKeyhole className="h-6 w-6 text-blue-400" />
+                <LuLockKeyhole className="h-6 w-6 text-blue-400" aria-hidden="true" />
               </div>
               <h3 className="font-display text-2xl font-bold text-white">Login Required</h3>
               <p className="mt-1.5 text-sm text-slate-400">
@@ -345,7 +352,7 @@ export default function ReportPreview() {
               <label className="block">
                 <span className="mb-1.5 block text-xs font-medium text-slate-300">Email address</span>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <LuMail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden="true" />
                   <input
                     type="email"
                     required
@@ -360,7 +367,7 @@ export default function ReportPreview() {
               <label className="block">
                 <span className="mb-1.5 block text-xs font-medium text-slate-300">Password</span>
                 <div className="relative">
-                  <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <LuLockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" aria-hidden="true" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
@@ -373,8 +380,9 @@ export default function ReportPreview() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-blue-400 cursor-pointer"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? <LuEyeOff className="h-4 w-4" aria-hidden="true" /> : <LuEye className="h-4 w-4" aria-hidden="true" />}
                   </button>
                 </div>
               </label>
@@ -391,7 +399,7 @@ export default function ReportPreview() {
                 className="btn-primary w-full py-3.5 text-sm font-semibold disabled:opacity-60 cursor-pointer"
               >
                 {authLoading ? 'Logging in...' : 'Log In & Unlock Report'}
-                {!authLoading && <ArrowRight className="h-4 w-4" />}
+                {!authLoading && <LuArrowRight className="h-4 w-4" aria-hidden="true" />}
               </button>
             </form>
 
@@ -411,7 +419,7 @@ export default function ReportPreview() {
                   href="/login?redirect=/#report"
                   className="font-semibold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1"
                 >
-                  Login Page <ExternalLink className="h-3 w-3" />
+                  Login Page <LuExternalLink className="h-3 w-3" aria-hidden="true" />
                 </Link>
               </p>
             </div>

@@ -12,6 +12,7 @@ import {
   type DragEvent,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { LuArrowDown, LuArrowUp, LuCheck, LuCheckCheck, LuCopy, LuDownload, LuEllipsis, LuEye, LuFile, LuFileSpreadsheet, LuFileText, LuImage, LuMapPin, LuPanelLeft, LuPencil, LuPlus, LuRotateCcw, LuSatellite, LuSun, LuTrash2, LuUserRound, LuX } from "react-icons/lu";
 
 type ChatMessage = {
   id: string;
@@ -301,11 +302,7 @@ function ChatSidebar({
         {!mobileOpen && (
           <div className="flex h-[60px] shrink-0 items-center justify-center border-b border-white/[0.05]">
             <button type="button" onClick={onOpenSidebar} className="rr-icon-btn" aria-label="Open chat history" title="Open sidebar">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]" aria-hidden="true">
-                <rect x="4" y="4" width="16" height="16" rx="2.5" />
-                <path d="M9 4v16" />
-                <path d="M6.5 8h.01M6.5 12h.01M6.5 16h.01" />
-              </svg>
+              <LuPanelLeft className="h-[19px] w-[19px]" aria-hidden="true" />
             </button>
           </div>
         )}
@@ -318,11 +315,7 @@ function ChatSidebar({
               </div>
           </div>
           <button type="button" onClick={onCloseMobile} className="rr-icon-btn" aria-label="Collapse sidebar" title="Collapse sidebar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]" aria-hidden="true">
-              <rect x="4" y="4" width="16" height="16" rx="2.5" />
-              <path d="M9 4v16" />
-              <path d="M6.5 8h.01M6.5 12h.01M6.5 16h.01" />
-            </svg>
+              <LuPanelLeft className="h-[19px] w-[19px]" aria-hidden="true" />
           </button>
         </div>
 
@@ -333,9 +326,7 @@ function ChatSidebar({
             className="flex h-10 w-full items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 text-[13px] font-medium text-slate-200 transition hover:border-blue-400/20 hover:bg-blue-500/[0.08] hover:text-white"
             title="New chat"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <LuPlus className="h-4 w-4 shrink-0" aria-hidden="true" />
             New chat
           </button>
         </div>
@@ -371,9 +362,7 @@ function ChatSidebar({
                           menu?.classList.toggle("hidden");
                         }}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-                          <circle cx="5" cy="12" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="19" cy="12" r="1.2" />
-                        </svg>
+                        <LuEllipsis className="h-4 w-4" aria-hidden="true" />
                       </button>
                       <div data-chat-menu className="absolute right-0 top-9 z-[120] hidden w-32 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111A2B] p-1 shadow-xl shadow-black/40">
                         <button
@@ -385,9 +374,7 @@ function ChatSidebar({
                             (event.currentTarget.parentElement as HTMLElement | null)?.classList.add("hidden");
                           }}
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
-                            <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                          </svg>
+                          <LuPencil className="h-3.5 w-3.5" aria-hidden="true" />
                           Rename
                         </button>
                         <button
@@ -399,9 +386,7 @@ function ChatSidebar({
                             (event.currentTarget.parentElement as HTMLElement | null)?.classList.add("hidden");
                           }}
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
-                            <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" />
-                          </svg>
+                          <LuTrash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           Delete
                         </button>
                       </div>
@@ -421,10 +406,7 @@ function ChatSidebar({
             aria-label="Profile"
           >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-300 ring-1 ring-blue-400/10">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-                <circle cx="12" cy="8" r="3.5" />
-                <path d="M5 20c.8-3.2 3.2-5 7-5s6.2 1.8 7 5" />
-              </svg>
+              <LuUserRound className="h-4 w-4" aria-hidden="true" />
             </span>
             <span className={!mobileOpen ? "hidden" : "truncate"}>{profileName}</span>
           </button>
@@ -444,52 +426,12 @@ function ChatHeader({ onReset, onClose }: { onReset: () => void; onClose: () => 
       <div className="flex min-w-0 items-center gap-2.5">
         <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={100} height={100} priority className="h-28 w-28 shrink-0 object-contain" />
       </div>
-
       <div className="flex shrink-0 items-center gap-0.5">
-        <button
-          type="button"
-          onClick={onReset}
-          aria-label="Start new chat"
-          title="New chat"
-          className="group rr-icon-btn"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-[17px] w-[17px] transition-transform duration-300 ease-out group-hover:rotate-[200deg]"
-            aria-hidden="true"
-          >
-            <path d="M3 12a9 9 0 1 1 3.2 6.9" />
-            <path d="M3 4v5h5" />
-          </svg>
+        <button type="button" onClick={onReset} aria-label="Start new chat" title="New chat" className="group rr-icon-btn">
+          <LuRotateCcw className="h-[17px] w-[17px] transition-transform duration-300 ease-out group-hover:rotate-[200deg]" aria-hidden="true" />
         </button>
-
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close chat"
-          title="Close chat"
-          className="rr-icon-btn"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-[17px] w-[17px]"
-            aria-hidden="true"
-          >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
+        <button type="button" onClick={onClose} aria-label="Close chat" title="Close chat" className="rr-icon-btn">
+          <LuX className="h-[17px] w-[17px]" aria-hidden="true" />
         </button>
       </div>
     </header>
@@ -499,7 +441,7 @@ function ChatHeader({ onReset, onClose }: { onReset: () => void; onClose: () => 
 function EmptyState() {
   return (
     <div className="flex min-h-[65vh] flex-col items-center justify-center px-6 py-16 text-center">
-        <Image src="/Logo-removebg-preview.png" alt="RoofRay logo" width={110} height={110} priority className="h-50 w-50 " />
+      <Image src="/Logo-removebg-preview.png" alt="RoofRay logo" width={110} height={110} priority className="h-50 w-50 " />
     </div>
   );
 }
@@ -521,7 +463,7 @@ function UserMessage({ message }: { message: ChatMessage }) {
     <div className="rr-msg-in group flex justify-end">
       <div className="relative max-w-full">
         <div className="rr-user-bubble inline-block w-auto min-w-fit max-w-full rounded-full px-4 py-2 text-[14px] leading-5 text-slate-100">
-          {message.content}<span className="rr-message-meta">✓✓</span>
+          {message.content}<span className="rr-message-meta"><LuCheckCheck className="h-3 w-3" aria-hidden="true" /></span>
         </div>
         <button
           type="button"
@@ -531,14 +473,9 @@ function UserMessage({ message }: { message: ChatMessage }) {
           className="absolute -bottom-9 right-0 flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 opacity-0 transition-all duration-150 hover:bg-white/[0.06] hover:text-slate-200 group-hover:opacity-100 focus-visible:opacity-100"
         >
           {copied ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-              <path d="m5 12 4 4L19 6" />
-            </svg>
+            <LuCheck className="h-4 w-4" aria-hidden="true" />
           ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-              <rect x="9" y="9" width="11" height="11" rx="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
+            <LuCopy className="h-4 w-4" aria-hidden="true" />
           )}
         </button>
       </div>
@@ -622,7 +559,7 @@ function AssistantMessage({
                 onClick={onLocationPermission}
                 className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-1.5 text-[12px] font-medium text-blue-300 hover:border-blue-400/40 hover:bg-blue-500/15"
               >
-                <span aria-hidden="true">↻</span>
+                <LuRotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                 Retry solar analysis
               </button>
             ) : message.failedInput ? (
@@ -631,7 +568,7 @@ function AssistantMessage({
                 onClick={() => onRetry(message.failedInput ?? "")}
                 className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-slate-400 hover:border-blue-400/30 hover:text-blue-300"
               >
-                <span aria-hidden="true">↻</span>
+                <LuRotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                 Try again
               </button>
             ) : null}
@@ -640,7 +577,7 @@ function AssistantMessage({
           <>
             {message.content.startsWith("☀️ ROOFRAY SOLAR FEASIBILITY REPORT") ? (
               <div className="mt-1">
-                <p className="text-sm font-semibold text-slate-200">☀️ Solar feasibility report is ready</p>
+                <p className="text-sm font-semibold text-slate-200"><LuSun className="mr-1 inline h-4 w-4" aria-hidden="true" />Solar feasibility report is ready</p>
                 <p className="mt-1 text-xs text-slate-500">Open the PDF preview to see the roof layout, panel placement and sun-direction diagram.</p>
               </div>
             ) : (
@@ -654,7 +591,7 @@ function AssistantMessage({
                   onClick={onPreviewPdf}
                   className="inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[12px] font-semibold text-blue-300 hover:bg-blue-500/20"
                 >
-                  <span aria-hidden="true">👁</span>
+                  <LuEye className="h-4 w-4" aria-hidden="true" />
                   Preview PDF
                 </button>
                 <button
@@ -662,7 +599,7 @@ function AssistantMessage({
                   onClick={onDownloadPdf}
                   className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
                 >
-                  <span aria-hidden="true">↓</span>
+                  <LuDownload className="h-4 w-4" aria-hidden="true" />
                   Download PDF
                 </button>
                 <button
@@ -670,7 +607,7 @@ function AssistantMessage({
                   onClick={() => window.location.assign("/solar-3d")}
                   className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-[12px] font-semibold text-cyan-300 hover:bg-cyan-500/20"
                 >
-                  <span aria-hidden="true">🛰</span>
+                  <LuSatellite className="h-4 w-4" aria-hidden="true" />
                   View My Roof in 3D
                 </button>
               </div>
@@ -684,7 +621,7 @@ function AssistantMessage({
                   className="h-[240px] w-full"
                 />
                 <div className="px-3 py-2 text-[11px] text-slate-500">
-                  📍 Live location • ±{Math.round(locationAccuracy ?? 0)} m accuracy
+                  <LuMapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />Live location • ±{Math.round(locationAccuracy ?? 0)} m accuracy
                 </div>
               </div>
             ) : null}
@@ -695,7 +632,7 @@ function AssistantMessage({
                 onClick={onLocationPermission}
                 className="mt-4 inline-flex items-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-2.5 text-[13px] font-semibold text-blue-300 transition hover:border-blue-400/50 hover:bg-blue-500/20 hover:text-blue-200"
               >
-                <span aria-hidden="true">📍</span>
+                <LuMapPin className="h-4 w-4" aria-hidden="true" />
                 Allow Location
               </button>
             ) : null}
@@ -795,8 +732,8 @@ function AttachmentPreview({ attachments, onRemove }: { attachments: AttachedFil
                 <img src={att.preview} alt={att.file.name} className="h-full w-full object-cover" />
               </div>
             ) : (
-              <span className="text-[18px]" aria-hidden="true">
-                {att.file.type === "application/pdf" ? "📄" : att.file.type === "text/csv" ? "📊" : "📝"}
+              <span className="flex h-8 w-8 items-center justify-center" aria-hidden="true">
+                {att.file.type === "application/pdf" ? <LuFileText className="h-5 w-5" /> : att.file.type === "text/csv" ? <LuFileSpreadsheet className="h-5 w-5" /> : <LuFile className="h-5 w-5" />}
               </span>
             )}
             <div className="flex max-w-[120px] flex-col">
@@ -809,7 +746,7 @@ function AttachmentPreview({ attachments, onRemove }: { attachments: AttachedFil
               aria-label={`Remove ${att.file.name}`}
               className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-white/[0.08] hover:text-white"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              <LuX className="h-3 w-3" aria-hidden="true" />
             </button>
           </div>
         );
@@ -861,11 +798,7 @@ function AttachmentMenu({ open, onPhoto, onFile, onClose }: { open: boolean; onP
         className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] text-slate-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-0"
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300 transition-colors group-hover:bg-blue-500/15" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <rect x="3" y="5" width="18" height="14" rx="2.5" />
-            <circle cx="8.5" cy="10" r="1.5" />
-            <path d="m5.5 17 4.5-4.5 3 3 2-2 3.5 3.5" />
-          </svg>
+          <LuImage className="h-4 w-4" aria-hidden="true" />
         </span>
         <span className="min-w-0">
           <span className="block font-medium">Upload image</span>
@@ -880,11 +813,7 @@ function AttachmentMenu({ open, onPhoto, onFile, onClose }: { open: boolean; onP
         className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] text-slate-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-0"
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-slate-300 transition-colors group-hover:bg-white/[0.08]" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" />
-            <path d="M14 3.5V8h4" />
-            <path d="M9 12h6M9 15h6M9 18h4" />
-          </svg>
+          <LuFileText className="h-4 w-4" aria-hidden="true" />
         </span>
         <span className="min-w-0">
           <span className="block font-medium">Upload file</span>
@@ -909,7 +838,7 @@ function ScrollToLatest({ visible, onClick }: { visible: boolean; onClick: () =>
         visible ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
       }`}
     >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
+      <LuArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
     </button>
   );
 }
@@ -964,7 +893,7 @@ function ChatComposer({
       {fileError && (
         <div className="mx-0 mb-2 flex items-center justify-between gap-2 rounded-xl border border-red-500/20 bg-red-500/[0.07] px-3 py-2 text-[12px] text-red-400">
           <span>{fileError}</span>
-          <button type="button" onClick={onDismissError} aria-label="Dismiss error" className="shrink-0 text-red-400/60 hover:text-red-400">×</button>
+          <button type="button" onClick={onDismissError} aria-label="Dismiss error" className="shrink-0 text-red-400/60 hover:text-red-400"><LuX className="h-4 w-4" aria-hidden="true" /></button>
         </div>
       )}
 
@@ -984,7 +913,7 @@ function ChatComposer({
                   menuOpen ? "border-blue-400/30 bg-blue-400/10 text-blue-300" : "border-white/[0.07] bg-white/[0.03] hover:border-blue-400/20 hover:bg-blue-500/[0.06] hover:text-slate-200"
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : "group-hover:scale-105"}`} aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+                <LuPlus className={`h-4 w-4 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : "group-hover:scale-105"}`} aria-hidden="true" />
               </button>
               <AttachmentMenu open={menuOpen} onPhoto={() => photoInputRef.current?.click()} onFile={() => fileInputRef.current?.click()} onClose={() => setMenuOpen(false)} />
             </div>
@@ -1009,7 +938,7 @@ function ChatComposer({
               aria-label="Send message"
               className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white outline-none transition-colors duration-200 hover:bg-blue-500 focus:outline-none focus:ring-0 active:scale-100 disabled:cursor-not-allowed disabled:bg-white/[0.07] disabled:text-slate-600"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-[16px] w-[16px]" aria-hidden="true"><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></svg>
+              <LuArrowUp className="h-[16px] w-[16px]" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -2164,7 +2093,7 @@ export default function RoofRayChat() {
             </div>
             <div className="flex items-center gap-0.5">
               <button type="button" onClick={closeChat} className="rr-icon-btn" aria-label="Close chat" title="Close chat">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                <LuX className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </header>
@@ -2173,9 +2102,7 @@ export default function RoofRayChat() {
           <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="rename-chat-title">
             <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 shadow-2xl shadow-black/50">
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
-                  <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                </svg>
+                <LuPencil className="h-5 w-5" aria-hidden="true" />
               </div>
               <h2 id="rename-chat-title" className="text-base font-semibold text-white">Rename chat</h2>
               <p className="mt-1.5 text-sm text-slate-400">Choose a new name for this conversation.</p>
@@ -2207,9 +2134,7 @@ export default function RoofRayChat() {
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="delete-chat-title">
             <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 shadow-2xl shadow-black/50">
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-300">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
-                  <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" />
-                </svg>
+                <LuTrash2 className="h-5 w-5" aria-hidden="true" />
               </div>
               <h2 id="delete-chat-title" className="text-base font-semibold text-white">Delete chat?</h2>
               <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
@@ -2278,7 +2203,7 @@ export default function RoofRayChat() {
         {goal !== null && (locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
           <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
             <div className="min-w-0">
-              <p className="text-[12px] font-semibold text-slate-100">📍 I need your location permission</p>
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-100"><LuMapPin className="h-3.5 w-3.5" aria-hidden="true" />I need your location permission</p>
               <p className="mt-0.5 text-[11px] text-slate-500">
                 Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.
               </p>

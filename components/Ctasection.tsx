@@ -1,3 +1,5 @@
+import { LuArrowRight, LuSun } from 'react-icons/lu';
+
 export default function CTASection() {
   return (
     <section id="waitlist" className="relative overflow-hidden">
@@ -17,10 +19,7 @@ export default function CTASection() {
       <div className="relative mx-auto max-w-4xl px-6 py-24 text-center lg:px-10 lg:py-32">
         {/* Icon */}
         <div className="mx-auto mb-8 grid h-16 w-16 place-items-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20">
-          <svg viewBox="0 0 24 24" fill="none" className="h-8 w-8 text-white" stroke="currentColor" strokeWidth={2}>
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-          </svg>
+          <LuSun className="h-8 w-8 text-white" aria-hidden="true" />
         </div>
 
         <p className="mb-5 font-mono text-xs uppercase tracking-[0.15em] text-white/60 font-semibold">
@@ -53,9 +52,7 @@ export default function CTASection() {
             className="shrink-0 rounded-full bg-white px-8 py-4 text-sm font-bold text-primary transition hover:bg-white/90 hover:shadow-lg hover:shadow-white/20"
           >
             Get early access
-            <svg viewBox="0 0 20 20" fill="currentColor" className="ml-1.5 inline h-4 w-4">
-              <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
-            </svg>
+            <LuArrowRight className="ml-1.5 inline h-4 w-4" aria-hidden="true" />
           </button>
         </form>
 

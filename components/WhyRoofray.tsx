@@ -1,9 +1,9 @@
+import { LuCircleCheck, LuMapPin, LuMessageCircle } from 'react-icons/lu';
+
 const REASONS = [
   {
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-      </svg>
+      <LuMessageCircle className="h-7 w-7" aria-hidden="true" />
     ),
     title: 'Just talk to it',
     body: 'No sliders, no multi-field forms. Tell RoofRay about your roof the way you\'d tell a friend.',
@@ -12,10 +12,7 @@ const REASONS = [
   },
   {
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-      </svg>
+      <LuMapPin className="h-7 w-7" aria-hidden="true" />
     ),
     title: 'Your exact rooftop',
     body: 'Not city averages — your precise latitude and longitude, with NASA POWER irradiance data.',
@@ -24,9 +21,7 @@ const REASONS = [
   },
   {
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
+      <LuCircleCheck className="h-7 w-7" aria-hidden="true" />
     ),
     title: 'A clear yes or no',
     body: 'A direct verdict on profitability, with the full breakdown on request. No decoding required.',
