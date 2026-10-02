@@ -53,7 +53,7 @@ export default function ProfilePage() {
       <header className="border-b border-white/[0.06] bg-[#080C15]">
         <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-5 sm:px-8">
           <Link href="/" className="shrink-0">
-            <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={190} height={65} className="h-28 w-auto object-contain" priority />
+            <Image src="/favicon.ico" alt="RoofRay" width={190} height={65} className="h-28 w-auto object-contain" priority />
           </Link>
           <Link href="/" className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-blue-400/30 hover:bg-blue-500/[0.06] hover:text-white">
             <LuArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to home
@@ -77,9 +77,6 @@ export default function ProfilePage() {
               <div className="border-b border-white/[0.06] px-6 py-7 sm:px-8 sm:py-8">
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-5">
-                    {/* <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-blue-300/30 bg-blue-600 text-3xl font-bold text-white shadow-lg shadow-blue-600/20">
-                      {initial}
-                    </div> */}
                     <div className="min-w-0">
                       <p className="text-xs font-medium uppercase tracking-wider text-blue-400">RoofRay account</p>
                       <h2 className="mt-1 truncate text-2xl font-bold text-white">{name}</h2>

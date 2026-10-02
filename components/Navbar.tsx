@@ -66,7 +66,7 @@ export default function Navbar() {
     <header className="absolute top-0 left-0 right-0 z-50">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4 lg:px-10">
         <a href="#top" className="flex-shrink-0 transition-transform duration-300 hover:scale-105">
-          <Image src="/Logo-removebg-preview.png" alt="RoofRay Logo" width={400} height={140} priority className="h-20 sm:h-20 md:h-24 lg:h-28 w-auto object-contain" />
+          <Image src="/favicon.ico" alt="RoofRay Logo" width={400} height={140} priority className="h-20 sm:h-20 md:h-24 lg:h-28 w-auto object-contain" />
         </a>
 
         <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">

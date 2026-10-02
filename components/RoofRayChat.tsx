@@ -425,7 +425,7 @@ function ChatHeader({ onReset, onClose }: { onReset: () => void; onClose: () => 
   return (
     <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
       <div className="flex min-w-0 items-center gap-2.5">
-        <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={100} height={100} priority className="h-28 w-28 shrink-0 object-contain" />
+        <Image src="/favicon.ico" alt="RoofRay" width={100} height={100} priority className="h-28 w-28 shrink-0 object-contain" />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <button type="button" onClick={onReset} aria-label="Start new chat" title="New chat" className="group rr-icon-btn">
@@ -442,7 +442,7 @@ function ChatHeader({ onReset, onClose }: { onReset: () => void; onClose: () => 
 function EmptyState() {
   return (
     <div className="flex min-h-[65vh] flex-col items-center justify-center px-6 py-16 text-center">
-      <Image src="/Logo-removebg-preview.png" alt="RoofRay logo" width={110} height={110} priority className="h-32 w-32 object-contain sm:h-48 sm:w-48" />
+      <Image src="/favicon.ico" alt="RoofRay logo" width={110} height={110} priority className="h-32 w-32 object-contain sm:h-48 sm:w-48" />
     </div>
   );
 }
@@ -542,7 +542,7 @@ function AssistantMessage({
     <div className="rr-assistant-row rr-msg-in flex items-start">
       <div className="rr-avatar-wrap shrink-0">
         <Image
-          src={LOGO_SRC}
+          src="/favicon.ico"
           alt="RoofRay"
           width={100}
           height={100}
@@ -704,7 +704,7 @@ function AssistantMessage({
 function ThinkingIndicator() {
   return (
     <div className="rr-msg-in flex items-center gap-3" role="status" aria-live="polite" aria-label="RoofRay is preparing a response">
-      <Image src={LOGO_SRC} alt="" width={100} height={100} className="h-[50px] w-[50px] object-contain" aria-hidden="true" />
+      <Image src="/favicon.ico" alt="" width={100} height={100} className="h-[50px] w-[50px] object-contain" aria-hidden="true" />
       <span className="flex items-center gap-[5px] pt-0.5">
         <span className="rr-dot rr-dot-1 h-1.5 w-1.5 rounded-full bg-slate-500" />
         <span className="rr-dot rr-dot-2 h-1.5 w-1.5 rounded-full bg-slate-500" />

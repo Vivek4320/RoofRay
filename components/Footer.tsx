@@ -41,7 +41,7 @@ export default function Footer() {
 
             <div className="flex items-center">
               <img
-                src="/Logo-removebg-preview.png"
+                src="/favicon.ico"
                 alt="RoofRay Logo"
                 className="h-20 sm:h-28 md:h-36 w-auto object-contain"
               />

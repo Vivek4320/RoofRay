@@ -27,7 +27,14 @@ export const metadata: Metadata = {
   title: 'RoofRay — Is Your Roof Worth Going Solar?',
   description:
     'AI-powered rooftop analysis using your location and sunlight data to calculate real solar savings.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+  },
 };
+
+
 
 export default function RootLayout({
   children,
