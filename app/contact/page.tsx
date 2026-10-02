@@ -1,15 +1,17 @@
-import Navbar from '@/components/Navbar';
-import BottomNav from '@/components/BottomNav';
-import Footer from '@/components/Footer';
-import { LuClock, LuMail, LuMapPin, LuPhone } from 'react-icons/lu';
+import Link from 'next/link';
+import { LuArrowLeft, LuClock, LuMail, LuMapPin, LuPhone } from 'react-icons/lu';
 
 export default function ContactPage() {
   return (
-    <main className="min-h-screen bg-background pb-16 lg:pb-0 text-white">
-      <Navbar />
-
-      <section className="px-6 pb-16 pt-32 md:pt-36">
-        <div className="mx-auto max-w-7xl text-center">
+    <main className="min-h-screen bg-background text-white">
+      <section className="px-6 pb-16 pt-8 md:pt-10">
+        <div className="mx-auto max-w-7xl">
+          <Link href="/" className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-5 py-3 text-sm font-medium text-blue-400 transition hover:bg-blue-500 hover:text-white">
+            <LuArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to Home
+          </Link>
+        </div>
+        <div className="mx-auto max-w-7xl pt-16 text-center md:pt-20">
           <p className="section-label mb-5 justify-center">Let&apos;s talk</p>
           <h1 className="font-display text-5xl font-bold md:text-6xl">
             Contact RoofRay
@@ -86,8 +88,6 @@ export default function ContactPage() {
         </div>
       </section>
 
-      <Footer />
-      <BottomNav />
     </main>
   );
 }

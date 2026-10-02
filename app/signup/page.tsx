@@ -3,10 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { LuArrowLeft, LuArrowRight, LuCheck, LuEye, LuEyeOff, LuLockKeyhole, LuMail, LuSun, LuUserRound } from "react-icons/lu";
+import { LuArrowRight, LuCheck, LuEye, LuEyeOff, LuLockKeyhole, LuMail, LuUserRound } from "react-icons/lu";
 import { saveSession, supabaseAuth } from "@/lib/supabase";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const FULL_NAME_REGEX = new RegExp("^[\\p{L}\\p{M}][\\p{L}\\p{M}' .-]*$", "u");
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -25,7 +26,7 @@ export default function SignupPage() {
     if (!normalizedName) return "Please enter your full name.";
     if (normalizedName.length < 2) return "Full name must be at least 2 characters.";
     if (normalizedName.length > 80) return "Full name must be 80 characters or fewer.";
-    if (!/^[\p{L}\p{M}][\p{L}\p{M}' .-]*$/u.test(normalizedName)) {
+    if (!FULL_NAME_REGEX.test(normalizedName)) {
       return "Full name contains invalid characters.";
     }
 
@@ -79,12 +80,9 @@ export default function SignupPage() {
       <div className="w-full max-w-5xl grid lg:grid-cols-2 overflow-hidden rounded-[2rem] border border-[#1E293B] bg-[#0D1424]/95 shadow-2xl shadow-black/30">
         <section className="hidden lg:flex relative flex-col justify-between p-12 bg-[#101827] border-r border-[#1E293B]">
           <Link href="/" className="inline-flex w-fit">
-            <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={260} height={90} className="h-20 w-auto object-contain" priority />
+            <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={260} height={90} className="h-30 w-auto object-contain" priority />
           </Link>
           <div>
-            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-400/20">
-              <LuSun className="h-7 w-7 text-blue-400" aria-hidden="true" />
-            </div>
             <p className="section-label mb-4">Start with RoofRay</p>
             <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold leading-tight text-white">
               Make your rooftop ready for smarter solar decisions.
@@ -101,19 +99,18 @@ export default function SignupPage() {
         </section>
 
         <section className="p-6 sm:p-10 lg:p-12">
-          <div className="mb-8 lg:hidden">
+          <div className="mb-6 lg:hidden">
             <Link href="/" className="inline-flex">
               <Image src="/Logo-removebg-preview.png" alt="RoofRay" width={220} height={80} className="h-16 w-auto object-contain" priority />
             </Link>
           </div>
 
           <div className="max-w-md mx-auto">
-            <Link href="/" className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-400 transition-colors"><LuArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />Back to RoofRay</Link>
-            <p className="section-label mt-8 mb-3">Create account</p>
+            <p className="section-label mt-6 mb-3">Create account</p>
             <h2 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl font-bold text-white">Join RoofRay.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-400">Create your account to start using your RoofRay solar assistant.</p>
 
-            <form onSubmit={handleSubmit} className="mt-8 space-y-4" noValidate>
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-300">Full name</span>
                 <div className="relative">
@@ -158,7 +155,7 @@ export default function SignupPage() {
               </button>
             </form>
 
-            <p className="mt-7 text-center text-sm text-slate-500">
+            <p className="mt-6 text-center text-sm text-slate-500">
               Already have an account?{" "}
               <Link href="/login" className="font-semibold text-blue-400 hover:text-blue-300">Log in</Link>
             </p>

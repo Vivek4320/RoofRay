@@ -1,5 +1,5 @@
 'use client';
-import { LuCircleHelp, LuFileText, LuMail, LuShieldCheck, LuSparkles } from 'react-icons/lu';
+import { LuCircleHelp, LuFileText, LuInfo, LuMail, LuShieldCheck, LuSparkles } from 'react-icons/lu';
 
 const NAV_ITEMS = [
   {
@@ -28,6 +28,13 @@ const NAV_ITEMS = [
     label: 'FAQ',
     icon: (
       <LuCircleHelp className="h-5 w-5" aria-hidden="true" />
+    ),
+  },
+  {
+    href: '/about',
+    label: 'About',
+    icon: (
+      <LuInfo className="h-5 w-5" aria-hidden="true" />
     ),
   },
   {

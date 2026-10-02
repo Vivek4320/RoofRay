@@ -348,6 +348,16 @@ body {
   }
 }
 
+/* Keep page sections readable on mobile even if scroll-observer animation
+   initialization is delayed or unavailable. */
+@media (max-width: 767px) {
+  .animate-on-scroll {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 /* ===== SOLAR HOVER EFFECTS ===== */
 
 /* Sun ray burst — rays radiate from top-right corner on hover */

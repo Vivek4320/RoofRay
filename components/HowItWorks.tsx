@@ -29,7 +29,7 @@ const STEPS = [
 
 export default function HowItWorks() {
   return (
-    <section id="how" className="relative bg-background overflow-hidden">
+    <section id="how" className="relative">
       {/* Decorative diagonal stripe */}
       <div className="absolute inset-0 stripe-bg opacity-30 pointer-events-none" />
 

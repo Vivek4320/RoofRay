@@ -12,7 +12,8 @@ import {
   type DragEvent,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LuArrowDown, LuArrowUp, LuCheck, LuCheckCheck, LuCopy, LuDownload, LuEllipsis, LuEye, LuFile, LuFileSpreadsheet, LuFileText, LuImage, LuMapPin, LuPanelLeft, LuPencil, LuPlus, LuRotateCcw, LuSatellite, LuSun, LuTrash2, LuUserRound, LuX } from "react-icons/lu";
+import { LuArrowDown, LuArrowUp, LuCheck, LuCheckCheck, LuCopy, LuDownload, LuEllipsis, LuEye, LuFile, LuFileSpreadsheet, LuFileText, LuImage, LuMapPin, LuPanelLeft, LuPencil, LuPlus, LuRotateCcw, LuSatellite, LuSquare, LuSun, LuTrash2, LuUserRound, LuX } from "react-icons/lu";
+import { safeUUID } from "@/lib/uuid";
 
 type ChatMessage = {
   id: string;
@@ -296,7 +297,7 @@ function ChatSidebar({
       />
       <aside
         className={`fixed inset-y-0 left-0 z-[100] flex flex-col border-r border-white/[0.06] bg-[#090F1C] text-white shadow-2xl shadow-black/40 transition-[width,transform] duration-200 ease-out
-          ${mobileOpen ? "w-[270px] translate-x-0" : "w-[56px] translate-x-0"}`}
+          ${mobileOpen ? "w-[min(300px,85vw)] translate-x-0 md:w-[270px]" : "w-[270px] -translate-x-full md:w-[56px] md:translate-x-0"}`}
         aria-label="RoofRay chat history"
       >
         {!mobileOpen && (
@@ -309,13 +310,13 @@ function ChatSidebar({
 
         <div className={`flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] px-4 ${!mobileOpen ? "md:hidden" : ""}`}>
           <div className="flex min-w-0 items-center gap-2.5">
-              <div className="min-w-0">
-                <p className="truncate text-[14px] font-semibold text-white">RoofRay</p>
-                <p className="truncate text-[10px] text-slate-500">AI Solar Assistant</p>
-              </div>
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-semibold text-white">RoofRay</p>
+              <p className="truncate text-[10px] text-slate-500">AI Solar Assistant</p>
+            </div>
           </div>
           <button type="button" onClick={onCloseMobile} className="rr-icon-btn" aria-label="Collapse sidebar" title="Collapse sidebar">
-              <LuPanelLeft className="h-[19px] w-[19px]" aria-hidden="true" />
+            <LuPanelLeft className="h-[19px] w-[19px]" aria-hidden="true" />
           </button>
         </div>
 
@@ -332,70 +333,70 @@ function ChatSidebar({
         </div>
 
         <div className={`min-h-0 flex-1 overflow-y-auto px-2 pb-3 ${!mobileOpen ? "md:hidden" : ""}`}>
-            <p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">Recent chats</p>
-            <div className="space-y-0.5">
-              {chats.length === 0 ? (
-                <p className="px-2 py-3 text-xs text-slate-600">No conversations yet</p>
-              ) : (
-                chats.map((chat) => (
-                  <div key={chat.id} className={`group flex items-center gap-1 rounded-xl px-2 py-1 transition ${chat.id === activeChatId ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"}`}>
+          <p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">Recent chats</p>
+          <div className="space-y-0.5">
+            {chats.length === 0 ? (
+              <p className="px-2 py-3 text-xs text-slate-600">No conversations yet</p>
+            ) : (
+              chats.map((chat) => (
+                <div key={chat.id} className={`group flex items-center gap-1 rounded-xl px-2 py-1 transition ${chat.id === activeChatId ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"}`}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(chat.id)}
+                    className="min-w-0 flex-1 truncate px-1.5 py-2 text-left text-[12px] text-slate-300 hover:text-white"
+                    title={chat.title}
+                  >
+                    {chat.title}
+                  </button>
+                  <div className="relative shrink-0 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
                     <button
                       type="button"
-                      onClick={() => onSelect(chat.id)}
-                      className="min-w-0 flex-1 truncate px-1.5 py-2 text-left text-[12px] text-slate-300 hover:text-white"
-                      title={chat.title}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[0.06] hover:text-slate-200"
+                      aria-label={`Options for ${chat.title}`}
+                      title="Chat options"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        const menu = event.currentTarget.nextElementSibling as HTMLElement | null;
+                        document.querySelectorAll("[data-chat-menu]").forEach((item) => {
+                          if (item !== menu) item.classList.add("hidden");
+                        });
+                        menu?.classList.toggle("hidden");
+                      }}
                     >
-                      {chat.title}
+                      <LuEllipsis className="h-4 w-4" aria-hidden="true" />
                     </button>
-                    <div className="relative shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <div data-chat-menu className="absolute right-0 top-9 z-[120] hidden w-32 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111A2B] p-1 shadow-xl shadow-black/40">
                       <button
                         type="button"
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[0.06] hover:text-slate-200"
-                        aria-label={`Options for ${chat.title}`}
-                        title="Chat options"
+                        className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-slate-300 hover:bg-white/[0.06] hover:text-white"
                         onClick={(event) => {
                           event.stopPropagation();
-                          const menu = event.currentTarget.nextElementSibling as HTMLElement | null;
-                          document.querySelectorAll("[data-chat-menu]").forEach((item) => {
-                            if (item !== menu) item.classList.add("hidden");
-                          });
-                          menu?.classList.toggle("hidden");
+                          onRename(chat.id);
+                          (event.currentTarget.parentElement as HTMLElement | null)?.classList.add("hidden");
                         }}
                       >
-                        <LuEllipsis className="h-4 w-4" aria-hidden="true" />
+                        <LuPencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        Rename
                       </button>
-                      <div data-chat-menu className="absolute right-0 top-9 z-[120] hidden w-32 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111A2B] p-1 shadow-xl shadow-black/40">
-                        <button
-                          type="button"
-                          className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-slate-300 hover:bg-white/[0.06] hover:text-white"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onRename(chat.id);
-                            (event.currentTarget.parentElement as HTMLElement | null)?.classList.add("hidden");
-                          }}
-                        >
-                          <LuPencil className="h-3.5 w-3.5" aria-hidden="true" />
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-red-300 hover:bg-red-500/10 hover:text-red-200"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onDelete(chat.id);
-                            (event.currentTarget.parentElement as HTMLElement | null)?.classList.add("hidden");
-                          }}
-                        >
-                          <LuTrash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          Delete
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDelete(chat.id);
+                          (event.currentTarget.parentElement as HTMLElement | null)?.classList.add("hidden");
+                        }}
+                      >
+                        <LuTrash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        Delete
+                      </button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                </div>
+              ))
+            )}
           </div>
+        </div>
 
         <div className={`border-t border-white/[0.05] p-3 ${!mobileOpen ? "p-2" : ""}`}>
           <button
@@ -441,7 +442,7 @@ function ChatHeader({ onReset, onClose }: { onReset: () => void; onClose: () => 
 function EmptyState() {
   return (
     <div className="flex min-h-[65vh] flex-col items-center justify-center px-6 py-16 text-center">
-      <Image src="/Logo-removebg-preview.png" alt="RoofRay logo" width={110} height={110} priority className="h-50 w-50 " />
+      <Image src="/Logo-removebg-preview.png" alt="RoofRay logo" width={110} height={110} priority className="h-32 w-32 object-contain sm:h-48 sm:w-48" />
     </div>
   );
 }
@@ -461,8 +462,8 @@ function UserMessage({ message }: { message: ChatMessage }) {
 
   return (
     <div className="rr-msg-in group flex justify-end">
-      <div className="relative max-w-full">
-        <div className="rr-user-bubble inline-block w-auto min-w-fit max-w-full rounded-full px-4 py-2 text-[14px] leading-5 text-slate-100">
+      <div className="relative max-w-[85%]">
+        <div className="rr-user-bubble inline-block w-auto max-w-full whitespace-pre-wrap break-words rounded-2xl px-4 py-2 text-[14px] leading-5 text-slate-100">
           {message.content}<span className="rr-message-meta"><LuCheckCheck className="h-3 w-3" aria-hidden="true" /></span>
         </div>
         <button
@@ -470,7 +471,7 @@ function UserMessage({ message }: { message: ChatMessage }) {
           onClick={copyMessage}
           aria-label={copied ? "Copied" : "Copy message"}
           title={copied ? "Copied" : "Copy message"}
-          className="absolute -bottom-9 right-0 flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 opacity-0 transition-all duration-150 hover:bg-white/[0.06] hover:text-slate-200 group-hover:opacity-100 focus-visible:opacity-100"
+          className="absolute -left-9 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition-all duration-150 hover:bg-white/[0.06] hover:text-slate-200 md:-bottom-9 md:left-auto md:right-0 md:top-auto md:translate-y-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
         >
           {copied ? (
             <LuCheck className="h-4 w-4" aria-hidden="true" />
@@ -549,7 +550,7 @@ function AssistantMessage({
         />
       </div>
 
-      <div className="rr-assistant-card min-w-0 max-w-[85%] px-4 pb-4 pt-3 text-[14px] leading-relaxed text-slate-200">
+      <div className="rr-assistant-card min-w-0 max-w-[calc(100%-3.25rem)] break-words px-4 pb-4 pt-3 text-[14px] leading-relaxed text-slate-200 sm:max-w-[85%]">
         {message.isError ? (
           <div>
             <p className="text-slate-400">{message.content}</p>
@@ -682,7 +683,7 @@ function AssistantMessage({
                   onChange={(event) => setCustomApplianceValue(event.target.value)}
                   placeholder="Enter quantity"
                   aria-label="Custom appliance quantity"
-                  className="min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[13px] text-white outline-none placeholder:text-slate-500 focus:border-blue-400/40 focus:ring-2 focus:ring-blue-400/10"
+                  className="min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-blue-400/40 focus:ring-2 focus:ring-blue-400/10 sm:text-[13px]"
                 />
                 <button
                   type="submit"
@@ -703,7 +704,7 @@ function AssistantMessage({
 function ThinkingIndicator() {
   return (
     <div className="rr-msg-in flex items-center gap-3" role="status" aria-live="polite" aria-label="RoofRay is preparing a response">
-        <Image src={LOGO_SRC} alt="" width={100} height={100} className="h-[50px] w-[50px] object-contain" aria-hidden="true" />
+      <Image src={LOGO_SRC} alt="" width={100} height={100} className="h-[50px] w-[50px] object-contain" aria-hidden="true" />
       <span className="flex items-center gap-[5px] pt-0.5">
         <span className="rr-dot rr-dot-1 h-1.5 w-1.5 rounded-full bg-slate-500" />
         <span className="rr-dot rr-dot-2 h-1.5 w-1.5 rounded-full bg-slate-500" />
@@ -785,9 +786,8 @@ function AttachmentMenu({ open, onPhoto, onFile, onClose }: { open: boolean; onP
       ref={menuRef}
       role="menu"
       aria-label="Attachment options"
-      className={`absolute bottom-full left-0 mb-2 w-[220px] origin-bottom-left rounded-2xl border border-white/[0.08] bg-[#101A2B]/98 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl transition-all duration-150 ${
-        open ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none translate-y-1 scale-95 opacity-0"
-      }`}
+      className={`absolute bottom-full left-0 mb-2 w-[220px] max-w-[calc(100vw-2rem)] origin-bottom-left rounded-2xl border border-white/[0.08] bg-[#101A2B]/98 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl transition-all duration-150 ${open ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none translate-y-1 scale-95 opacity-0"
+        }`}
     >
       <p className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Attach</p>
 
@@ -834,9 +834,8 @@ function ScrollToLatest({ visible, onClick }: { visible: boolean; onClick: () =>
       type="button"
       onClick={onClick}
       aria-label="Scroll to latest message"
-      className={`absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-[#111B2E]/95 px-3.5 py-2 text-[12px] font-medium text-slate-300 shadow-lg backdrop-blur-sm transition-all duration-200 hover:border-blue-400/30 hover:text-white ${
-        visible ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
-      }`}
+      className={`absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-[#111B2E]/95 px-3.5 py-2 text-[12px] font-medium text-slate-300 shadow-lg backdrop-blur-sm transition-all duration-200 hover:border-blue-400/30 hover:text-white ${visible ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
+        }`}
     >
       <LuArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
     </button>
@@ -851,18 +850,18 @@ function DragOverlay({ visible }: { visible: boolean }) {
   return (
     <div aria-hidden="true" className={`pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}>
       <div className="absolute inset-0 rounded-[inherit] bg-[#0A1020]/90 backdrop-blur-sm" />
-      <div className="relative flex flex-col items-center gap-3 text-center">
-        <p className="text-[30px] font-medium text-white">Drop files to attach</p>
-        <p className="text-[20px] text-slate-400">Images, PDF, TXT, or CSV</p>
+      <div className="relative flex flex-col items-center gap-3 px-4 text-center">
+        <p className="text-[22px] font-medium text-white sm:text-[30px]">Drop files to attach</p>
+        <p className="text-[15px] text-slate-400 sm:text-[20px]">Images, PDF, TXT, or CSV</p>
       </div>
     </div>
   );
 }
 
 function ChatComposer({
-  input, onInputChange, onSend, loading, placeholder, attachments, onRemoveAttachment, onAddFiles, fileError, onDismissError,
+  input, onInputChange, onSend, onStop, loading, placeholder, attachments, onRemoveAttachment, onAddFiles, fileError, onDismissError,
 }: {
-  input: string; onInputChange: (v: string) => void; onSend: () => void; loading: boolean; placeholder: string;
+  input: string; onInputChange: (v: string) => void; onSend: () => void; onStop: () => void; loading: boolean; placeholder: string;
   attachments: AttachedFile[]; onRemoveAttachment: (id: string) => void; onAddFiles: (files: FileList | File[]) => void;
   fileError: string | null; onDismissError: () => void;
 }) {
@@ -909,9 +908,8 @@ function ChatComposer({
                 aria-label="Attach file or photo"
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
-                className={`group flex h-9 w-9 items-center justify-center rounded-xl border text-slate-400 transition-colors duration-200 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 active:scale-100 ${
-                  menuOpen ? "border-blue-400/30 bg-blue-400/10 text-blue-300" : "border-white/[0.07] bg-white/[0.03] hover:border-blue-400/20 hover:bg-blue-500/[0.06] hover:text-slate-200"
-                }`}
+                className={`group flex h-9 w-9 items-center justify-center rounded-xl border text-slate-400 transition-colors duration-200 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 active:scale-100 ${menuOpen ? "border-blue-400/30 bg-blue-400/10 text-blue-300" : "border-white/[0.07] bg-white/[0.03] hover:border-blue-400/20 hover:bg-blue-500/[0.06] hover:text-slate-200"
+                  }`}
               >
                 <LuPlus className={`h-4 w-4 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : "group-hover:scale-105"}`} aria-hidden="true" />
               </button>
@@ -928,17 +926,25 @@ function ChatComposer({
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={loading}
-              className="min-h-[36px] flex-1 resize-none border-0 bg-transparent px-2 py-2 text-[14px] leading-6 text-white !outline-none focus:!outline-none focus-visible:!outline-none focus:!ring-0 focus-visible:!ring-0 focus:!border-0 focus-visible:!border-0 placeholder:text-slate-500 disabled:opacity-50"
+              className="min-h-[36px] min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-base leading-6 text-white !outline-none focus:!outline-none focus-visible:!outline-none focus:!ring-0 focus-visible:!ring-0 focus:!border-0 focus-visible:!border-0 placeholder:text-slate-500 disabled:opacity-50 sm:text-[14px]"
               style={{ maxHeight: COMPOSER_MAX_HEIGHT }}
             />
 
             <button
-              type="submit"
-              disabled={!canSend}
-              aria-label="Send message"
+              type={loading ? "button" : "submit"}
+              onClick={loading ? onStop : undefined}
+              disabled={!loading && !canSend}
+              aria-label={loading ? "Stop generating" : "Send message"}
               className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white outline-none transition-colors duration-200 hover:bg-blue-500 focus:outline-none focus:ring-0 active:scale-100 disabled:cursor-not-allowed disabled:bg-white/[0.07] disabled:text-slate-600"
             >
-              <LuArrowUp className="h-[16px] w-[16px]" aria-hidden="true" />
+              {loading ? (
+                <span className="relative flex h-5 w-5 items-center justify-center" aria-hidden="true">
+                  <span className="absolute inset-0 animate-spin rounded-full border border-white/30 border-t-white" />
+                  <LuSquare className="relative h-2.5 w-2.5" />
+                </span>
+              ) : (
+                <LuArrowUp className="h-[16px] w-[16px]" aria-hidden="true" />
+              )}
             </button>
           </div>
         </div>
@@ -952,6 +958,7 @@ function ChatComposer({
 /* ----------------------------------------------------------------------- */
 
 export default function RoofRayChat() {
+  const [locationError, setLocationError] = useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const isFullScreenPage = pathname === "/chat";
@@ -959,6 +966,7 @@ export default function RoofRayChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const generationControllerRef = useRef<AbortController | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationStatus, setLocationStatus] = useState<"idle" | "detecting" | "ready" | "warning" | "denied" | "unavailable">("idle");
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
@@ -985,7 +993,7 @@ export default function RoofRayChat() {
   const [roofPhotoDataUrl, setRoofPhotoDataUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [activeChatId, setActiveChatId] = useState("");
   const [pendingDeleteChat, setPendingDeleteChat] = useState<ChatRecord | null>(null);
@@ -1010,12 +1018,16 @@ export default function RoofRayChat() {
     return () => window.removeEventListener("roofray_report_ready", handleReportUpdate);
   }, []);
 
+  // Sidebar starts closed on phones; on desktop it restores the saved state.
   useEffect(() => {
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
+    if (isMobile) { setSidebarOpen(false); return; }
     const saved = localStorage.getItem("roofray_sidebar_open");
-    if (saved !== null) setSidebarOpen(saved === "true");
+    setSidebarOpen(saved === null ? true : saved === "true");
   }, []);
 
   useEffect(() => {
+    if (window.matchMedia("(max-width: 767px)").matches) return;
     localStorage.setItem("roofray_sidebar_open", String(sidebarOpen));
   }, [sidebarOpen]);
 
@@ -1034,6 +1046,19 @@ export default function RoofRayChat() {
   void locationStatus;
   void locationAccuracy;
   void locationLabel;
+
+  function stopGeneration() {
+    generationControllerRef.current?.abort();
+    generationControllerRef.current = null;
+    setLoading(false);
+    setLocationLoading(false);
+  }
+
+  function finishGeneration(controller: AbortController) {
+    if (generationControllerRef.current !== controller) return;
+    generationControllerRef.current = null;
+    setLoading(false);
+  }
 
   async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
     try {
@@ -1070,7 +1095,7 @@ export default function RoofRayChat() {
       if (attachments.length + newAtts.length >= MAX_ATTACHMENTS) { error = `Maximum ${MAX_ATTACHMENTS} files allowed.`; break; }
       if (!ALLOWED_TYPES.includes(file.type)) { error = "File type not supported."; continue; }
       if (file.size > MAX_FILE_BYTES) { error = "File is larger than 10 MB."; continue; }
-      const id = crypto.randomUUID();
+      const id = safeUUID();
       const preview = ALLOWED_IMAGES.includes(file.type) ? URL.createObjectURL(file) : undefined;
       newAtts.push({ id, file, preview });
     }
@@ -1110,7 +1135,7 @@ export default function RoofRayChat() {
       setOpen(true);
     }
     return () => window.removeEventListener("roofray:open-chat", handleOpen);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFullScreenPage]);
 
 
@@ -1120,17 +1145,23 @@ export default function RoofRayChat() {
       if (stored) {
         const parsed = JSON.parse(stored) as ChatRecord[];
         if (Array.isArray(parsed)) {
+          const savedActiveChatId = localStorage.getItem("roofray_active_chat");
+          const activeChat = parsed.find((chat) => chat.id === savedActiveChatId)
+            ?? [...parsed].sort((a, b) => b.updatedAt - a.updatedAt)[0];
           setChats(parsed);
-          if (parsed.length > 0) {
-            const latest = [...parsed].sort((a, b) => b.updatedAt - a.updatedAt)[0];
-            setActiveChatId(latest.id);
-            setMessages(latest.messages || []);
-            setHasStarted((latest.messages || []).length > 0);
+          if (activeChat) {
+            setActiveChatId(activeChat.id);
+            setMessages(activeChat.messages || []);
+            setHasStarted((activeChat.messages || []).length > 0);
           }
         }
       }
     } catch { /* ignore malformed local history */ }
   }, []);
+
+  useEffect(() => {
+    if (activeChatId) localStorage.setItem("roofray_active_chat", activeChatId);
+  }, [activeChatId]);
 
   useEffect(() => {
     if (!activeChatId) return;
@@ -1163,7 +1194,8 @@ export default function RoofRayChat() {
     setAutoScroll(distanceFromBottom < AUTO_SCROLL_THRESHOLD);
   }
 
-  async function getBestLocationPosition(): Promise<GeolocationPosition> {
+  async function getBestLocationPosition(signal?: AbortSignal): Promise<GeolocationPosition> {
+    if (signal?.aborted) throw new DOMException("Location request stopped.", "AbortError");
     if (!navigator.geolocation) {
       throw new Error("Geolocation is not supported by this browser.");
     }
@@ -1173,16 +1205,19 @@ export default function RoofRayChat() {
       let settled = false;
       let timer = 0;
 
-      const finish = (position?: GeolocationPosition, error?: GeolocationPositionError) => {
+      const finish = (position?: GeolocationPosition, error?: GeolocationPositionError | Error) => {
         if (settled) return;
         settled = true;
         window.clearTimeout(timer);
         if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        signal?.removeEventListener("abort", abort);
         if (position) resolve(position);
         else reject(error ?? new Error("Unable to determine your location."));
       };
 
       let watchId: number | null = null;
+      const abort = () => finish(undefined, new DOMException("Location request stopped.", "AbortError"));
+      signal?.addEventListener("abort", abort, { once: true });
 
       watchId = navigator.geolocation.watchPosition(
         (position) => {
@@ -1219,10 +1254,19 @@ export default function RoofRayChat() {
     });
   }
 
-  async function loadLocationAnalysis(roofAreaSqFt?: number | null): Promise<SolarAnalysis | null> {
+  async function loadLocationAnalysis(roofAreaSqFt?: number | null, signal?: AbortSignal): Promise<SolarAnalysis | null> {
+    if (signal?.aborted) return null;
+    setLocationError(null);
+    if (!window.isSecureContext) {
+      setLocationStatus("unavailable");
+      setLocationLoading(false);
+      setLocationError("Location access requires HTTPS. Open RoofRay using its secure HTTPS address, then try again.");
+      return null;
+    }
     if (!navigator.geolocation) {
       setLocationStatus("unavailable");
       setLocationLoading(false);
+      setLocationError("This browser does not provide location access. Check your browser and device location settings.");
       return null;
     }
     // Check the browser permission state first. If it is still "prompt",
@@ -1236,8 +1280,13 @@ export default function RoofRayChat() {
     setLocationStatus("detecting");
 
     return new Promise<SolarAnalysis | null>((resolve) => {
-      void getBestLocationPosition()
+      void getBestLocationPosition(signal)
         .then(async (position) => {
+          if (signal?.aborted) {
+            setLocationLoading(false);
+            resolve(null);
+            return;
+          }
           const latitude = position.coords.latitude;
           const longitude = position.coords.longitude;
           const accuracy = position.coords.accuracy;
@@ -1253,10 +1302,15 @@ export default function RoofRayChat() {
             JSON.stringify({ latitude, longitude, accuracy, timestamp: Date.now() }),
           );
           const resolvedLocation = await reverseGeocode(latitude, longitude);
+          if (signal?.aborted) {
+            setLocationLoading(false);
+            resolve(null);
+            return;
+          }
           if (resolvedLocation) setLocationLabel(resolvedLocation);
           if (!locationMessageShownRef.current) {
             locationMessageShownRef.current = true;
-            setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: resolvedLocation ? "📍 Location detected: " + resolvedLocation : "📍 Location detected: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) }]);
+            setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: resolvedLocation ? "📍 Location detected: " + resolvedLocation : "📍 Location detected: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) }]);
             setHasStarted(true);
           }
           let lastError = "Live solar analysis could not be completed.";
@@ -1265,6 +1319,7 @@ export default function RoofRayChat() {
               const response = await fetch("/api/solar-analysis", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                signal,
                 body: JSON.stringify({
                   latitude,
                   longitude,
@@ -1276,6 +1331,11 @@ export default function RoofRayChat() {
                 }),
               });
               const data = await response.json().catch(() => ({}));
+              if (signal?.aborted) {
+                setLocationLoading(false);
+                resolve(null);
+                return;
+              }
               if (response.ok && data.ok && data.analysis) {
                 sessionStorage.setItem("roofray_solar_analysis", JSON.stringify(data.analysis));
                 setSolarContext(data.analysis);
@@ -1293,11 +1353,21 @@ export default function RoofRayChat() {
                 error: lastError,
               });
             } catch (error) {
+              if (signal?.aborted) {
+                setLocationLoading(false);
+                resolve(null);
+                return;
+              }
               lastError = error instanceof Error ? error.message : lastError;
               console.warn("[RoofRay] Solar analysis request failed:", error);
             }
             if (attempt === 1) {
               await new Promise((retryResolve) => window.setTimeout(retryResolve, 1000));
+              if (signal?.aborted) {
+                setLocationLoading(false);
+                resolve(null);
+                return;
+              }
             }
           }
 
@@ -1306,7 +1376,7 @@ export default function RoofRayChat() {
           setMessages((current) => [
             ...current,
             {
-              id: crypto.randomUUID(),
+              id: safeUUID(),
               role: "assistant",
               content: `⚠️ Live solar analysis failed: ${lastError}`,
               isError: true,
@@ -1317,18 +1387,30 @@ export default function RoofRayChat() {
         })
         .catch((error) => {
           setLocationLoading(false);
+          if (signal?.aborted) {
+            resolve(null);
+            return;
+          }
           console.warn("[RoofRay] Geolocation failed:", {
             code: error?.code,
             message: error?.message,
           });
-          if (error?.code === 1) setLocationStatus("denied");
-          else setLocationStatus("unavailable");
+          if (error?.code === 1) {
+            setLocationStatus("denied");
+            setLocationError("Location permission was denied. Allow location for RoofRay in your browser settings, then try again.");
+          } else if (error?.code === 3) {
+            setLocationStatus("unavailable");
+            setLocationError("Getting your location timed out. Check that device location is on and try again.");
+          } else {
+            setLocationStatus("unavailable");
+            setLocationError("Your location could not be detected. Turn on device location and try again.");
+          }
           resolve(null);
         });
     });
   }
 
-  async function refreshAnalysisWithRoofArea(areaSqFt: number): Promise<SolarAnalysis | null> {
+  async function refreshAnalysisWithRoofArea(areaSqFt: number, signal?: AbortSignal): Promise<SolarAnalysis | null> {
     const analysisLocation = solarContext?.location as Record<string, unknown> | undefined;
     const latitude = readNumber(analysisLocation?.latitude) ?? locationCoords?.latitude ?? null;
     const longitude = readNumber(analysisLocation?.longitude) ?? locationCoords?.longitude ?? null;
@@ -1338,6 +1420,7 @@ export default function RoofRayChat() {
       const response = await fetch("/api/solar-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal,
         body: JSON.stringify({
           latitude,
           longitude,
@@ -1405,20 +1488,20 @@ export default function RoofRayChat() {
     const finalAnalysis = hasAnalysisLocation
       ? analysis
       : ({
-          ...analysis,
+        ...analysis,
+        location: {
+          ...(analysisLocation ?? {}),
+          latitude: fallbackLat,
+          longitude: fallbackLon,
+        },
+        planningEstimate: {
+          ...((analysis.planningEstimate ?? {}) as Record<string, unknown>),
           location: {
-            ...(analysisLocation ?? {}),
             latitude: fallbackLat,
             longitude: fallbackLon,
           },
-          planningEstimate: {
-            ...((analysis.planningEstimate ?? {}) as Record<string, unknown>),
-            location: {
-              latitude: fallbackLat,
-              longitude: fallbackLon,
-            },
-          },
-        } as SolarAnalysis);
+        },
+      } as SolarAnalysis);
 
     const payload = {
       report,
@@ -1438,7 +1521,7 @@ export default function RoofRayChat() {
       // localStorage and can outlive the current browser session.
       localStorage.setItem("roofray_report_data", serialized);
       window.dispatchEvent(new Event("roofray_report_ready"));
-    } catch {}
+    } catch { }
     setReportPdfGenerating(true);
     setReportPdfError(null);
     try {
@@ -1509,7 +1592,7 @@ export default function RoofRayChat() {
           sessionStorage.setItem("roofray_report_data", raw);
           localStorage.setItem("roofray_report_data", raw);
         }
-      } catch {}
+      } catch { }
 
       // Older chat records may contain the report message but not the PDF
       // payload. Rebuild the payload from the saved chat + saved analysis.
@@ -1528,7 +1611,7 @@ export default function RoofRayChat() {
               savedLocation = { latitude, longitude };
             }
           }
-        } catch {}
+        } catch { }
 
         if (!savedAnalysis && savedLocation) {
           savedAnalysis = {
@@ -1558,7 +1641,7 @@ export default function RoofRayChat() {
         try {
           sessionStorage.setItem("roofray_report_data", raw);
           localStorage.setItem("roofray_report_data", raw);
-        } catch {}
+        } catch { }
       }
 
       if (!raw) {
@@ -1627,13 +1710,17 @@ export default function RoofRayChat() {
     link.remove();
   }
 
-  async function generateFinalReport(analysis: SolarAnalysis, roofPhotoOverride?: string | null, goalOverride?: string | null) {
+  async function generateFinalReport(analysis: SolarAnalysis, roofPhotoOverride?: string | null, goalOverride?: string | null, signal?: AbortSignal) {
     const reportGoal = goalOverride ?? goal;
     if (reportGoal === null) return;
+    const controller = signal ? null : new AbortController();
+    const requestSignal = signal ?? controller!.signal;
+    if (controller) generationControllerRef.current = controller;
     setLoading(true);
 
     try {
       const validToken = await getValidToken();
+      if (requestSignal.aborted) return;
       if (!validToken) {
         throw new Error("Your login session is not available. Please log in again, then try your message.");
       }
@@ -1667,25 +1754,30 @@ export default function RoofRayChat() {
             Authorization: "Bearer " + token,
           },
           body: JSON.stringify(requestBody),
+          signal: requestSignal,
         });
 
       let response = await sendChatRequest(validToken);
       if (response.status === 401) {
         const refreshedToken = await getValidToken();
+        if (requestSignal.aborted) return;
         if (refreshedToken && refreshedToken !== validToken) {
           response = await sendChatRequest(refreshedToken);
         }
       }
 
       const data = await response.json().catch(() => ({}));
+      if (requestSignal.aborted) return;
       if (!response.ok || !data.ok || typeof data.message !== "string" || !data.message.trim()) {
         throw new Error(typeof data.error === "string" ? data.error : "Unable to generate the solar report.");
       }
 
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: data.message },
+        { id: safeUUID(), role: "assistant", content: data.message },
       ]);
+      const activeController = generationControllerRef.current;
+      if (activeController?.signal === requestSignal) finishGeneration(activeController);
       await persistReportAndDownloadPdf(data.message, analysis, {
         name,
         roofAreaSqFt: roofArea,
@@ -1698,14 +1790,15 @@ export default function RoofRayChat() {
         roofPhotoDataUrl: roofPhotoOverride || roofPhotoDataUrl || undefined,
       });
     } catch (error) {
+      if (requestSignal.aborted) return;
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("[RoofRay] Final report error:", error);
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: "RoofRay couldn't generate the report. " + errorMessage, isError: true },
+        { id: safeUUID(), role: "assistant", content: "RoofRay couldn't generate the report. " + errorMessage, isError: true },
       ]);
     } finally {
-      setLoading(false);
+      if (controller) finishGeneration(controller);
     }
   }
 
@@ -1716,11 +1809,14 @@ export default function RoofRayChat() {
 
     const imageAttachment = attachments.find((att) => ALLOWED_IMAGES.includes(att.file.type));
     const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: safeUUID(),
       role: "user",
       content: content || (imageAttachment ? "📸 Roof photo uploaded" : `[${attachments.length} file(s) attached]`),
     };
     const nextMessages = [...messages, userMessage];
+    const controller = new AbortController();
+    const signal = controller.signal;
+    generationControllerRef.current = controller;
     setHasStarted(true);
     setAutoScroll(true);
     setMessages(nextMessages);
@@ -1743,6 +1839,10 @@ export default function RoofRayChat() {
 
     if (imageAttachment && !nextRoofPhotoDataUrl) {
       const preparedPhoto = await prepareRoofPhoto(imageAttachment.file);
+      if (signal.aborted) {
+        finishGeneration(controller);
+        return;
+      }
       if (preparedPhoto) {
         nextRoofPhotoDataUrl = preparedPhoto;
         setRoofPhotoDataUrl(preparedPhoto);
@@ -1761,7 +1861,11 @@ export default function RoofRayChat() {
     } else if (roofArea === null && number !== null && number > 0) {
       nextRoofArea = number;
       setRoofArea(number);
-      const refreshedAnalysis = await refreshAnalysisWithRoofArea(number);
+      const refreshedAnalysis = await refreshAnalysisWithRoofArea(number, signal);
+      if (signal.aborted) {
+        finishGeneration(controller);
+        return;
+      }
       if (refreshedAnalysis) currentSolarContext = refreshedAnalysis;
     } else if (roofArea !== null && roofType === null) {
       if (normalized.includes("rcc") || normalized.includes("concrete")) nextRoofType = "RCC/Concrete";
@@ -1808,19 +1912,27 @@ export default function RoofRayChat() {
     // A roof photo is no longer required: the report uses the detected building footprint
     // and mapped 3D building data for the site model.
     if (nextGoal !== null && goal === null) {
-      const liveAnalysis = await loadLocationAnalysis(nextRoofArea);
+      const liveAnalysis = await loadLocationAnalysis(nextRoofArea, signal);
+      if (signal.aborted) {
+        finishGeneration(controller);
+        return;
+      }
       if (liveAnalysis) {
         currentSolarContext = liveAnalysis;
-        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl, nextGoal);
+        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl, nextGoal, signal);
       }
-      setLoading(false);
+      finishGeneration(controller);
       return;
     }
 
     const validToken = await getValidToken();
+    if (signal.aborted) {
+      finishGeneration(controller);
+      return;
+    }
     if (!validToken) {
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: "Your login session is not available. Please log in again, then try your message." }]);
-      setLoading(false);
+      setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: "Your login session is not available. Please log in again, then try your message." }]);
+      finishGeneration(controller);
       return;
     }
 
@@ -1853,6 +1965,7 @@ export default function RoofRayChat() {
             Authorization: "Bearer " + token,
           },
           body: JSON.stringify(requestBody),
+          signal,
         });
 
       let response = await sendChatRequest(validToken);
@@ -1860,12 +1973,14 @@ export default function RoofRayChat() {
       // Recover once from a stale access token without changing the chat UI.
       if (response.status === 401) {
         const refreshedToken = await getValidToken();
+        if (signal.aborted) return;
         if (refreshedToken && refreshedToken !== validToken) {
           response = await sendChatRequest(refreshedToken);
         }
       }
 
       const data = await response.json().catch(() => ({}));
+      if (signal.aborted) return;
       if (!response.ok || !data.ok) {
         console.error("[RoofRay] Chat request failed:", response.status, data);
         throw new Error(typeof data.error === "string" ? data.error : "Unable to get a response.");
@@ -1901,21 +2016,22 @@ export default function RoofRayChat() {
                       ? "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)"
                       : nextGoal === null
                         ? "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)"
-  : data.message;
+                        : data.message;
 
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: fixedNextQuestion },
+        { id: safeUUID(), role: "assistant", content: fixedNextQuestion },
       ]);
 
     } catch (error) {
+      if (signal.aborted) return;
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("[RoofRay] Chat UI error:", error);
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: "RoofRay couldn't complete that request. " + errorMessage, isError: true, failedInput: content },
+        { id: safeUUID(), role: "assistant", content: "RoofRay couldn't complete that request. " + errorMessage, isError: true, failedInput: content },
       ]);
-    } finally { setLoading(false); }
+    } finally { finishGeneration(controller); }
   }
 
   function openChat() {
@@ -1927,6 +2043,10 @@ export default function RoofRayChat() {
     setOpen(true);
   }
   void openChat;
+
+  function closeSidebarOnMobile() {
+    if (window.matchMedia("(max-width: 767px)").matches) setSidebarOpen(false);
+  }
 
   function startNewChat() {
     setMessages([]);
@@ -1945,12 +2065,13 @@ export default function RoofRayChat() {
     setAutoScroll(true);
     setAttachments([]);
     setFileError(null);
-    setActiveChatId(crypto.randomUUID());
+    setActiveChatId(safeUUID());
   }
 
   function resetChat() {
     startNewChat();
   }
+  void resetChat;
 
   function selectChat(id: string) {
     const chat = chats.find((item) => item.id === id);
@@ -2017,13 +2138,13 @@ export default function RoofRayChat() {
   const visibleMessages = messages.filter((m) => m.content.trim());
   const composerPlaceholder =
     name === null ? "Enter your name"
-    : roofArea === null ? "e.g. 1200 sq ft"
-    : roofType === null ? "RCC/Concrete, Metal Sheet, Tile, or Other"
-    : monthlyBill === null ? "e.g. ₹2500 per month"
-    : connectionType === null ? "Residential, Commercial, or Other"
-    : ownership === null ? "Own, Permission, or No"
-    : goal === null ? "Reduce bill, Maximum generation, Cost/subsidy, or Feasibility"
-    : "Ask RoofRay anything...";
+      : roofArea === null ? "e.g. 1200 sq ft"
+        : roofType === null ? "RCC/Concrete, Metal Sheet, Tile, or Other"
+          : monthlyBill === null ? "e.g. ₹2500 per month"
+            : connectionType === null ? "Residential, Commercial, or Other"
+              : ownership === null ? "Own, Permission, or No"
+                : goal === null ? "Reduce bill, Maximum generation, Cost/subsidy, or Feasibility"
+                  : "Ask RoofRay anything...";
 
   if (!open) return null;
 
@@ -2070,7 +2191,7 @@ export default function RoofRayChat() {
         onDrop={handleDrop}
         className={
           isFullScreenPage
-            ? "rr-chat-shell fixed inset-0 z-[80] flex h-[100dvh] w-screen flex-col overflow-hidden text-white"
+            ? "rr-chat-shell fixed inset-0 z-[80] flex h-[100dvh] w-full flex-col overflow-hidden overflow-x-hidden text-white"
             : "rr-chat-shell fixed bottom-0 right-0 z-[80] flex h-[min(760px,100dvh)] w-full flex-col overflow-hidden text-white shadow-2xl shadow-black/60 sm:bottom-4 sm:right-4 sm:h-[min(760px,calc(100dvh-2rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl lg:bottom-7 lg:right-7"
         }
       >
@@ -2078,18 +2199,27 @@ export default function RoofRayChat() {
           chats={chats}
           activeChatId={activeChatId}
           mobileOpen={sidebarOpen}
-          onNewChat={startNewChat}
-          onSelect={selectChat}
+          onNewChat={() => { startNewChat(); closeSidebarOnMobile(); }}
+          onSelect={(id) => { selectChat(id); closeSidebarOnMobile(); }}
           onRename={renameChat}
           onDelete={deleteChat}
           onCloseMobile={() => setSidebarOpen(false)}
           onOpenSidebar={() => setSidebarOpen(true)}
         />
 
-        <div className={`rr-chat-main flex min-h-0 h-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "w-full md:ml-[270px] md:w-[calc(100%-270px)]" : "ml-[56px] w-[calc(100%-56px)] md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
+        <div className={`rr-chat-main flex min-h-0 h-full flex-col transition-[margin,width] duration-200 ${sidebarOpen ? "w-full md:ml-[270px] md:w-[calc(100%-270px)]" : "ml-0 w-full md:ml-[56px] md:w-[calc(100%-56px)]"}`}>
           <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/[0.05] bg-[#0A1020]/98 px-4 backdrop-blur-xl sm:px-5">
             <div className="flex min-w-0 items-center gap-2">
-              {/* Desktop compact rail owns the sidebar-open button when the sidebar is collapsed. */}
+              {/* Phones: menu button opens the sidebar. Desktop uses the compact rail instead. */}
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="rr-icon-btn md:hidden"
+                aria-label="Open chat history"
+                title="Open sidebar"
+              >
+                <LuPanelLeft className="h-[19px] w-[19px] lg:hidden" aria-hidden="true" />
+              </button>
             </div>
             <div className="flex items-center gap-0.5">
               <button type="button" onClick={closeChat} className="rr-icon-btn" aria-label="Close chat" title="Close chat">
@@ -2098,187 +2228,203 @@ export default function RoofRayChat() {
             </div>
           </header>
 
-        {pendingRenameChat && (
-          <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="rename-chat-title">
-            <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 shadow-2xl shadow-black/50">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
-                <LuPencil className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <h2 id="rename-chat-title" className="text-base font-semibold text-white">Rename chat</h2>
-              <p className="mt-1.5 text-sm text-slate-400">Choose a new name for this conversation.</p>
-              <input
-                autoFocus
-                value={renameValue}
-                onChange={(event) => setRenameValue(event.target.value.slice(0, 50))}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") confirmRenameChat();
-                  if (event.key === "Escape") { setPendingRenameChat(null); setRenameValue(""); }
-                }}
-                maxLength={50}
-                className="mt-4 h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-400/40 focus:ring-2 focus:ring-blue-400/10"
-                aria-label="New chat name"
-              />
-              <div className="mt-5 flex justify-end gap-2">
-                <button type="button" onClick={() => { setPendingRenameChat(null); setRenameValue(""); }} className="h-10 rounded-lg border border-white/[0.08] px-4 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white">
-                  Cancel
-                </button>
-                <button type="button" disabled={!renameValue.trim()} onClick={confirmRenameChat} className="h-10 rounded-lg bg-blue-500/15 px-4 text-sm font-medium text-blue-300 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-40">
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {pendingDeleteChat && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="delete-chat-title">
-            <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 shadow-2xl shadow-black/50">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-300">
-                <LuTrash2 className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <h2 id="delete-chat-title" className="text-base font-semibold text-white">Delete chat?</h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
-                Are you sure you want to delete “{pendingDeleteChat.title}”? This action cannot be undone.
-              </p>
-              <div className="mt-5 flex justify-end gap-2">
-                <button type="button" onClick={() => setPendingDeleteChat(null)} className="h-10 rounded-lg border border-white/[0.08] px-4 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white">
-                  Cancel
-                </button>
-                <button type="button" onClick={confirmDeleteChat} className="h-10 rounded-lg bg-red-500/15 px-4 text-sm font-medium text-red-300 transition hover:bg-red-500/25">
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <DragOverlay visible={dragOver} />
-
-        <div
-          ref={scrollRef}
-          onScroll={handleMessagesScroll}
-          role="log"
-          aria-live="polite"
-          aria-label="Conversation with RoofRay"
-          className="rr-scroll rr-grid-surface relative flex-1 overflow-y-auto overscroll-contain"
-        >
-          <div className="rr-grid-overlay" aria-hidden="true" />
-          <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
-            {!hasStarted ? (
-              <EmptyState />
-            ) : (
-              <div className="space-y-6">
-                {visibleMessages.map((message) =>
-                  message.role === "user" ? (
-                    <UserMessage key={message.id} message={message} />
-                  ) : (
-                    <AssistantMessage
-                      key={message.id}
-                      message={message}
-                      onRetry={(t) => void sendMessage(t)}
-                      onLocationPermission={async () => {
-                        const liveAnalysis = await loadLocationAnalysis(roofArea);
-                        if (liveAnalysis) await generateFinalReport(liveAnalysis);
-                      }}
-                      locationCoords={locationCoords}
-                      locationAccuracy={locationAccuracy}
-                      reportPdfUrl={reportPdfUrl}
-                      onPreviewPdf={() => void previewReportPdf(message.content)}
-                      onDownloadPdf={() => void downloadReportPdf(message.content)}
-                    />
-                  )
-                )}
-                {loading && <ThinkingIndicator />}
-              </div>
-            )}
-            <div ref={endRef} />
-          </div>
-
-          <ScrollToLatest
-            visible={!autoScroll && hasStarted}
-            onClick={() => { setAutoScroll(true); endRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-          />
-        </div>
-
-        {goal !== null && (locationStatus === "idle" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
-          <div className="mx-auto flex w-full max-w-[900px] items-center justify-between gap-3 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:px-6">
-            <div className="min-w-0">
-              <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-100"><LuMapPin className="h-3.5 w-3.5" aria-hidden="true" />I need your location permission</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">
-                Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void loadLocationAnalysis(roofArea)}
-              className="shrink-0 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[11px] font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
-            >
-              {locationStatus === "denied" ? "Enable Location" : "Allow Location"}
-            </button>
-          </div>
-        )}
-
-        {reportPdfGenerating && (
-          <div className="border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-2 text-[11px] text-blue-300 sm:px-6">
-            Preparing your PDF report...
-          </div>
-        )}
-        {reportPdfError && !reportPdfGenerating && (
-          <div className="flex items-center justify-between gap-3 border-t border-red-400/10 bg-[#0A1020]/95 px-4 py-2 text-[11px] text-red-300 sm:px-6">
-            <span>{reportPdfError}</span>
-            <button
-              type="button"
-              onClick={() => setReportPdfError(null)}
-              className="shrink-0 text-slate-500 hover:text-slate-300"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {reportPdfPreviewOpen && reportPdfUrl && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-3 sm:p-6">
-            <div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0D1424] shadow-2xl">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                <p className="text-sm font-semibold text-white">RoofRay Solar Report Preview</p>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => void downloadReportPdf()} className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">Download PDF</button>
-                  <button type="button" onClick={() => setReportPdfPreviewOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">Close</button>
+          {pendingRenameChat && (
+            <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="rename-chat-title">
+              <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 shadow-2xl shadow-black/50">
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
+                  <LuPencil className="h-5 w-5" aria-hidden="true" />
                 </div>
-              </div>
-              <object
-                data={reportPdfUrl}
-                type="application/pdf"
-                aria-label="RoofRay Solar Report PDF preview"
-                className="min-h-0 flex-1 border-0 bg-white"
-              >
-                <div className="flex h-full flex-col items-center justify-center gap-4 bg-white p-8 text-center text-slate-700">
-                  <p className="text-sm font-semibold">PDF preview is not available in this browser.</p>
-                  <button
-                    type="button"
-                    onClick={() => void openReportPdfInNewTab()}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white"
-                  >
-                    Open PDF in new tab
+                <h2 id="rename-chat-title" className="text-base font-semibold text-white">Rename chat</h2>
+                <p className="mt-1.5 text-sm text-slate-400">Choose a new name for this conversation.</p>
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={(event) => setRenameValue(event.target.value.slice(0, 50))}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") confirmRenameChat();
+                    if (event.key === "Escape") { setPendingRenameChat(null); setRenameValue(""); }
+                  }}
+                  maxLength={50}
+                  className="mt-4 h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 text-base text-white outline-none placeholder:text-slate-600 focus:border-blue-400/40 focus:ring-2 focus:ring-blue-400/10 sm:text-sm"
+                  aria-label="New chat name"
+                />
+                <div className="mt-5 flex justify-end gap-2">
+                  <button type="button" onClick={() => { setPendingRenameChat(null); setRenameValue(""); }} className="h-10 rounded-lg border border-white/[0.08] px-4 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white">
+                    Cancel
+                  </button>
+                  <button type="button" disabled={!renameValue.trim()} onClick={confirmRenameChat} className="h-10 rounded-lg bg-blue-500/15 px-4 text-sm font-medium text-blue-300 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-40">
+                    Save
                   </button>
                 </div>
-              </object>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <ChatComposer
-          input={input}
-          onInputChange={setInput}
-          onSend={() => void sendMessage()}
-          loading={loading}
-          placeholder={composerPlaceholder}
-          attachments={attachments}
-          onRemoveAttachment={removeAttachment}
-          onAddFiles={addFiles}
-          fileError={fileError}
-          onDismissError={() => setFileError(null)}
-        />
+          {pendingDeleteChat && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="delete-chat-title">
+              <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111A2B] p-5 shadow-2xl shadow-black/50">
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-300">
+                  <LuTrash2 className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <h2 id="delete-chat-title" className="text-base font-semibold text-white">Delete chat?</h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
+                  Are you sure you want to delete “{pendingDeleteChat.title}”? This action cannot be undone.
+                </p>
+                <div className="mt-5 flex justify-end gap-2">
+                  <button type="button" onClick={() => setPendingDeleteChat(null)} className="h-10 rounded-lg border border-white/[0.08] px-4 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-white">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={confirmDeleteChat} className="h-10 rounded-lg bg-red-500/15 px-4 text-sm font-medium text-red-300 transition hover:bg-red-500/25">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DragOverlay visible={dragOver} />
+
+          <div
+            ref={scrollRef}
+            onScroll={handleMessagesScroll}
+            role="log"
+            aria-live="polite"
+            aria-label="Conversation with RoofRay"
+            className="rr-scroll rr-grid-surface relative flex-1 overflow-y-auto overscroll-contain"
+          >
+            <div className="rr-grid-overlay" aria-hidden="true" />
+            <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
+              {!hasStarted ? (
+                <EmptyState />
+              ) : (
+                <div className="space-y-6">
+                  {visibleMessages.map((message) =>
+                    message.role === "user" ? (
+                      <UserMessage key={message.id} message={message} />
+                    ) : (
+                      <AssistantMessage
+                        key={message.id}
+                        message={message}
+                        onRetry={(t) => void sendMessage(t)}
+                        onLocationPermission={async () => {
+                          const liveAnalysis = await loadLocationAnalysis(roofArea);
+                          if (liveAnalysis) await generateFinalReport(liveAnalysis);
+                        }}
+                        locationCoords={locationCoords}
+                        locationAccuracy={locationAccuracy}
+                        reportPdfUrl={reportPdfUrl}
+                        onPreviewPdf={() => void previewReportPdf(message.content)}
+                        onDownloadPdf={() => void downloadReportPdf(message.content)}
+                      />
+                    )
+                  )}
+                  {loading && <ThinkingIndicator />}
+                </div>
+              )}
+              <div ref={endRef} />
+            </div>
+
+            <ScrollToLatest
+              visible={!autoScroll && hasStarted}
+              onClick={() => { setAutoScroll(true); endRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+            />
+          </div>
+
+          {goal !== null && (locationStatus === "idle" || locationStatus === "detecting" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
+            <div className="mx-auto flex w-full max-w-[900px] flex-col gap-2 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6">
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-100"><LuMapPin className="h-3.5 w-3.5" aria-hidden="true" />I need your location permission</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Allow location access so RoofRay can calculate your solar generation, shading, panel count and system size.
+                </p>
+                {locationError && (
+                  <p role="alert" className="mt-1 text-[11px] text-amber-300">
+                    {locationError}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadLocationAnalysis(roofArea)}
+                disabled={locationLoading}
+                aria-busy={locationLoading}
+                className="shrink-0 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[11px] font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200 disabled:cursor-wait disabled:opacity-60"
+              >
+                {locationLoading
+                ? "Finding location…"
+                : locationStatus === "denied"
+                  ? "Enable Location"
+                  : locationError?.includes("HTTPS")
+                    ? "HTTPS Required"
+                    : locationStatus === "unavailable"
+                      ? "Try Again"
+                      : "Allow Location"}
+              </button>
+            </div>
+          )}
+
+          {reportPdfGenerating && (
+            <div className="border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-2 text-[11px] text-blue-300 sm:px-6">
+              Preparing your PDF report...
+            </div>
+          )}
+          {reportPdfError && !reportPdfGenerating && (
+            <div className="flex items-center justify-between gap-3 border-t border-red-400/10 bg-[#0A1020]/95 px-4 py-2 text-[11px] text-red-300 sm:px-6">
+              <span>{reportPdfError}</span>
+              <button
+                type="button"
+                onClick={() => setReportPdfError(null)}
+                className="shrink-0 text-slate-500 hover:text-slate-300"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {reportPdfPreviewOpen && reportPdfUrl && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-3 sm:p-6">
+              <div className="flex h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0D1424] shadow-2xl">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+                  <p className="text-sm font-semibold text-white">RoofRay Solar Report Preview</p>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => void downloadReportPdf()} className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">Download PDF</button>
+                    <button type="button" onClick={() => setReportPdfPreviewOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">Close</button>
+                  </div>
+                </div>
+                <object
+                  data={reportPdfUrl}
+                  type="application/pdf"
+                  aria-label="RoofRay Solar Report PDF preview"
+                  className="min-h-0 flex-1 border-0 bg-white"
+                >
+                  <div className="flex h-full flex-col items-center justify-center gap-4 bg-white p-8 text-center text-slate-700">
+                    <p className="text-sm font-semibold">PDF preview is not available in this browser.</p>
+                    <button
+                      type="button"
+                      onClick={() => void openReportPdfInNewTab()}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white"
+                    >
+                      Open PDF in new tab
+                    </button>
+                  </div>
+                </object>
+              </div>
+            </div>
+          )}
+
+          <ChatComposer
+            input={input}
+            onInputChange={setInput}
+            onSend={() => void sendMessage()}
+            onStop={stopGeneration}
+            loading={loading}
+            placeholder={composerPlaceholder}
+            attachments={attachments}
+            onRemoveAttachment={removeAttachment}
+            onAddFiles={addFiles}
+            fileError={fileError}
+            onDismissError={() => setFileError(null)}
+          />
         </div>
       </section>
     </>

@@ -10,7 +10,7 @@ import FAQ from '@/components/FAQ';
 
 export default function Home() {
   return (
-    <main id="main-content" className="min-h-screen bg-background pb-16 lg:pb-0">
+    <main id="main-content">
       <Navbar />
       <Hero />
       <AnimateInView>

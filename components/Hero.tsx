@@ -6,7 +6,7 @@ const House3D = dynamic(() => import('./House3D'), { ssr: false });
 
 export default function Hero() {
   return (
-    <section id="top" className="relative min-h-screen overflow-hidden bg-background pt-28 md:pt-36">
+    <section id="top" className="relative min-h-screen overflow-hidden  pt-28 md:pt-36">
       {/* Background �� layered solar effects */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Large radial blue glow */}
@@ -45,9 +45,9 @@ export default function Hero() {
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-10">
-        <div className="grid min-h-[calc(100vh-6rem)] items-center gap-12 lg:grid-cols-[1.15fr_1fr] lg:gap-6">
+        <div className="grid min-h-0 items-center gap-8 lg:min-h-[calc(100vh-6rem)] lg:grid-cols-[1.15fr_1fr] lg:gap-6">
           {/* Left: Content */}
-          <div className="animate-rise lg:-mt-12">
+          <div className="min-w-0 animate-rise lg:-mt-12">
             {/* Badge */}
             <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 transition-all duration-300 hover:bg-primary/15 hover:border-primary/40 hover:shadow-sm cursor-default">
               <span className="relative flex h-2 w-2">
@@ -93,12 +93,12 @@ export default function Hero() {
           </div> 
 
           {/* Right: Interactive 3D Solar House Model */}
-          <div className="relative flex flex-col items-center gap-2 animate-rise lg:animate-rise-delayed w-full">
+          <div className="relative flex min-w-0 flex-col items-center gap-2 animate-rise lg:animate-rise-delayed w-full">
             {/* Background glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-blue-600/15 opacity-60 blur-3xl pointer-events-none" />
 
             {/* 3D House Model */}
-            <div className="w-full max-w-[560px] relative z-10">
+            <div className="relative z-10 w-full min-w-0 max-w-[560px]">
               <House3D />
             </div>
           </div>
