@@ -578,8 +578,8 @@ function AssistantMessage({
           <>
             {message.content.startsWith("☀️ ROOFRAY SOLAR FEASIBILITY REPORT") ? (
               <div className="mt-1">
-                <p className="text-sm font-semibold text-slate-200"><LuSun className="mr-1 inline h-4 w-4" aria-hidden="true" />Solar feasibility report is ready</p>
-                <p className="mt-1 text-xs text-slate-500">Open the PDF preview to see the roof layout, panel placement and sun-direction diagram.</p>
+                <p className="text-sm font-semibold text-slate-200"><LuSun className="mr-1 inline h-4 w-4" aria-hidden="true" />Solar planning result is ready</p>
+                <p className="mt-1 text-xs text-slate-500">Open the PDF for the maximum panel capacity, appliance-load check, and month/day generation chart.</p>
               </div>
             ) : (
               renderAssistantContent(message.content)
