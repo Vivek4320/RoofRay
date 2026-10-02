@@ -45,7 +45,7 @@ export default function Footer() {
                 alt="RoofRay Logo"
                 className="h-12 sm:h-12 md:h-12 w-auto object-contain"
               />
-            </div>
+            </div><br></br>
 
             <p className="max-w-sm leading-7 sm:leading-8 text-sm sm:text-base text-slate-400">
               AI-powered rooftop analysis that helps homeowners discover
