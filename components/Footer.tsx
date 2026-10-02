@@ -43,7 +43,7 @@ export default function Footer() {
               <img
                 src="/favicon.ico"
                 alt="RoofRay Logo"
-                className="h-20 sm:h-28 md:h-36 w-auto object-contain"
+                className="h-12 sm:h-12 md:h-12 w-auto object-contain"
               />
             </div>
 
