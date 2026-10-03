@@ -53,7 +53,7 @@ export default function ProfilePage() {
       <header className="border-b border-white/[0.06] bg-[#080C15]">
         <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-5 sm:px-8">
           <Link href="/" className="shrink-0">
-            <Image src="/favicon.ico" alt="RoofRay" width={190} height={65} className="h-28 w-auto object-contain" priority />
+            <Image src="/favicon.ico" alt="RoofRay" width={190} height={65} className="h-12 w-auto object-contain" priority />
           </Link>
           <Link href="/" className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-blue-400/30 hover:bg-blue-500/[0.06] hover:text-white">
             <LuArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to home
