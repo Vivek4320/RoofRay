@@ -987,6 +987,7 @@ export default function RoofRayChat() {
   const [connectionType, setConnectionType] = useState<string | null>(null);
   const [ownership, setOwnership] = useState<string | null>(null);
   const [goal, setGoal] = useState<string | null>(null);
+  const [reportFlow, setReportFlow] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
@@ -1719,7 +1720,32 @@ export default function RoofRayChat() {
     setLoading(true);
 
     try {
-      const validToken = await getValidToken();
+      if (nextReportFlow) {
+      setReportFlow(true);
+      const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
+      const nextQuestion = nextRoofArea === null
+        ? "To prepare your solar report, what is your roof area in square feet?"
+        : nextRoofType === null
+          ? "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)"
+          : nextMonthlyBill === null
+            ? "What is your average monthly electricity bill in ₹?"
+            : nextApplianceStep < applianceNames.length
+              ? `Approximately how many ${applianceNames[nextApplianceStep]}s do you have? Enter 0 if none.`
+              : nextConnectionType === null
+                ? "Is the electricity connection Residential or Commercial?"
+                : nextOwnership === null
+                  ? "Do you own the property, or do you have permission to install solar there?"
+                  : nextGoal === null
+                    ? "What is your main goal: reduce bill, maximum generation, cost/subsidy, or feasibility?"
+                    : "";
+      if (nextQuestion) {
+        setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: nextQuestion }]);
+        finishGeneration(controller);
+        return;
+      }
+    }
+
+    const validToken = await getValidToken();
       if (requestSignal.aborted) return;
       if (!validToken) {
         throw new Error("Your login session is not available. Please log in again, then try your message.");
@@ -1852,6 +1878,9 @@ export default function RoofRayChat() {
     }
 
     const normalized = content.toLowerCase();
+    const isReportRequest = /\b(generate|create|make|prepare|need|want|give me|show me|estimate|calculate)\b.{0,50}\b(solar|rooftop|roof|feasibility|system|report|installation)\b|\b(solar|rooftop|roof)\b.{0,50}\b(report|estimate|feasibility|system size)\b/i.test(content)
+      || /solar system.*(estimate|report)|feasibility report|solar report/i.test(content);
+    const nextReportFlow = reportFlow || isReportRequest;
 
     const isGreeting = /^(hi+|hello+|hey+|good morning|good afternoon|good evening)[!.\s]*$/i.test(content.trim());
 
@@ -1860,7 +1889,7 @@ export default function RoofRayChat() {
       !/[?؟]/.test(content) &&
       !/\b(what|why|how|benefit|benefits|solar|can|does|do|tell|explain|estimate|calculate|hello|hi|hey)\b/i.test(content);
 
-    if (name === null) {
+    if (name === null && !nextReportFlow) {
       if (!isGreeting && isLikelyName) {
         nextName = content.replace(/\s+/g, " ").trim().slice(0, 80);
         if (nextName) setName(nextName);
@@ -1919,6 +1948,7 @@ export default function RoofRayChat() {
     // A roof photo is no longer required: the report uses the detected building footprint
     // and mapped 3D building data for the site model.
     if (nextGoal !== null && goal === null) {
+      setReportFlow(false);
       const liveAnalysis = await loadLocationAnalysis(nextRoofArea, signal);
       if (signal.aborted) {
         finishGeneration(controller);
@@ -2039,6 +2069,7 @@ export default function RoofRayChat() {
     setConnectionType(null);
     setOwnership(null);
     setGoal(null);
+    setReportFlow(false);
     setLocationLabel(null);
     locationMessageShownRef.current = false;
     setHasStarted(false);
