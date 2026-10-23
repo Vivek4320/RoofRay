@@ -363,9 +363,9 @@ function buildPdf(data: SummaryData): Uint8Array {
 
       commands.push(...cardCommands(
         42, 392, 244, 70,
-        "MAXIMUM PLANNING PANELS",
+        "ESTIMATED MAX PANELS ON ROOF",
         data.panelCount !== null ? String(Math.round(maxPanelCount)) + " panels" : "Unavailable",
-        data.panelCount !== null ? (String(Math.round(maxPanelCount)) + " × " + Math.round(data.panelPowerW) + "W") : undefined,
+        data.panelCount !== null ? (String(Math.round(maxPanelCount)) + " × " + Math.round(data.panelPowerW) + "W modules; layout estimate") : undefined,
       ));
       commands.push(...cardCommands(
         300, 392, 244, 70,
