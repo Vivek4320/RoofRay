@@ -114,7 +114,7 @@ export async function POST(request: Request) {
               (message.role === "user" || message.role === "assistant") &&
               typeof message.content === "string"
           )
-          .slice(-20)
+          .slice(-8)
       : [];
 
     if (!messages.length) {
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     }
 
     const solarContext = body.solarContext
-      ? JSON.stringify(body.solarContext).slice(0, 50000)
+      ? JSON.stringify(body.solarContext).slice(0, 7000)
       : "No live solar analysis is available yet.";
     const solarContextObject = body.solarContext && typeof body.solarContext === "object"
       ? body.solarContext
@@ -531,7 +531,7 @@ export async function POST(request: Request) {
       { role: "system", content: systemPrompt },
       ...messages.map((message) => ({
         role: message.role,
-        content: message.content,
+        content: message.content.slice(0, 1200),
       })),
     ];
 
