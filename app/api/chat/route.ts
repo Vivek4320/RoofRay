@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as {
+      mode?: "chat" | "report";
       messages?: ChatMessage[];
       solarContext?: Record<string, unknown> | null;
     };
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
       ownershipInput !== null &&
       ownershipInput !== undefined;
 
-    if (intakeComplete) {
+    if (intakeComplete && body.mode === "report") {
       const planning = (solarContextObject.planningEstimate ?? {}) as Record<string, unknown>;
       const placement = (solarContextObject.panelPlacement ?? {}) as Record<string, unknown>;
       const estimate = (placement.estimate ?? {}) as Record<string, unknown>;
