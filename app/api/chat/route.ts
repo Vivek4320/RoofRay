@@ -105,6 +105,7 @@ export async function POST(request: Request) {
       messages?: ChatMessage[];
       solarContext?: Record<string, unknown> | null;
       languageHint?: string;
+      preferredLanguage?: "en" | "gu";
     };
 
     const messages = Array.isArray(body.messages)
@@ -508,10 +509,9 @@ export async function POST(request: Request) {
       "Keep every reply short: normally 1-3 sentences or at most 3 short bullet points.",
       "Respond quickly and avoid unnecessary reasoning or long explanations.",
       "Answer only what the user asked. Do not add unnecessary background, explanations, summaries, repeated information, or follow-up offers.",
-      "LANGUAGE MATCHING IS REQUIRED: Detect the language of the LATEST user message and answer in that same language. Re-evaluate the language on every new user message; never stay locked to the language used at the start of the conversation.",
-      "If the latest user message is English, reply in natural English. If it is Gujarati written in Gujarati script, reply in Gujarati script. If it is Gujarati written using English/Latin letters (Roman Gujarati, such as 'maru bill ketlu aavse?'), reply in Roman Gujarati using English/Latin letters, not Gujarati script.",
-      "If the user switches from English to Gujarati or from Gujarati to English mid-conversation, switch your very next reply accordingly while preserving the conversation context and solar facts. Do not translate the user's message unless asked.",
-      "For mixed-language messages, follow the dominant language of the latest message. If the message is too short to identify a language, use the language of the most recent clearly identifiable user message.",
+      body.preferredLanguage === "gu"
+        ? "LANGUAGE LOCK: The user selected Gujarati for this entire chat. Every response must be in Gujarati script, including intake questions, explanations, follow-ups, and solar-report summaries. Never answer in English. Keep product names, technical abbreviations, units, and standard labels only when they are normally used that way."
+        : "LANGUAGE LOCK: The user selected English for this entire chat. Every response must be in English. Never switch to Gujarati, even if the user sends a Gujarati message. Keep solar facts and calculations unchanged.",
       "For greetings or simple conversational messages, reply naturally in one short sentence.",
       "This is a conversational LLM assistant, NOT a rigid form. Always answer the user's actual latest question first. Never replace a valid question with the next intake question.",
       "For general questions such as solar benefits, costs, maintenance, technology, or subsidies, answer directly using reliable general knowledge. Do not demand the user's name or roof area first.",
