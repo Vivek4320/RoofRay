@@ -19,7 +19,7 @@ async function localizeFixedResponse(
   if (!apiKey) return text;
   const userHistory = messages
     .filter((message) => message.role === "user")
-    .slice(-8)
+    .slice(-4)
     .map((message) => message.content)
     .join("\n");
   const configuredModel = process.env.ROOFRAY_GROQ_MODEL?.trim();
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     }
 
     const solarContext = body.solarContext
-      ? JSON.stringify(body.solarContext).slice(0, 7000)
+      ? JSON.stringify(body.solarContext).slice(0, 2200)
       : "No live solar analysis is available yet.";
     const solarContextObject = body.solarContext && typeof body.solarContext === "object"
       ? body.solarContext
@@ -521,7 +521,7 @@ export async function POST(request: Request) {
     // The final solar report above remains deterministic and never depends on an LLM.
     const configuredModel = process.env.ROOFRAY_GROQ_MODEL?.trim();
     const model =
-      configuredModel || "openai/gpt-oss-120b";
+      configuredModel || "llama-3.1-8b-instant";
 
     // Groq uses OpenAI-compatible chat messages.
     const groqMessages: Array<{
@@ -531,7 +531,7 @@ export async function POST(request: Request) {
       { role: "system", content: systemPrompt },
       ...messages.map((message) => ({
         role: message.role,
-        content: message.content.slice(0, 1200),
+        content: message.content.slice(0, 500),
       })),
     ];
 
@@ -546,7 +546,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           model,
           messages: groqMessages,
-          max_completion_tokens: 1200,
+          max_completion_tokens: 700,
           temperature: 0.3,
         }),
         cache: "no-store",
