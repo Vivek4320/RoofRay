@@ -457,7 +457,7 @@ function buildPdf(data: SummaryData): Uint8Array {
         "BT /F1 6.5 Tf 0.45 0.52 0.60 rg 430 92 Td (Roof maximum is a planning capacity. Final panel count, setbacks and inverter design require site verification.) Tj ET",
         "BT /F1 6.5 Tf 0.45 0.52 0.60 rg 430 79 Td (The appliance load is an instantaneous connected-load estimate, not daily energy consumption.) Tj ET",
       );
-    } else {
+    } else if (pageIndex === 1) {
       commands.push(...headerCommands("Solar Generation — Month & Day", "ROOFRAY | PVGIS-BACKED GENERATION PLANNING"));
       commands.push(
         "BT /F1 8 Tf 0.35 0.43 0.52 rg 42 482 Td (Bars show modeled monthly units. The label below each month shows the month-average daily units.) Tj ET",
