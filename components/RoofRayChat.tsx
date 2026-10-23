@@ -1720,35 +1720,6 @@ export default function RoofRayChat() {
     setLoading(true);
 
     try {
-      if (nextReportFlow) {
-      setReportFlow(true);
-      if (!locationCoords && !signal.aborted) {
-        await loadLocationAnalysis(nextRoofArea, signal);
-        if (signal.aborted) { finishGeneration(controller); return; }
-      }
-      const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
-      const nextQuestion = nextRoofArea === null
-        ? "To prepare your solar report, what is your roof area in square feet?"
-        : nextRoofType === null
-          ? "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)"
-          : nextMonthlyBill === null
-            ? "What is your average monthly electricity bill in ₹?"
-            : nextApplianceStep < applianceNames.length
-              ? `Approximately how many ${applianceNames[nextApplianceStep]}s do you have? Enter 0 if none.`
-              : nextConnectionType === null
-                ? "Is the electricity connection Residential or Commercial?"
-                : nextOwnership === null
-                  ? "Do you own the property, or do you have permission to install solar there?"
-                  : nextGoal === null
-                    ? "What is your main goal: reduce bill, maximum generation, cost/subsidy, or feasibility?"
-                    : "";
-      if (nextQuestion) {
-        setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: nextQuestion }]);
-        finishGeneration(controller);
-        return;
-      }
-    }
-
     const validToken = await getValidToken();
       if (requestSignal.aborted) return;
       if (!validToken) {
@@ -1964,6 +1935,38 @@ export default function RoofRayChat() {
       }
       finishGeneration(controller);
       return;
+    }
+
+    if (nextReportFlow) {
+      setReportFlow(true);
+      if (!locationCoords && !signal.aborted) {
+        await loadLocationAnalysis(nextRoofArea, signal);
+        if (signal.aborted) {
+          finishGeneration(controller);
+          return;
+        }
+      }
+      const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
+      const nextQuestion = nextRoofArea === null
+        ? "To prepare your solar report, what is your roof area in square feet?"
+        : nextRoofType === null
+          ? "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)"
+          : nextMonthlyBill === null
+            ? "What is your average monthly electricity bill in ₹?"
+            : nextApplianceStep < applianceNames.length
+              ? `Approximately how many ${applianceNames[nextApplianceStep]}s do you have? Enter 0 if none.`
+              : nextConnectionType === null
+                ? "Is the electricity connection Residential or Commercial?"
+                : nextOwnership === null
+                  ? "Do you own the property, or do you have permission to install solar there?"
+                  : nextGoal === null
+                    ? "What is your main goal: reduce bill, maximum generation, cost/subsidy, or feasibility?"
+                    : "";
+      if (nextQuestion) {
+        setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: nextQuestion }]);
+        finishGeneration(controller);
+        return;
+      }
     }
 
     const validToken = await getValidToken();
