@@ -1959,7 +1959,7 @@ export default function RoofRayChat() {
 
     if (nextReportFlow) {
       setReportFlow(true);
-      if (!locationCoords && !signal.aborted) {
+      if (isReportRequest && !locationCoords && !signal.aborted) {
         await loadLocationAnalysis(nextRoofArea, signal);
         if (signal.aborted) {
           finishGeneration(controller);
