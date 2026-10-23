@@ -1855,12 +1855,17 @@ export default function RoofRayChat() {
 
     const isGreeting = /^(hi+|hello+|hey+|good morning|good afternoon|good evening)[!.\s]*$/i.test(content.trim());
 
+    const isLikelyName =
+      content.length <= 40 &&
+      !/[?؟]/.test(content) &&
+      !/\b(what|why|how|benefit|benefits|solar|can|does|do|tell|explain|estimate|calculate|hello|hi|hey)\b/i.test(content);
+
     if (name === null) {
-      if (!isGreeting) {
+      if (!isGreeting && isLikelyName) {
         nextName = content.replace(/\s+/g, " ").trim().slice(0, 80);
         if (nextName) setName(nextName);
       }
-    } else if (roofArea === null && number !== null && number > 0) {
+    } else if (roofArea === null && number !== null && number > 0 && !/[?؟]/.test(content)) {
       nextRoofArea = number;
       setRoofArea(number);
       const refreshedAnalysis = await refreshAnalysisWithRoofArea(number, signal);
@@ -1899,7 +1904,7 @@ export default function RoofRayChat() {
       else if (normalized.includes("permission") || normalized.includes("manjuri") || content.includes("મંજૂરી")) nextOwnership = "Permission";
       else if (/\bno\b/.test(normalized) || normalized.includes("nathi") || content.includes("નથી")) nextOwnership = "No";
       if (nextOwnership) setOwnership(nextOwnership);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership !== null && goal === null) {
+    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership !== null && goal === null && content.length <= 80 && !/[?؟]/.test(content)) {
       if (normalized.includes("reduce") || normalized.includes("ochhu") || normalized.includes("ghat") || content.includes("ઘટાડ") || content.includes("ઓછું")) nextGoal = "Reduce electricity bill";
       else if (normalized.includes("maximum") || normalized.includes("vadhu generation") || content.includes("વધુ ઉત્પાદન")) nextGoal = "Maximum generation";
       else if (normalized.includes("cost") || normalized.includes("subsidy") || normalized.includes("kharch") || content.includes("ખર્ચ") || content.includes("સબસિડી")) nextGoal = "Cost/subsidy";
@@ -1940,7 +1945,7 @@ export default function RoofRayChat() {
 
     try {
       const requestBody = {
-        mode: nextGoal !== null ? "chat" : undefined,
+        mode: "chat",
         languageHint: content,
         messages: nextMessages.map(({ role, content: mc }) => ({
           role,
