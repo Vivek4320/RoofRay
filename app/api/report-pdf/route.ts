@@ -522,7 +522,14 @@ function buildPdf(data: SummaryData): Uint8Array {
       commands.push(...sectionTitleCommands(42, 135, "DAYLIGHT SHADOW CHECK"));
       const riskSummary = "Current model risk: " + data.shadowRisk.toUpperCase() + ". Time samples analyzed: " + data.shadowTimeSeries.length + ". This is a short-term sun-path screen; it is not a full annual shade simulation.";
       commands.push(...wrappedTextCommands(riskSummary, 48, 105, 740, 8));
-      commands.push(...wrappedTextCommands("Data source: " + (data.obstacleSource || "unavailable") + (data.obstacleRadiusMeters !== null ? " within " + data.obstacleRadiusMeters + " m. © OpenStreetMap contributors.", ""), 48, 75, 740, 7));
+      const obstacleSourceLine =
+        "Data source: " +
+        (data.obstacleSource || "unavailable") +
+        (data.obstacleRadiusMeters !== null
+          ? " within " + data.obstacleRadiusMeters + " m."
+          : ".") +
+        " © OpenStreetMap contributors.";
+      commands.push(...wrappedTextCommands(obstacleSourceLine, 48, 75, 740, 7));
     }
 
     commands.push(...footerCommands());
