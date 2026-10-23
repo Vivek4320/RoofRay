@@ -127,6 +127,22 @@ type SummaryData = {
   shadingPercent: number | null;
   monthlyGenerationKwh: Array<Record<string, unknown>>;
   applianceLoad: ApplianceLoadBreakdown;
+  obstacles: Array<{
+    type: string;
+    name: string;
+    distanceMeters: number;
+    bearingDeg: number;
+    heightMeters: number;
+    heightSource: string;
+    shadowRisk: string;
+    estimatedShadowReachMeters: number | null;
+  }>;
+  obstacleSource: string;
+  obstacleRadiusMeters: number | null;
+  likelyShadowDirections: string[];
+  shadowRisk: string;
+  shadowTimeSeries: Array<Record<string, unknown>>;
+  shadowCaveats: string[];
 };
 
 function wrapLines(value: string, width = 94): string[] {
@@ -325,8 +341,32 @@ function generationBarChartCommands(
   return commands;
 }
 
+function directionFromBearing(deg: number): string {
+  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return directions[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+}
+
+function wrappedTextCommands(value: string, x: number, y: number, width: number, fontSize: number): string[] {
+  const safe = value.replace(/\s+/g, " ").trim();
+  const maxChars = Math.max(35, Math.floor(width / (fontSize * 0.53)));
+  const words = safe.split(" ");
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const candidate = line ? line + " " + word : word;
+    if (candidate.length > maxChars && line) {
+      lines.push(line);
+      line = word;
+    } else line = candidate;
+  }
+  if (line) lines.push(line);
+  return lines.slice(0, 4).flatMap((text, index) => [
+    "BT /F1 " + fontSize + " Tf 0.25 0.32 0.42 rg " + x + " " + (y - index * (fontSize + 3)) + " Td (" + pdfText(text) + ") Tj ET",
+  ]);
+}
+
 function buildPdf(data: SummaryData): Uint8Array {
-  const pages = 2;
+  const pages = 3;
   const pageWidth = 842;
   const pageHeight = 595;
   const objects: Array<string | Buffer> = [];
@@ -430,6 +470,61 @@ function buildPdf(data: SummaryData): Uint8Array {
       }
     }
 
+    if (pageIndex === 2) {
+      commands.push(...headerCommands("Nearby Obstacles & Shadow Risk", "ROOFRAY | MAPPED OBSTACLE SCREENING — NOT A 3D ROOF SURVEY"));
+      commands.push(
+        "BT /F1 9 Tf 0.25 0.32 0.42 rg 42 476 Td (" +
+          pdfText("Nearby mapped buildings and towers can block sunlight. Risk below is a screening estimate, not a guarantee of roof-level shade.") +
+          ") Tj ET",
+      );
+      commands.push(...sectionTitleCommands(42, 448, "MAPPED OBSTACLES NEAR THE PROPERTY"));
+      commands.push(
+        "BT /F2 7 Tf 0.02 0.07 0.14 rg 48 414 Td (TYPE / NAME) Tj ET",
+        "BT /F2 7 Tf 0.02 0.07 0.14 rg 335 414 Td (DISTANCE) Tj ET",
+        "BT /F2 7 Tf 0.02 0.07 0.14 rg 420 414 Td (BEARING) Tj ET",
+        "BT /F2 7 Tf 0.02 0.07 0.14 rg 500 414 Td (HEIGHT) Tj ET",
+        "BT /F2 7 Tf 0.02 0.07 0.14 rg 590 414 Td (SHADOW RISK) Tj ET",
+      );
+      let obstacleY = 394;
+      if (data.obstacles.length === 0) {
+        commands.push(
+          "BT /F1 9 Tf 0.35 0.43 0.52 rg 48 390 Td (" +
+            pdfText(data.obstacleSource === "unavailable" ? "Obstacle map data unavailable. Do not assume the site is obstacle-free." : "No mapped buildings or towers were found in the searched radius. Unmapped obstacles may still exist.") +
+            ") Tj ET",
+        );
+        obstacleY = 365;
+      } else {
+        for (const obstacle of data.obstacles.slice(0, 8)) {
+          const label = (obstacle.type + ": " + obstacle.name).slice(0, 40);
+          const risk = obstacle.shadowRisk.toUpperCase();
+          commands.push(
+            "BT /F1 7 Tf 0.15 0.22 0.32 rg 48 " + obstacleY + " Td (" + pdfText(label) + ") Tj ET",
+            "BT /F1 7 Tf 0.15 0.22 0.32 rg 335 " + obstacleY + " Td (" + obstacle.distanceMeters.toFixed(0) + " m) Tj ET",
+            "BT /F1 7 Tf 0.15 0.22 0.32 rg 420 " + obstacleY + " Td (" + pdfText(directionFromBearing(obstacle.bearingDeg)) + ") Tj ET",
+            "BT /F1 7 Tf 0.15 0.22 0.32 rg 500 " + obstacleY + " Td (" + obstacle.heightMeters.toFixed(1) + " m" + (obstacle.heightSource === "estimated" ? "*" : "") + ") Tj ET",
+            "BT /F2 7 Tf 0.15 0.22 0.32 rg 590 " + obstacleY + " Td (" + pdfText(risk) + ") Tj ET",
+          );
+          obstacleY -= 24;
+        }
+      }
+      const riskY = Math.min(obstacleY - 12, 330);
+      commands.push(...sectionTitleCommands(42, riskY, "PANEL PLACEMENT GUIDANCE"));
+      const guidance = data.obstacles.length
+        ? "Prioritize roof zones with the clearest sky view. Avoid placing panels in the likely shadow corridor cast by high/medium-risk obstacles where the actual roof layout confirms overlap."
+        : "No reliable obstacle-specific placement zone can be identified from this map result. Use an on-site shade survey or a roof photo/3D layout before final panel placement.";
+      commands.push(...wrappedTextCommands(guidance, 48, riskY - 42, 740, 9));
+      const directions = data.likelyShadowDirections.length
+        ? "Potential shadow directions flagged by the model: " + data.likelyShadowDirections.join(", ") + "."
+        : "No directional shadow corridor was confidently flagged by the current mapped-obstacle screening.";
+      commands.push(...wrappedTextCommands(directions, 48, riskY - 82, 740, 8));
+      const caveat = "Limitations: OpenStreetMap may omit buildings/towers; heights may be estimated; current analysis does not know exact roof edges, parapets, trees, or panel-row geometry. It cannot truthfully name an exact panel coordinate. Confirm placement with a roof plan and site shade survey. * indicates estimated obstacle height.";
+      commands.push(...wrappedTextCommands(caveat, 48, riskY - 124, 740, 7));
+      commands.push(...sectionTitleCommands(42, 135, "DAYLIGHT SHADOW CHECK"));
+      const riskSummary = "Current model risk: " + data.shadowRisk.toUpperCase() + ". Time samples analyzed: " + data.shadowTimeSeries.length + ". This is a short-term sun-path screen; it is not a full annual shade simulation.";
+      commands.push(...wrappedTextCommands(riskSummary, 48, 105, 740, 8));
+      commands.push(...wrappedTextCommands("Data source: " + (data.obstacleSource || "unavailable") + (data.obstacleRadiusMeters !== null ? " within " + data.obstacleRadiusMeters + " m. © OpenStreetMap contributors.", ""), 48, 75, 740, 7));
+    }
+
     commands.push(...footerCommands());
     if (pageIndex === 1) {
       commands.push(
@@ -519,6 +614,32 @@ export async function POST(request: Request) {
       shadingPercent: numberValue(planning.estimatedShadingPercent),
       monthlyGenerationKwh,
       applianceLoad: parseApplianceLoad(inputs.applianceDetails),
+      obstacles: (() => {
+        const obstacleContext = (context.obstacles ?? {}) as Record<string, unknown>;
+        const rawObstacles = Array.isArray(obstacleContext.obstacles) ? obstacleContext.obstacles as Array<Record<string, unknown>> : [];
+        return rawObstacles.map((item) => ({
+          type: String(item.type ?? "obstacle"),
+          name: String(item.name ?? "Unnamed obstacle"),
+          distanceMeters: numberValue(item.distanceMeters) ?? 0,
+          bearingDeg: numberValue(item.bearingDeg) ?? 0,
+          heightMeters: numberValue(item.heightMeters) ?? 0,
+          heightSource: String(item.heightSource ?? "estimated"),
+          shadowRisk: String(item.shadowRisk ?? "unknown"),
+          estimatedShadowReachMeters: numberValue(item.estimatedShadowReachMeters),
+        }));
+      })(),
+      obstacleSource: String(((context.obstacles ?? {}) as Record<string, unknown>).source ?? ((context.obstacles ?? {}) as Record<string, unknown>).provider ?? "unavailable"),
+      obstacleRadiusMeters: numberValue(((context.obstacles ?? {}) as Record<string, unknown>).radiusMeters),
+      likelyShadowDirections: Array.isArray((context.obstacles as Record<string, unknown> | undefined)?.likelyShadowDirections)
+        ? ((context.obstacles as Record<string, unknown>).likelyShadowDirections as unknown[]).map(String).slice(0, 8)
+        : [],
+      shadowRisk: String(((context.shadow ?? {}) as Record<string, unknown>).currentRisk ?? "unknown"),
+      shadowTimeSeries: Array.isArray(((context.shadow ?? {}) as Record<string, unknown>).timeSeries)
+        ? (((context.shadow ?? {}) as Record<string, unknown>).timeSeries as Array<Record<string, unknown>>).slice(0, 12)
+        : [],
+      shadowCaveats: Array.isArray(((context.shadow ?? {}) as Record<string, unknown>).caveats)
+        ? (((context.shadow ?? {}) as Record<string, unknown>).caveats as unknown[]).map(String).slice(0, 4)
+        : [],
     };
 
     const pdf = buildPdf(data);
