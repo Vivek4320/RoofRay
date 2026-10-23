@@ -127,9 +127,44 @@ export async function POST(request: Request) {
       );
     }
 
-    const solarContext = body.solarContext
-      ? JSON.stringify(body.solarContext).slice(0, 2200)
-      : "No live solar analysis is available yet.";
+    const rawContext = body.solarContext && typeof body.solarContext === "object"
+      ? body.solarContext as Record<string, any>
+      : {};
+    const rawPlanning = (rawContext.planningEstimate ?? {}) as Record<string, any>;
+    const rawPlacement = (rawContext.panelPlacement ?? {}) as Record<string, any>;
+    const rawEstimate = (rawPlacement.estimate ?? {}) as Record<string, any>;
+    const rawUserInputs = (rawContext.userInputs ?? {}) as Record<string, any>;
+    // Send only validated fields useful to the conversation. Avoid shipping full
+    // geospatial payloads, images, or raw time-series on every turn.
+    const compactContext = {
+      location: rawPlanning.location ?? rawContext.location ?? null,
+      userInputs: {
+        roofAreaSqFt: rawUserInputs.roofAreaSqFt ?? null,
+        roofType: rawUserInputs.roofType ?? null,
+        monthlyBillInr: rawUserInputs.monthlyBillInr ?? null,
+        applianceDetails: rawUserInputs.applianceDetails ?? null,
+        connectionType: rawUserInputs.connectionType ?? null,
+        ownership: rawUserInputs.ownership ?? null,
+        goal: rawUserInputs.goal ?? null,
+      },
+      planningEstimate: {
+        systemSizeKw: rawPlanning.systemSizeKw ?? rawEstimate.systemSizeKw ?? null,
+        panelCount: rawPlanning.panelCount ?? rawEstimate.panelCount ?? null,
+        panelPowerW: rawPlanning.panelPowerW ?? null,
+        averageMonthlyGenerationKwh: rawPlanning.averageMonthlyGenerationKwh ?? null,
+        annualGenerationAfterEstimatedShadingKwh: rawPlanning.annualGenerationAfterEstimatedShadingKwh ?? rawEstimate.effectiveGenerationKwh ?? null,
+        estimatedShadingPercent: rawPlanning.estimatedShadingPercent ?? null,
+        recommendedDirection: rawPlanning.recommendedDirection ?? null,
+        recommendedSlopeDeg: rawPlanning.recommendedSlopeDeg ?? null,
+      },
+      annual: {
+        specificYieldKwhPerKwp: (rawContext.annual as Record<string, any> | undefined)?.specificYieldKwhPerKwp ?? null,
+      },
+      tariffInrPerKwh: rawUserInputs.tariffInrPerKwh ?? rawPlanning.tariffInrPerKwh ?? null,
+      estimatedSavingsInr: rawPlanning.estimatedSavingsInr ?? null,
+      savingsCalculationAvailable: Boolean(rawPlanning.estimatedSavingsInr != null || rawUserInputs.tariffInrPerKwh != null),
+    };
+    const solarContext = JSON.stringify(compactContext);
     const solarContextObject = body.solarContext && typeof body.solarContext === "object"
       ? body.solarContext
       : {};
@@ -485,7 +520,10 @@ export async function POST(request: Request) {
       "When enough validated user inputs and live analysis are available, use the existing RoofRay calculations and explain their results. Never claim a report was generated if the report tool was not run.",
       "Browser location is captured automatically when RoofRay opens. Use the supplied geometric shadow analysis to estimate shading automatically; never ask the user to self-report shading.",
       "If location analysis or shadow data is unavailable, clearly say the shading estimate is unavailable instead of asking the user for shading.",
-      "Do not invent measurements, irradiation, shadow data, panel counts, system size, generation, savings, payback, or coverage.",
+      "Do not invent measurements, irradiation, shadow data, panel counts, system size, generation, savings, payback, tariff rates, or coverage.",
+      "For electricity-bill savings questions, use only an explicit savings figure from the supplied context or calculate transparently from an explicitly supplied tariff and generation. Never assume ₹/kWh, household bill percentage, self-consumption, or net-metering credit.",
+      "If the tariff or savings inputs are missing, say that an exact savings estimate is not available yet and ask one useful follow-up question, usually the user's approximate electricity tariff per kWh or monthly bill. Do not provide a made-up rupee range.",
+      "Do not treat generic industry assumptions as user-specific facts. Clearly distinguish actual supplied data from estimates.";
       "Treat PVGIS, mapped roof, obstacle/shadow, and panel-placement values in the supplied context as the source of truth.",
       "Use the supplied shadow analysis as an estimated shading result and clearly label it as an estimate.",
       "After all eight required inputs are collected, stop asking questions and give a concrete location-based feasibility summary using the supplied RoofRay analysis and user inputs.",
@@ -546,7 +584,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           model,
           messages: groqMessages,
-          max_completion_tokens: 700,
+          max_completion_tokens: 500,
           temperature: 0.3,
         }),
         cache: "no-store",
