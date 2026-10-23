@@ -973,6 +973,7 @@ export default function RoofRayChat() {
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
   const locationMessageShownRef = useRef(false);
+  const locationPromptAttemptedRef = useRef(false);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
   const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
   const [reportPdfPreviewOpen, setReportPdfPreviewOpen] = useState(false);
@@ -1070,6 +1071,56 @@ export default function RoofRayChat() {
       return null;
     }
   }
+
+  // Ask for browser location as soon as the chat opens, before the user starts
+  // entering roof details. This obtains coordinates only; solar analysis waits
+  // until the required roof inputs have been collected.
+  useEffect(() => {
+    if (!open || locationCoords || locationPromptAttemptedRef.current) return;
+    locationPromptAttemptedRef.current = true;
+
+    if (!window.isSecureContext || !navigator.geolocation) {
+      setLocationStatus("unavailable");
+      setLocationError("Location access is unavailable in this browser context. Open RoofRay over HTTPS and enable device location services.");
+      return;
+    }
+
+    setLocationLoading(true);
+    setLocationStatus("detecting");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        setLocationAccuracy(accuracy);
+        setLocationLoading(false);
+        if (!Number.isFinite(accuracy) || accuracy > 1000) {
+          setLocationCoords(null);
+          setLocationStatus("warning");
+          setLocationError("Your browser returned an approximate location (±" + Math.round(accuracy / 1000) + " km). Enable precise device location or use the manual map pin before generating a rooftop report.");
+          return;
+        }
+        setLocationCoords({ latitude, longitude });
+        setLocationStatus("ready");
+        setLocationError(null);
+        try {
+          sessionStorage.setItem("roofray_location", JSON.stringify({ latitude, longitude, accuracy }));
+          localStorage.setItem("roofray_location", JSON.stringify({ latitude, longitude, accuracy }));
+        } catch {}
+        void reverseGeocode(latitude, longitude).then((label) => {
+          if (label) setLocationLabel(label);
+        });
+      },
+      (error) => {
+        setLocationLoading(false);
+        setLocationStatus(error.code === error.PERMISSION_DENIED ? "denied" : "warning");
+        setLocationError(
+          error.code === error.PERMISSION_DENIED
+            ? "Location permission was denied. Allow Location for RoofRay in your browser settings, then reopen the chat."
+            : "RoofRay could not get a precise location yet. Check device location services and retry Location Analysis.",
+        );
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+    );
+  }, [open, locationCoords]);
 
   function hydrateStoredLocation() {
     try {
