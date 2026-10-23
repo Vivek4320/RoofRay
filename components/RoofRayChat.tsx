@@ -1722,6 +1722,10 @@ export default function RoofRayChat() {
     try {
       if (nextReportFlow) {
       setReportFlow(true);
+      if (!locationCoords && !signal.aborted) {
+        await loadLocationAnalysis(nextRoofArea, signal);
+        if (signal.aborted) { finishGeneration(controller); return; }
+      }
       const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
       const nextQuestion = nextRoofArea === null
         ? "To prepare your solar report, what is your roof area in square feet?"
