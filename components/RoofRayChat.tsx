@@ -1291,6 +1291,26 @@ export default function RoofRayChat() {
           const latitude = position.coords.latitude;
           const longitude = position.coords.longitude;
           const accuracy = position.coords.accuracy;
+          // A coarse Wi-Fi/IP fix must never be treated as a precise rooftop location.
+          // Otherwise obstacle mapping and the generated PDF can describe the wrong city.
+          if (!Number.isFinite(accuracy) || accuracy > 1000) {
+            setLocationCoords(null);
+            setSolarContext(null);
+            setLocationAccuracy(accuracy);
+            setLocationStatus("warning");
+            setLocationLoading(false);
+            sessionStorage.removeItem("roofray_location");
+            localStorage.removeItem("roofray_location");
+            sessionStorage.removeItem("roofray_solar_analysis");
+            setLocationError("Your browser returned an approximate location (accuracy ±" + Math.round(accuracy / 1000) + " km). RoofRay needs a more precise location before rooftop and shadow calculations. Enable device location services and precise location permission, then retry Location Analysis.");
+            setMessages((current) => [...current, {
+              id: safeUUID(),
+              role: "assistant",
+              content: "⚠️ Location is too approximate (±" + Math.round(accuracy / 1000) + " km). I cannot safely use it for your rooftop solar report. Please enable precise device/browser location and retry Location Analysis.",
+            }]);
+            resolve(null);
+            return;
+          }
           setLocationCoords({ latitude, longitude });
           setLocationAccuracy(accuracy);
           setLocationStatus(accuracy > 100 ? "warning" : "ready");
