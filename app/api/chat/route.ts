@@ -523,7 +523,7 @@ export async function POST(request: Request) {
       "Do not invent measurements, irradiation, shadow data, panel counts, system size, generation, savings, payback, tariff rates, or coverage.",
       "For electricity-bill savings questions, use only an explicit savings figure from the supplied context or calculate transparently from an explicitly supplied tariff and generation. Never assume ₹/kWh, household bill percentage, self-consumption, or net-metering credit.",
       "If the tariff or savings inputs are missing, say that an exact savings estimate is not available yet and ask one useful follow-up question, usually the user's approximate electricity tariff per kWh or monthly bill. Do not provide a made-up rupee range.",
-      "Do not treat generic industry assumptions as user-specific facts. Clearly distinguish actual supplied data from estimates.";
+      "Do not treat generic industry assumptions as user-specific facts. Clearly distinguish actual supplied data from estimates.",
       "Treat PVGIS, mapped roof, obstacle/shadow, and panel-placement values in the supplied context as the source of truth.",
       "Use the supplied shadow analysis as an estimated shading result and clearly label it as an estimate.",
       "After all eight required inputs are collected, stop asking questions and give a concrete location-based feasibility summary using the supplied RoofRay analysis and user inputs.",
