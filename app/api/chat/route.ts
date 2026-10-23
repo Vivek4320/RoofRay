@@ -10,6 +10,59 @@ function extractGroqText(data: any): string {
   return typeof content === "string" ? content.trim() : "";
 }
 
+async function localizeFixedResponse(
+  text: string,
+  messages: ChatMessage[],
+  languageHint: string | undefined,
+  apiKey: string | undefined,
+): Promise<string> {
+  if (!apiKey) return text;
+  const userHistory = messages
+    .filter((message) => message.role === "user")
+    .slice(-8)
+    .map((message) => message.content)
+    .join("\n");
+  const configuredModel = process.env.ROOFRAY_GROQ_MODEL?.trim();
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: configuredModel || "openai/gpt-oss-120b",
+        messages: [
+          {
+            role: "system",
+            content: [
+              "Translate the supplied RoofRay response into the language used in the latest clearly identifiable user message.",
+              "If the user writes Gujarati using Gujarati script, respond in Gujarati script.",
+              "If the user writes Gujarati using English/Latin letters (Roman Gujarati), respond in Roman Gujarati using Latin letters.",
+              "If the user writes English, respond in English.",
+              "Use recent user-message history to infer the language when the latest answer is only a number or a short option. Prefer the most recent clearly identifiable language, not the assistant's language.",
+              "Keep the meaning, all numbers, currency amounts, units, percentages, technical values, and report facts unchanged. Translate prose and labels only.",
+              "Return only the translated response, with no explanation or quotation marks.",
+            ].join("\n"),
+          },
+          {
+            role: "user",
+            content: `Recent user messages:\n${userHistory}\n\nLatest language hint:\n${languageHint || ""}\n\nText to translate:\n${text}`,
+          },
+        ],
+        max_completion_tokens: 1800,
+        temperature: 0,
+      }),
+      cache: "no-store",
+    });
+    if (!response.ok) return text;
+    const data = await response.json().catch(() => ({}));
+    return extractGroqText(data) || text;
+  } catch {
+    return text;
+  }
+}
+
 async function verifyAccessToken(token: string): Promise<boolean> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -51,6 +104,7 @@ export async function POST(request: Request) {
       mode?: "chat" | "report";
       messages?: ChatMessage[];
       solarContext?: Record<string, unknown> | null;
+      languageHint?: string;
     };
 
     const messages = Array.isArray(body.messages)
@@ -350,12 +404,18 @@ export async function POST(request: Request) {
         "These are location-based planning estimates. Final panel layout, structure, electrical design and on-site shading require a physical site assessment.",
       ].filter(Boolean).join("\n");
 
-      return NextResponse.json({ ok: true, message: answer });
+      const localizedAnswer = await localizeFixedResponse(
+        answer,
+        messages,
+        body.languageHint,
+        process.env.GROQ_API_KEY?.trim(),
+      );
+      return NextResponse.json({ ok: true, message: localizedAnswer });
     }
 
     // Intake questions are deterministic. Do not send the growing chat history to Groq
     // while the user is still answering the fixed form. This also avoids TPM errors.
-    if (!intakeComplete) {
+    if (!intakeComplete && body.mode !== "chat") {
       const applianceText = String(applianceDetailsInput ?? "");
       const applianceCount = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"]
         .filter((label) => new RegExp(label.replace(" ", "\\s*") + "\\s*:", "i").test(applianceText))
@@ -385,7 +445,13 @@ export async function POST(request: Request) {
                       ? fixedQuestions.ownership
                       : fixedQuestions.goal;
 
-      return NextResponse.json({ ok: true, message: nextQuestion });
+      const localizedQuestion = await localizeFixedResponse(
+        nextQuestion,
+        messages,
+        body.languageHint,
+        process.env.GROQ_API_KEY?.trim(),
+      );
+      return NextResponse.json({ ok: true, message: localizedQuestion });
     }
 
     const apiKey = process.env.GROQ_API_KEY?.trim();
