@@ -1710,7 +1710,7 @@ export default function RoofRayChat() {
     link.remove();
   }
 
-  async function generateFinalReport(analysis: SolarAnalysis, roofPhotoOverride?: string | null, goalOverride?: string | null, signal?: AbortSignal) {
+  async function generateFinalReport(analysis: SolarAnalysis, roofPhotoOverride?: string | null, goalOverride?: string | null, signal?: AbortSignal, languageHint?: string) {
     const reportGoal = goalOverride ?? goal;
     if (reportGoal === null) return;
     const controller = signal ? null : new AbortController();
@@ -1726,6 +1726,8 @@ export default function RoofRayChat() {
       }
 
       const requestBody = {
+        mode: "report",
+        languageHint,
         messages: messages.map(({ role, content: mc }) => ({
           role,
           content: mc,
@@ -1888,20 +1890,20 @@ export default function RoofRayChat() {
         setApplianceStep(nextApplianceStep);
       }
     } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceStep >= 6 && connectionType === null) {
-      if (normalized.includes("residential")) nextConnectionType = "Residential";
-      else if (normalized.includes("commercial")) nextConnectionType = "Commercial";
-      else if (normalized.includes("other")) nextConnectionType = "Other";
+      if (normalized.includes("residential") || normalized.includes("ghar") || normalized.includes("home") || content.includes("ઘર")) nextConnectionType = "Residential";
+      else if (normalized.includes("commercial") || normalized.includes("dukan") || normalized.includes("business") || content.includes("દુકાન")) nextConnectionType = "Commercial";
+      else if (normalized.includes("other") || content.includes("અન્ય")) nextConnectionType = "Other";
       if (nextConnectionType) setConnectionType(nextConnectionType);
     } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership === null) {
-      if (normalized.includes("own")) nextOwnership = "Own";
-      else if (normalized.includes("permission")) nextOwnership = "Permission";
-      else if (normalized.includes("no")) nextOwnership = "No";
+      if (normalized.includes("own") || normalized.includes("maru") || normalized.includes("mari") || content.includes("મારું") || content.includes("મારી")) nextOwnership = "Own";
+      else if (normalized.includes("permission") || normalized.includes("manjuri") || content.includes("મંજૂરી")) nextOwnership = "Permission";
+      else if (/\bno\b/.test(normalized) || normalized.includes("nathi") || content.includes("નથી")) nextOwnership = "No";
       if (nextOwnership) setOwnership(nextOwnership);
     } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership !== null && goal === null) {
-      if (normalized.includes("reduce")) nextGoal = "Reduce electricity bill";
-      else if (normalized.includes("maximum")) nextGoal = "Maximum generation";
-      else if (normalized.includes("cost") || normalized.includes("subsidy")) nextGoal = "Cost/subsidy";
-      else if (normalized.includes("feasibility")) nextGoal = "Just check feasibility";
+      if (normalized.includes("reduce") || normalized.includes("ochhu") || normalized.includes("ghat") || content.includes("ઘટાડ") || content.includes("ઓછું")) nextGoal = "Reduce electricity bill";
+      else if (normalized.includes("maximum") || normalized.includes("vadhu generation") || content.includes("વધુ ઉત્પાદન")) nextGoal = "Maximum generation";
+      else if (normalized.includes("cost") || normalized.includes("subsidy") || normalized.includes("kharch") || content.includes("ખર્ચ") || content.includes("સબસિડી")) nextGoal = "Cost/subsidy";
+      else if (normalized.includes("feasibility") || normalized.includes("shakyata") || content.includes("શક્યતા")) nextGoal = "Just check feasibility";
       if (nextGoal) {
         setGoal(nextGoal);
         // Location analysis and report generation start immediately after the goal is selected.
@@ -1919,7 +1921,7 @@ export default function RoofRayChat() {
       }
       if (liveAnalysis) {
         currentSolarContext = liveAnalysis;
-        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl, nextGoal, signal);
+        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl, nextGoal, signal, content);
       }
       finishGeneration(controller);
       return;
@@ -1938,6 +1940,8 @@ export default function RoofRayChat() {
 
     try {
       const requestBody = {
+        mode: nextGoal !== null ? "chat" : undefined,
+        languageHint: content,
         messages: nextMessages.map(({ role, content: mc }) => ({
           role,
           content: mc,
@@ -1989,38 +1993,9 @@ export default function RoofRayChat() {
         throw new Error("RoofRay returned an empty response.");
       }
 
-      // Keep the intake order fixed on the client as well, so an older
-      // deployed API response cannot bring back the previous question flow.
-      const applianceQuestions = [
-        "How many TVs do you have?",
-        "How many fans do you have?",
-        "How many ACs do you have?",
-        "How many refrigerators do you have?",
-        "How many bulbs/lights do you have?",
-        "How many water pumps do you have?",
-      ];
-      const fixedNextQuestion =
-        nextName === null
-          ? "What is your name?"
-          : nextRoofArea === null
-            ? "What is the area of your roof in square feet?"
-            : nextRoofType === null
-              ? "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)"
-              : nextMonthlyBill === null
-                ? "What is your average monthly electricity bill in ₹?"
-                : nextApplianceStep < applianceQuestions.length
-                  ? applianceQuestions[nextApplianceStep]
-                  : nextConnectionType === null
-                    ? "What type of electricity connection do you have? (Residential, Commercial, or Other)"
-                    : nextOwnership === null
-                      ? "Do you own the property, or do you have permission to install solar there? (Own, Permission, or No)"
-                      : nextGoal === null
-                        ? "What is your main goal for installing solar? (Reduce electricity bill, Maximum generation, Cost/subsidy, or Just check feasibility)"
-                        : data.message;
-
       setMessages((current) => [
         ...current,
-        { id: safeUUID(), role: "assistant", content: fixedNextQuestion },
+        { id: safeUUID(), role: "assistant", content: data.message },
       ]);
 
     } catch (error) {
