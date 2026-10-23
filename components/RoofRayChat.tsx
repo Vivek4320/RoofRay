@@ -1832,9 +1832,30 @@ export default function RoofRayChat() {
 
   async function sendMessage(text = input) {
     const content = text.trim();
-    if (!chatLanguage) return;
     if (!content && attachments.length === 0) return;
     if (loading) return;
+
+    // Let the user greet RoofRay first, then offer the language choices in chat.
+    if (!chatLanguage) {
+      const firstMessage: ChatMessage = {
+        id: safeUUID(),
+        role: "user",
+        content,
+      };
+      setMessages([
+        firstMessage,
+        {
+          id: safeUUID(),
+          role: "assistant",
+          content: "Hi! Welcome to RoofRay. Which language would you like to use for this chat?",
+        },
+      ]);
+      setHasStarted(true);
+      setAutoScroll(true);
+      setInput("");
+      setAttachments([]);
+      return;
+    }
 
     const imageAttachment = attachments.find((att) => ALLOWED_IMAGES.includes(att.file.type));
     const userMessage: ChatMessage = {
@@ -2335,17 +2356,7 @@ export default function RoofRayChat() {
             <div className="rr-grid-overlay" aria-hidden="true" />
             <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
               {!hasStarted ? (
-                chatLanguage === null ? (
-                  <div className="flex min-h-[65vh] flex-col items-center justify-center px-6 py-12 text-center">
-                    <Image src="/favicon.ico" alt="RoofRay logo" width={88} height={88} priority className="mb-5 h-16 w-16 object-contain" />
-                    <h2 className="text-xl font-semibold text-white">Choose your chat language</h2>
-                    <p className="mt-2 text-sm text-slate-400">ચેટ માટે ભાષા પસંદ કરો / Select the language for your chat</p>
-                    <div className="mt-6 flex flex-wrap justify-center gap-3">
-                      <button type="button" onClick={() => setChatLanguage("en")} className="rounded-xl border border-blue-400/40 bg-blue-500/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500/20">English</button>
-                      <button type="button" onClick={() => setChatLanguage("gu")} className="rounded-xl border border-blue-400/40 bg-blue-500/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500/20">ગુજરાતી (Gujarati)</button>
-                    </div>
-                  </div>
-                ) : <EmptyState />
+                <EmptyState />
               ) : (
                 <div className="space-y-6">
                   {visibleMessages.map((message) =>
@@ -2367,6 +2378,23 @@ export default function RoofRayChat() {
                         onDownloadPdf={() => void downloadReportPdf(message.content)}
                       />
                     )
+                  )}
+                  {chatLanguage === null && (
+                    <div className="rr-msg-in flex justify-start">
+                      <div className="max-w-[85%] rounded-2xl border border-blue-400/30 bg-[#0B1729] p-4">
+                        <p className="text-sm font-medium text-slate-100">Choose your chat language / ચેટની ભાષા પસંદ કરો</p>
+                        <div className="mt-3 flex flex-wrap gap-3">
+                          <button type="button" onClick={() => {
+                            setChatLanguage("en");
+                            setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: "Great! Let’s start. What is your name?" }]);
+                          }} className="rounded-xl border border-blue-400/40 bg-blue-500/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500/20">English</button>
+                          <button type="button" onClick={() => {
+                            setChatLanguage("gu");
+                            setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: "સરસ! ચાલો શરૂ કરીએ. તમારું નામ શું છે?" }]);
+                          }} className="rounded-xl border border-blue-400/40 bg-blue-500/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500/20">ગુજરાતી (Gujarati)</button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                   {loading && <ThinkingIndicator />}
                 </div>
