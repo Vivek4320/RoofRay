@@ -964,6 +964,7 @@ export default function RoofRayChat() {
   const isFullScreenPage = pathname === "/chat";
   const [open, setOpen] = useState(isFullScreenPage);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatLanguage, setChatLanguage] = useState<"en" | "gu" | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const generationControllerRef = useRef<AbortController | null>(null);
@@ -1831,6 +1832,7 @@ export default function RoofRayChat() {
 
   async function sendMessage(text = input) {
     const content = text.trim();
+    if (!chatLanguage) return;
     if (!content && attachments.length === 0) return;
     if (loading) return;
 
@@ -1964,20 +1966,21 @@ export default function RoofRayChat() {
     if (nextReportFlow) {
       setReportFlow(true);
       const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
+      const gu = chatLanguage === "gu";
       const nextQuestion = nextRoofArea === null
-        ? "To prepare your solar report, what is your roof area in square feet?"
+        ? (gu ? "તમારી છતનું ક્ષેત્રફળ કેટલું છે? (ચોરસ ફૂટમાં)" : "To prepare your solar report, what is your roof area in square feet?")
         : nextRoofType === null
-          ? "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)"
+          ? (gu ? "તમારી છત કયા પ્રકારની છે? (RCC/કોંક્રિટ, મેટલ શીટ, ટાઇલ કે અન્ય)" : "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)")
           : nextMonthlyBill === null
-            ? "What is your average monthly electricity bill in ₹?"
+            ? (gu ? "તમારું સરેરાશ માસિક વીજળી બિલ કેટલું આવે છે? (₹માં)" : "What is your average monthly electricity bill in ₹?")
             : nextApplianceStep < applianceNames.length
-              ? `Approximately how many ${applianceNames[nextApplianceStep]}s do you have? Enter 0 if none.`
+              ? (gu ? `તમારા ઘરે કેટલા ${({TV:"ટીવી",Fan:"પંખા",AC:"એસી",Refrigerator:"ફ્રિજ",Bulb:"બલ્બ/લાઇટ", "Water Pump":"પાણીના પંપ"})[applianceNames[nextApplianceStep] as "TV" | "Fan" | "AC" | "Refrigerator" | "Bulb" | "Water Pump"]} છે? ન હોય તો 0 લખો.` : `Approximately how many ${applianceNames[nextApplianceStep]}s do you have? Enter 0 if none.`)
               : nextConnectionType === null
-                ? "Is the electricity connection Residential or Commercial?"
+                ? (gu ? "તમારું વીજળી કનેક્શન ઘરેલું છે કે વ્યાવસાયિક? (Residential/Commercial)" : "Is the electricity connection Residential or Commercial?")
                 : nextOwnership === null
-                  ? "Do you own the property, or do you have permission to install solar there?"
+                  ? (gu ? "મિલકત તમારી પોતાની છે કે સોલાર લગાવવાની પરવાનગી છે?" : "Do you own the property, or do you have permission to install solar there?")
                   : nextGoal === null
-                    ? "What is your main goal: reduce bill, maximum generation, cost/subsidy, or feasibility?"
+                    ? (gu ? "સોલાર લગાવવાનો તમારો મુખ્ય હેતુ શું છે: બિલ ઘટાડવું, વધુ વીજ ઉત્પાદન, ખર્ચ/સબસિડી કે શક્યતા તપાસવી?" : "What is your main goal: reduce bill, maximum generation, cost/subsidy, or feasibility?")
                     : "";
       if (nextQuestion) {
         setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: nextQuestion }]);
@@ -2000,6 +2003,7 @@ export default function RoofRayChat() {
     try {
       const requestBody = {
         mode: "chat",
+        preferredLanguage: chatLanguage,
         languageHint: content,
         messages: nextMessages.map(({ role, content: mc }) => ({
           role,
@@ -2084,6 +2088,7 @@ export default function RoofRayChat() {
 
   function startNewChat() {
     setMessages([]);
+    setChatLanguage(null);
     setName(null);
     setRoofArea(null);
     setRoofType(null);
@@ -2330,7 +2335,17 @@ export default function RoofRayChat() {
             <div className="rr-grid-overlay" aria-hidden="true" />
             <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
               {!hasStarted ? (
-                <EmptyState />
+                chatLanguage === null ? (
+                  <div className="flex min-h-[65vh] flex-col items-center justify-center px-6 py-12 text-center">
+                    <Image src="/favicon.ico" alt="RoofRay logo" width={88} height={88} priority className="mb-5 h-16 w-16 object-contain" />
+                    <h2 className="text-xl font-semibold text-white">Choose your chat language</h2>
+                    <p className="mt-2 text-sm text-slate-400">ચેટ માટે ભાષા પસંદ કરો / Select the language for your chat</p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-3">
+                      <button type="button" onClick={() => setChatLanguage("en")} className="rounded-xl border border-blue-400/40 bg-blue-500/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500/20">English</button>
+                      <button type="button" onClick={() => setChatLanguage("gu")} className="rounded-xl border border-blue-400/40 bg-blue-500/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500/20">ગુજરાતી (Gujarati)</button>
+                    </div>
+                  </div>
+                ) : <EmptyState />
               ) : (
                 <div className="space-y-6">
                   {visibleMessages.map((message) =>
