@@ -127,6 +127,10 @@ type SummaryData = {
   shadingPercent: number | null;
   monthlyGenerationKwh: Array<Record<string, unknown>>;
   applianceLoad: ApplianceLoadBreakdown;
+  equipmentRecommendedPanels: number;
+  equipmentDailyUseKwh: number;
+  equipmentRecommendedCapacityKw: number;
+  roofMaximumPanels: number | null;
   obstacles: Array<{
     type: string;
     name: string;
@@ -403,15 +407,15 @@ function buildPdf(data: SummaryData): Uint8Array {
 
       commands.push(...cardCommands(
         42, 392, 244, 70,
-        "ESTIMATED MAX PANELS ON ROOF",
-        data.panelCount !== null ? String(Math.round(maxPanelCount)) + " panels" : "Unavailable",
-        data.panelCount !== null ? (String(Math.round(maxPanelCount)) + " × " + Math.round(data.panelPowerW) + "W modules; layout estimate") : undefined,
+        "RECOMMENDED PANELS FROM APPLIANCES",
+        data.equipmentRecommendedPanels + " panels",
+        data.equipmentRecommendedPanels + " × " + Math.round(data.panelPowerW) + "W; " + data.equipmentDailyUseKwh.toFixed(1) + " kWh/day estimated demand",
       ));
       commands.push(...cardCommands(
         300, 392, 244, 70,
-        "SOLAR DC SIZE",
-        data.systemSizeKw !== null ? maxSystemKw.toFixed(2) + " kW" : "Unavailable",
-        "Roof-area based planning size",
+        "LOAD-BASED SYSTEM SIZE",
+        data.equipmentRecommendedCapacityKw.toFixed(2) + " kW",
+        data.roofMaximumPanels !== null ? "Roof-area estimate: max " + data.roofMaximumPanels + " panels" : "Roof capacity unavailable",
       ));
       commands.push(...cardCommands(
         558, 392, 242, 70,
@@ -621,6 +625,35 @@ export async function POST(request: Request) {
       shadingPercent: numberValue(planning.estimatedShadingPercent),
       monthlyGenerationKwh,
       applianceLoad: parseApplianceLoad(inputs.applianceDetails),
+      equipmentDailyUseKwh: (() => {
+        const load = parseApplianceLoad(inputs.applianceDetails);
+        return Number(((load.bulbs * 10 * 5 + load.fans * 75 * 8 + load.acs * 1500 * 6 + load.refrigerators * 200 * 8 + load.tvs * 100 * 4 + load.pumps * 750 * 1) / 1000).toFixed(1));
+      })(),
+      equipmentRecommendedPanels: (() => {
+        const load = parseApplianceLoad(inputs.applianceDetails);
+        const dailyKwh = (load.bulbs * 10 * 5 + load.fans * 75 * 8 + load.acs * 1500 * 6 + load.refrigerators * 200 * 8 + load.tvs * 100 * 4 + load.pumps * 750 * 1) / 1000;
+        const panelW = numberValue(planning.panelPowerW) ?? 450;
+        const perPanelDailyKwh = (panelW / 1000) * 4.5 * 0.8;
+        const energyPanels = perPanelDailyKwh > 0 ? Math.ceil(dailyKwh / perPanelDailyKwh) : 0;
+        const roofArea = numberValue(planning.roofAreaSqFt) ?? numberValue(inputs.roofAreaSqFt);
+        const roofMax = roofArea !== null ? Math.max(0, Math.floor(((roofArea * 0.092903) * 0.72) / 1.952748)) : null;
+        return roofMax === null ? energyPanels : Math.min(energyPanels, roofMax);
+      })(),
+      equipmentRecommendedCapacityKw: (() => {
+        const load = parseApplianceLoad(inputs.applianceDetails);
+        const dailyKwh = (load.bulbs * 10 * 5 + load.fans * 75 * 8 + load.acs * 1500 * 6 + load.refrigerators * 200 * 8 + load.tvs * 100 * 4 + load.pumps * 750 * 1) / 1000;
+        const panelW = numberValue(planning.panelPowerW) ?? 450;
+        const perPanelDailyKwh = (panelW / 1000) * 4.5 * 0.8;
+        const energyPanels = perPanelDailyKwh > 0 ? Math.ceil(dailyKwh / perPanelDailyKwh) : 0;
+        const roofArea = numberValue(planning.roofAreaSqFt) ?? numberValue(inputs.roofAreaSqFt);
+        const roofMax = roofArea !== null ? Math.max(0, Math.floor(((roofArea * 0.092903) * 0.72) / 1.952748)) : null;
+        const recommended = roofMax === null ? energyPanels : Math.min(energyPanels, roofMax);
+        return Number((recommended * panelW / 1000).toFixed(2));
+      })(),
+      roofMaximumPanels: (() => {
+        const roofArea = numberValue(planning.roofAreaSqFt) ?? numberValue(inputs.roofAreaSqFt);
+        return roofArea !== null ? Math.max(0, Math.floor(((roofArea * 0.092903) * 0.72) / 1.952748)) : null;
+      })(),
       obstacles: (() => {
         const obstacleContext = (context.obstacles ?? {}) as Record<string, unknown>;
         const rawObstacles = Array.isArray(obstacleContext.obstacles) ? obstacleContext.obstacles as Array<Record<string, unknown>> : [];
