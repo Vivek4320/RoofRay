@@ -189,17 +189,9 @@ export async function getPVGISAnalysis({
   const annualEnergy = asNumber(fixed?.E_y);
   const annualIrradiation = asNumber(fixed?.["H(i)_y"]);
 
-  // Reject obviously implausible per-kWp yields instead of publishing a misleading
-  // generation report. A rooftop system in this region should not imply >2,500
-  // kWh per kWp per year from a fixed, grid-connected PVGIS model.
   const specificYield = annualEnergy === null || peakPowerKw <= 0
     ? null
     : annualEnergy / peakPowerKw;
-  if (specificYield !== null && specificYield > 2500) {
-    throw new Error(
-      `PVGIS returned an implausible specific yield (${Math.round(specificYield)} kWh/kWp/year) for the selected coordinates. Generation has been stopped to avoid showing unreliable units; verify the PVGIS response and coordinates.`,
-    );
-  }
 
   return {
     provider: "PVGIS",
@@ -244,6 +236,9 @@ export async function getPVGISAnalysis({
     })),
     notes: [
       "PVGIS estimates solar-resource and PV-system performance from long-term radiation and meteorological data.",
+      ...(specificYield !== null && specificYield > 2500
+        ? ["Warning: PVGIS returned a very high specific yield for the selected coordinates. Verify the returned coordinates, radiation database, and source response before treating this estimate as bankable."]
+        : []),
       "The optimal direction is the solar-resource optimum for a fixed system; it is not a building-specific roof-face recommendation.",
       "Nearby buildings, trees, roof geometry, and temporary shadows require a separate roof/obstacle analysis layer.",
     ],
