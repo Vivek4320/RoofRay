@@ -524,7 +524,7 @@ function buildPdf(data: SummaryData): Uint8Array {
       const caveat = "Limitations: OpenStreetMap may omit buildings/towers; heights may be estimated; current analysis does not know exact roof edges, parapets, trees, or panel-row geometry. It cannot truthfully name an exact panel coordinate. Confirm placement with a roof plan and site shade survey. * indicates estimated obstacle height.";
       commands.push(...wrappedTextCommands(caveat, 48, riskY - 124, 740, 7));
       commands.push(...sectionTitleCommands(42, 135, "DAYLIGHT SHADOW CHECK"));
-      const riskSummary = "Current model risk: " + data.shadowRisk.toUpperCase() + ". Time samples analyzed: " + data.shadowTimeSeries.length + ". This is a short-term sun-path screen; it is not a full annual shade simulation.";
+      const riskSummary = "Current model risk: " + (data.obstacles.length === 0 || data.obstacleSource === "unavailable" ? "UNKNOWN (obstacle data unavailable)" : data.shadowRisk.toUpperCase()) + ". Time samples analyzed: " + data.shadowTimeSeries.length + ". This is a short-term sun-path screen; it is not a full annual shade simulation.";
       commands.push(...wrappedTextCommands(riskSummary, 48, 105, 740, 8));
       const obstacleSourceLine =
         "Data source: " +
