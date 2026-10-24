@@ -1921,7 +1921,10 @@ export default function RoofRayChat() {
 
     const normalized = content.toLowerCase();
     const isReportRequest = /\b(generate|create|make|prepare|need|want|give me|show me|estimate|calculate)\b.{0,50}\b(solar|rooftop|roof|feasibility|system|report|installation)\b|\b(solar|rooftop|roof)\b.{0,50}\b(report|estimate|feasibility|system size)\b/i.test(content)
-      || /solar system.*(estimate|report)|feasibility report|solar report/i.test(content);
+      || /solar system.*(estimate|report)|feasibility report|solar report/i.test(content)
+      // A clear installation intent should start the structured intake immediately.
+      // Location is collected by browser geolocation after the intake, not by asking for a PIN code.
+      || /\b(for installing solar|install(?:ing)? solar|solar installation|want to install solar|planning to install solar|install solar panels)\b/i.test(content);
     const nextReportFlow = reportFlow || isReportRequest;
 
     const isGreeting = /^(hi+|hello+|hey+|good morning|good afternoon|good evening)[!.\s]*$/i.test(content.trim());
