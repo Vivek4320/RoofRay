@@ -1167,8 +1167,15 @@ export default function RoofRayChat() {
       }
     } catch { /* ignore malformed local history */ }
     finally {
-      // Prevent the initial empty React state from overwriting saved chats
-      // before localStorage hydration has completed. Browser timing differs.
+      // Every conversation needs an ID even when the user starts chatting
+      // without clicking "New Chat". Without it, the save effect has nothing
+      // to persist, which can make refresh behavior differ between browsers.
+      const savedActiveId = localStorage.getItem("roofray_active_chat");
+      if (!savedActiveId) {
+        const newId = safeUUID();
+        localStorage.setItem("roofray_active_chat", newId);
+        setActiveChatId(newId);
+      }
       setChatsHydrated(true);
     }
   }, []);
