@@ -189,6 +189,18 @@ export async function getPVGISAnalysis({
   const annualEnergy = asNumber(fixed?.E_y);
   const annualIrradiation = asNumber(fixed?.["H(i)_y"]);
 
+  // Reject obviously implausible per-kWp yields instead of publishing a misleading
+  // generation report. A rooftop system in this region should not imply >2,500
+  // kWh per kWp per year from a fixed, grid-connected PVGIS model.
+  const specificYield = annualEnergy === null || peakPowerKw <= 0
+    ? null
+    : annualEnergy / peakPowerKw;
+  if (specificYield !== null && specificYield > 2500) {
+    throw new Error(
+      `PVGIS returned an implausible specific yield (${Math.round(specificYield)} kWh/kWp/year) for the selected coordinates. Generation has been stopped to avoid showing unreliable units; verify the PVGIS response and coordinates.`,
+    );
+  }
+
   return {
     provider: "PVGIS",
     apiVersion: "5.3",
