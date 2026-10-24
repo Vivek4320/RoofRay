@@ -301,8 +301,30 @@ export async function POST(request: Request) {
 
   const estimatedLoadKw = applianceLoad.kw;
       const size = num(planning.systemSizeKw ?? estimate.systemSizeKw) || fallbackSize;
-      const count = num(planning.panelCount ?? estimate.panelCount) || fallbackCount;
+      const roofMaximumPanels = Number.isFinite(fallbackCount)
+        ? Math.max(0, Math.floor(fallbackCount))
+        : Number.isFinite(num(planning.panelCount ?? estimate.panelCount))
+          ? Math.max(0, Math.floor(num(planning.panelCount ?? estimate.panelCount)))
+          : null;
       const watts = num(planning.panelPowerW ?? panel.assumedPowerW) || panelWatts;
+      // Energy sizing uses explicit default daily-use assumptions because appliance
+      // counts alone do not tell us actual kWh consumption.
+      const estimatedDailyUseKwh = (
+        applianceLoad.bulbs * 10 * 5 +
+        applianceLoad.fans * 75 * 8 +
+        applianceLoad.acs * 1500 * 6 +
+        applianceLoad.refrigerators * 200 * 8 +
+        applianceLoad.tvs * 100 * 4 +
+        applianceLoad.pumps * 750 * 1
+      ) / 1000;
+      const panelDailyYieldKwh = (watts / 1000) * 4.5 * 0.8;
+      const loadBasedPanels = panelDailyYieldKwh > 0
+        ? Math.ceil(estimatedDailyUseKwh / panelDailyYieldKwh)
+        : 0;
+      const recommendedPanels = roofMaximumPanels === null
+        ? loadBasedPanels
+        : Math.min(loadBasedPanels, roofMaximumPanels);
+      const recommendedCapacityKw = Number((recommendedPanels * watts / 1000).toFixed(2));
       let shadeFromShadow = NaN;
       if (Array.isArray(shadow.timeSeries)) {
         const samples = shadow.timeSeries as Array<Record<string, unknown>>;
@@ -404,12 +426,19 @@ export async function POST(request: Request) {
         typeof ownershipInput === "string" && ownershipInput.trim() ? `Property permission: ${ownershipInput}` : "",
         "",
         "⚡ RECOMMENDED SOLAR SYSTEM",
-        Number.isFinite(size) && Number.isFinite(count)
-          ? `Recommended capacity: ~${fmt(size, 2)} kW`
-          : "Recommended capacity: unavailable",
-        Number.isFinite(count)
-          ? `Panels: ${Math.round(count)} × ${Math.round(watts || 450)}W`
-          : "Panels: unavailable",
+        estimatedDailyUseKwh > 0
+          ? `Estimated appliance energy use: ~${fmt(estimatedDailyUseKwh, 1)} kWh/day using assumed typical daily usage hours.`
+          : "Estimated appliance energy use: unavailable; appliance quantities were not parsed.",
+        recommendedPanels > 0
+          ? `Load-based recommendation: ~${recommendedPanels} panels × ${Math.round(watts || 450)}W (~${fmt(recommendedCapacityKw, 2)} kW), sized from estimated appliance energy use.`
+          : "Load-based recommendation: unavailable; please provide appliance quantities.",
+        roofMaximumPanels !== null
+          ? `Preliminary roof-area capacity: up to ${roofMaximumPanels} panels. This is a separate physical-space estimate, not the recommended system size.`
+          : "",
+        roofMaximumPanels !== null && loadBasedPanels > roofMaximumPanels
+          ? "⚠️ Estimated appliance demand needs more panels than the preliminary roof-area estimate allows. Consider energy-efficient appliances, usage changes, or another suitable installation area."
+          : "",
+        "Sizing assumptions: bulbs 5 h/day, fans 8 h/day, ACs 6 h/day, refrigerators 8 equivalent full-load h/day, TVs 4 h/day, pumps 1 h/day; 4.5 peak-sun-hours/day and 80% system performance. Actual usage and local conditions can change the result.",
         generationLine,
         Number.isFinite(averageDailyGeneration)
           ? `☀️ Average expected generation: ~${fmt(averageDailyGeneration, 1)} kWh/day.`
