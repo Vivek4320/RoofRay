@@ -222,10 +222,13 @@ export async function getPVGISAnalysis({
     },
     monthly: monthly.map((item) => ({
       month: item.month ?? 0,
-      energyKwh: item.e_m ?? item.E_m ?? 0,
-      irradiationKwhM2: item.h_i_m ?? item["H(i)_m"] ?? 0,
-      averageDailyEnergyKwh: item.e_d ?? item.E_d ?? 0,
-      averageDailyIrradiationKwhM2: item.h_i_d ?? item["H(i)_d"] ?? 0,
+      // PVGIS monthly E_m / H(i)_m values are the monthly totals.
+      // Prefer these canonical fields before any lowercase aliases so a
+      // daily-average field can never accidentally drive the monthly chart.
+      energyKwh: item.E_m ?? item.e_m ?? 0,
+      irradiationKwhM2: item["H(i)_m"] ?? item.h_i_m ?? 0,
+      averageDailyEnergyKwh: item.E_d ?? item.e_d ?? 0,
+      averageDailyIrradiationKwhM2: item["H(i)_d"] ?? item.h_i_d ?? 0,
     })),
     notes: [
       "PVGIS estimates solar-resource and PV-system performance from long-term radiation and meteorological data.",
