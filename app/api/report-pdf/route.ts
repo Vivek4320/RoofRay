@@ -471,6 +471,14 @@ function buildPdf(data: SummaryData): Uint8Array {
         commands.push(
           "BT /F2 9 Tf 0.02 0.07 0.14 rg 42 70 Td (Annual modeled generation: ~" + Math.round(data.annualGenerationKwh) + " kWh/year) Tj ET",
         );
+        const specificYield = data.systemSizeKw && data.systemSizeKw > 0
+          ? data.annualGenerationKwh / data.systemSizeKw
+          : null;
+        if (specificYield !== null && specificYield > 2200) {
+          commands.push(
+            "BT /F2 6.5 Tf 0.72 0.22 0.12 rg 42 58 Td (Verification warning: modeled yield is unusually high (" + Math.round(specificYield) + " kWh/kW/year). Verify PVGIS response and roof coordinates before relying on this estimate.) Tj ET",
+          );
+        }
       }
     }
 
