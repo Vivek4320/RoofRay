@@ -9,7 +9,7 @@ export type ShadowTimeSample = {
 
 export type ShadowAnalysis = {
   provider: "RoofRay geometric shadow engine";
-  currentRisk: "high" | "medium" | "low" | "none";
+  currentRisk: "high" | "medium" | "low" | "none" | "unknown";
   estimatedAffectedDirections: string[];
   timeSeries: ShadowTimeSample[];
   caveats: string[];
@@ -36,6 +36,27 @@ export function analyzeShadowTimeline(
     elevationDeg: number;
   }>,
 ): ShadowAnalysis {
+  if (obstacles.length === 0) {
+    return {
+      provider: "RoofRay geometric shadow engine",
+      currentRisk: "unknown",
+      estimatedAffectedDirections: [],
+      timeSeries: sunSamples.map((sun) => ({
+        timestamp: sun.timestamp,
+        sunAzimuthDeg: Number(sun.azimuthDeg.toFixed(1)),
+        sunElevationDeg: Number(sun.elevationDeg.toFixed(1)),
+        affectedObstacleCount: 0,
+        highRiskObstacleCount: 0,
+        risk: "none" as const,
+      })),
+      caveats: [
+        "No mapped obstacle data was available; shadow risk cannot be classified as low.",
+        "OpenStreetMap may omit buildings, towers, trees, and roof structures.",
+        "A site survey or higher-resolution 3D/shade model is required for final panel placement.",
+      ],
+    };
+  }
+
   const timeSeries = sunSamples.map((sun) => {
     if (sun.elevationDeg <= 0) {
       return {
