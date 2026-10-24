@@ -107,26 +107,26 @@ export async function POST(request: Request) {
         : null;
 
     const systemSizeKw = panelPlacement?.estimate.systemSizeKw ?? null;
-    const monthlyGenerationKwh = pvgis.monthly.map((item) => ({
-      month: item.month,
-      expectedKwh: systemSizeKw === null
+    const monthlyGenerationKwh = pvgis.monthly.map((item) => {
+      // PVGIS E_d is the average daily AC energy yield for the modeled system.
+      // Scale the daily yield by the real number of days in that month and the
+      // proposed system size; do not treat daily and monthly values as interchangeable.
+      const daysInMonth = new Date(2026, item.month, 0).getDate();
+      const dailyYieldPerKw = Number.isFinite(item.averageDailyEnergyKwh)
+        ? item.averageDailyEnergyKwh
+        : item.energyKwh / daysInMonth;
+      const shadingMultiplier = 1 - Math.min(Math.max(shadingFactor, 0), 0.8);
+      const averageDailyKwh = systemSizeKw === null
         ? null
-        : Math.round(
-            item.energyKwh *
-              (1 - Math.min(Math.max(shadingFactor, 0), 0.8)) *
-              systemSizeKw,
-          ),
-      averageDailyKwh: systemSizeKw === null
-        ? null
-        : Number(
-            (
-              (item.energyKwh *
-                (1 - Math.min(Math.max(shadingFactor, 0), 0.8)) *
-                systemSizeKw) /
-              new Date(2026, item.month, 0).getDate()
-            ).toFixed(2),
-          ),
-    }));
+        : Number((dailyYieldPerKw * shadingMultiplier * systemSizeKw).toFixed(2));
+      return {
+        month: item.month,
+        expectedKwh: averageDailyKwh === null
+          ? null
+          : Math.round(averageDailyKwh * daysInMonth),
+        averageDailyKwh,
+      };
+    });
 
     const averageDailyGenerationKwh =
       panelPlacement?.estimate.effectiveGenerationKwh !== null &&
