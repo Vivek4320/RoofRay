@@ -246,6 +246,7 @@ type ChatRecord = {
   createdAt: number;
   updatedAt: number;
   messages: ChatMessage[];
+  chatLanguage?: "en" | "gu" | null;
 };
 
 function chatTitle(messages: ChatMessage[]) {
@@ -998,6 +999,7 @@ export default function RoofRayChat() {
   const [dragOver, setDragOver] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chats, setChats] = useState<ChatRecord[]>([]);
+  const [chatsHydrated, setChatsHydrated] = useState(false);
   const [activeChatId, setActiveChatId] = useState("");
   const [pendingDeleteChat, setPendingDeleteChat] = useState<ChatRecord | null>(null);
   const [pendingRenameChat, setPendingRenameChat] = useState<ChatRecord | null>(null);
@@ -1158,11 +1160,17 @@ export default function RoofRayChat() {
           if (activeChat) {
             setActiveChatId(activeChat.id);
             setMessages(activeChat.messages || []);
+            setChatLanguage(activeChat.chatLanguage ?? null);
             setHasStarted((activeChat.messages || []).length > 0);
           }
         }
       }
     } catch { /* ignore malformed local history */ }
+    finally {
+      // Prevent the initial empty React state from overwriting saved chats
+      // before localStorage hydration has completed. Browser timing differs.
+      setChatsHydrated(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -1170,7 +1178,7 @@ export default function RoofRayChat() {
   }, [activeChatId]);
 
   useEffect(() => {
-    if (!activeChatId) return;
+    if (!chatsHydrated || !activeChatId) return;
     setChats((current) => {
       const now = Date.now();
       const existing = current.find((chat) => chat.id === activeChatId);
@@ -1180,14 +1188,19 @@ export default function RoofRayChat() {
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
         messages,
+        chatLanguage,
       };
       const next = existing
         ? current.map((chat) => chat.id === activeChatId ? nextChat : chat)
         : [nextChat, ...current];
-      localStorage.setItem("roofray_chats", JSON.stringify(next));
+      try {
+        localStorage.setItem("roofray_chats", JSON.stringify(next));
+      } catch {
+        // Keep the in-memory conversation usable if browser storage is unavailable.
+      }
       return next;
     });
-  }, [activeChatId, messages]);
+  }, [chatsHydrated, activeChatId, messages, chatLanguage]);
 
   useEffect(() => {
     if (autoScroll) endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -2139,6 +2152,7 @@ export default function RoofRayChat() {
     if (!chat) return;
     setActiveChatId(id);
     setMessages(chat.messages || []);
+    setChatLanguage(chat.chatLanguage ?? null);
     setHasStarted((chat.messages || []).length > 0);
     setName(null);
     setRoofArea(null);
