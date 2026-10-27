@@ -623,7 +623,7 @@ function AssistantMessage({
                   className="h-[240px] w-full"
                 />
                 <div className="px-3 py-2 text-[11px] text-slate-500">
-                  <LuMapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />{Number.isFinite(locationAccuracy) ? `Live location • ±${Math.round(locationAccuracy ?? 0)} m accuracy` : `Selected address • ${locationLabel ?? "verify the map pin"}`}
+                  <LuMapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />{Number.isFinite(locationAccuracy) ? `Live location • ±${Math.round(locationAccuracy ?? 0)} m accuracy` : `Selected coordinates • ${locationCoords ? `${locationCoords.latitude.toFixed(5)}, ${locationCoords.longitude.toFixed(5)}` : "verify the map pin"}`}
                 </div>
               </div>
             ) : null}
