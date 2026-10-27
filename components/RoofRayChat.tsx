@@ -1265,17 +1265,28 @@ export default function RoofRayChat() {
         },
       );
 
-      // Desktop Chrome may only expose Wi-Fi/IP positioning. In that case use
-      // the best fix received instead of waiting forever.
+      // Some desktop browsers first return a very coarse Wi-Fi/IP-based fix.
+      // Do not immediately accept it: allow the watch to improve and request one
+      // final high-accuracy position before deciding which result to use.
       timer = window.setTimeout(() => {
-        if (best) finish(best);
-        else {
-          navigator.geolocation.getCurrentPosition(
-            (position) => finish(position),
-            (error) => finish(undefined, error),
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-          );
-        }
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const bestSoFar = best;
+            if (
+              bestSoFar &&
+              bestSoFar.coords.accuracy <= position.coords.accuracy
+            ) {
+              finish(bestSoFar);
+            } else {
+              finish(position);
+            }
+          },
+          (error) => {
+            if (best) finish(best);
+            else finish(undefined, error);
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+        );
       }, 12000);
     });
   }
