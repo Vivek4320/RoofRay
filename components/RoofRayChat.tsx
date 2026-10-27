@@ -623,7 +623,7 @@ function AssistantMessage({
                   className="h-[240px] w-full"
                 />
                 <div className="px-3 py-2 text-[11px] text-slate-500">
-                  <LuMapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />Live location • ±{Math.round(locationAccuracy ?? 0)} m accuracy
+                  <LuMapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />{Number.isFinite(locationAccuracy) ? `Live location • ±${Math.round(locationAccuracy ?? 0)} m accuracy` : `Selected address • ${locationLabel ?? "verify the map pin"}`}
                 </div>
               </div>
             ) : null}
@@ -974,6 +974,8 @@ export default function RoofRayChat() {
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const [manualLocationAddress, setManualLocationAddress] = useState("");
+  const [manualLocationLoading, setManualLocationLoading] = useState(false);
   const locationMessageShownRef = useRef(false);
   const locationPromptAttemptedRef = useRef(false);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
@@ -1222,7 +1224,7 @@ export default function RoofRayChat() {
 
   async function getBestLocationPosition(signal?: AbortSignal): Promise<GeolocationPosition> {
     if (signal?.aborted) throw new DOMException("Location request stopped.", "AbortError");
-    if (!navigator.geolocation) {
+    if (!navigator.geolocation && !manualCoords) {
       throw new Error("Geolocation is not supported by this browser.");
     }
 
@@ -1291,7 +1293,7 @@ export default function RoofRayChat() {
     });
   }
 
-  async function loadLocationAnalysis(roofAreaSqFt?: number | null, signal?: AbortSignal): Promise<SolarAnalysis | null> {
+  async function loadLocationAnalysis(roofAreaSqFt?: number | null, signal?: AbortSignal, manualCoords?: { latitude: number; longitude: number; label: string }): Promise<SolarAnalysis | null> {
     if (signal?.aborted) return null;
     setLocationError(null);
     if (!window.isSecureContext) {
@@ -1317,7 +1319,10 @@ export default function RoofRayChat() {
     setLocationStatus("detecting");
 
     return new Promise<SolarAnalysis | null>((resolve) => {
-      void getBestLocationPosition(signal)
+      const locationPromise = manualCoords
+        ? Promise.resolve({ coords: { latitude: manualCoords.latitude, longitude: manualCoords.longitude, accuracy: NaN } } as GeolocationPosition)
+        : getBestLocationPosition(signal);
+      void locationPromise
         .then(async (position) => {
           if (signal?.aborted) {
             setLocationLoading(false);
@@ -1326,10 +1331,10 @@ export default function RoofRayChat() {
           }
           const latitude = position.coords.latitude;
           const longitude = position.coords.longitude;
-          const accuracy = position.coords.accuracy;
+          const accuracy = manualCoords ? NaN : position.coords.accuracy;
           // A coarse Wi-Fi/IP fix must never be treated as a precise rooftop location.
           // Otherwise obstacle mapping and the generated PDF can describe the wrong city.
-          if (!Number.isFinite(accuracy) || accuracy > 1000) {
+          if (!manualCoords && (!Number.isFinite(accuracy) || accuracy > 1000)) {
             setLocationCoords(null);
             setSolarContext(null);
             setLocationAccuracy(accuracy);
@@ -1364,7 +1369,8 @@ export default function RoofRayChat() {
             resolve(null);
             return;
           }
-          if (resolvedLocation) setLocationLabel(resolvedLocation);
+          if (manualCoords) setLocationLabel(manualCoords.label);
+          else if (resolvedLocation) setLocationLabel(resolvedLocation);
           if (!locationMessageShownRef.current) {
             locationMessageShownRef.current = true;
             setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: resolvedLocation ? "📍 Location detected: " + resolvedLocation : "📍 Location detected: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) }]);
@@ -2443,7 +2449,7 @@ export default function RoofRayChat() {
             />
           </div>
 
-          {goal !== null && (locationStatus === "idle" || locationStatus === "detecting" || locationStatus === "denied" || locationStatus === "unavailable") && !locationCoords && (
+          {goal !== null && (locationStatus === "idle" || locationStatus === "detecting" || locationStatus === "denied" || locationStatus === "unavailable" || locationStatus === "warning") && !locationCoords && (
             <div className="mx-auto flex w-full max-w-[900px] flex-col gap-2 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6">
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-100"><LuMapPin className="h-3.5 w-3.5" aria-hidden="true" />I need your location permission</p>
@@ -2473,6 +2479,76 @@ export default function RoofRayChat() {
                       ? "Try Again"
                       : "Allow Location"}
               </button>
+              <form
+                className="flex min-w-0 flex-1 flex-col gap-2 sm:max-w-[440px]"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  const address = manualLocationAddress.trim();
+                  if (!address || manualLocationLoading) return;
+                  setManualLocationLoading(true);
+                  setLocationError(null);
+                  try {
+                    const response = await fetch("/api/geocode", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ address }),
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok || !result.ok || !Number.isFinite(result.latitude) || !Number.isFinite(result.longitude)) {
+                      throw new Error(result.error || "Could not find that address. Try a more complete address or paste coordinates from Google Maps.");
+                    }
+                    const label = typeof result.label === "string" ? result.label : address;
+                    setLocationCoords({ latitude: result.latitude, longitude: result.longitude });
+                    setLocationAccuracy(null);
+                    setLocationLabel(label);
+                    setLocationStatus("ready");
+                    sessionStorage.setItem("roofray_location", JSON.stringify({
+                      latitude: result.latitude,
+                      longitude: result.longitude,
+                      accuracy: null,
+                      source: "manual-address",
+                      timestamp: Date.now(),
+                    }));
+                    localStorage.setItem("roofray_location", JSON.stringify({
+                      latitude: result.latitude,
+                      longitude: result.longitude,
+                      accuracy: null,
+                      source: "manual-address",
+                      timestamp: Date.now(),
+                    }));
+                    await loadLocationAnalysis(roofArea, undefined, {
+                      latitude: result.latitude,
+                      longitude: result.longitude,
+                      label,
+                    });
+                  } catch (error) {
+                    setLocationError(error instanceof Error ? error.message : "Could not use that address.");
+                  } finally {
+                    setManualLocationLoading(false);
+                  }
+                }}
+              >
+                <label htmlFor="roofray-manual-address" className="text-[11px] font-semibold text-slate-300">
+                  Or enter your full house address / paste Google Maps coordinates
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="roofray-manual-address"
+                    value={manualLocationAddress}
+                    onChange={(event) => setManualLocationAddress(event.target.value)}
+                    placeholder="House, street, area, city"
+                    className="min-w-0 flex-1 rounded-lg border border-blue-400/20 bg-slate-950/70 px-3 py-2 text-[12px] text-white outline-none placeholder:text-slate-600 focus:border-blue-400/60"
+                    autoComplete="street-address"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!manualLocationAddress.trim() || manualLocationLoading}
+                    className="shrink-0 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-[11px] font-semibold text-emerald-300 disabled:opacity-50"
+                  >
+                    {manualLocationLoading ? "Searching…" : "Use address"}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 
