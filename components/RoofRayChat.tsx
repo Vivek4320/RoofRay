@@ -1224,7 +1224,7 @@ export default function RoofRayChat() {
 
   async function getBestLocationPosition(signal?: AbortSignal): Promise<GeolocationPosition> {
     if (signal?.aborted) throw new DOMException("Location request stopped.", "AbortError");
-    if (!navigator.geolocation && !manualCoords) {
+    if (!navigator.geolocation) {
       throw new Error("Geolocation is not supported by this browser.");
     }
 
@@ -1302,7 +1302,7 @@ export default function RoofRayChat() {
       setLocationError("Location access requires HTTPS. Open RoofRay using its secure HTTPS address, then try again.");
       return null;
     }
-    if (!navigator.geolocation) {
+    if (!navigator.geolocation && !manualCoords) {
       setLocationStatus("unavailable");
       setLocationLoading(false);
       setLocationError("This browser does not provide location access. Check your browser and device location settings.");
