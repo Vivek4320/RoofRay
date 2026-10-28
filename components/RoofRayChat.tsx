@@ -974,8 +974,6 @@ export default function RoofRayChat() {
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
-  const [manualLocationAddress, setManualLocationAddress] = useState("");
-  const [manualLocationLoading, setManualLocationLoading] = useState(false);
   const locationMessageShownRef = useRef(false);
   const locationPromptAttemptedRef = useRef(false);
   const [solarContext, setSolarContext] = useState<SolarAnalysis | null>(null);
@@ -2479,76 +2477,7 @@ export default function RoofRayChat() {
                       ? "Try Again"
                       : "Allow Location"}
               </button>
-              <form
-                className="flex min-w-0 flex-1 flex-col gap-2 sm:max-w-[440px]"
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  const address = manualLocationAddress.trim();
-                  if (!address || manualLocationLoading) return;
-                  setManualLocationLoading(true);
-                  setLocationError(null);
-                  try {
-                    const response = await fetch("/api/geocode", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ address }),
-                    });
-                    const result = await response.json().catch(() => ({}));
-                    if (!response.ok || !result.ok || !Number.isFinite(result.latitude) || !Number.isFinite(result.longitude)) {
-                      throw new Error(result.error || "Could not find that address. Try a more complete address or paste coordinates from Google Maps.");
-                    }
-                    const label = typeof result.label === "string" ? result.label : address;
-                    setLocationCoords({ latitude: result.latitude, longitude: result.longitude });
-                    setLocationAccuracy(null);
-                    setLocationLabel(label);
-                    setLocationStatus("ready");
-                    sessionStorage.setItem("roofray_location", JSON.stringify({
-                      latitude: result.latitude,
-                      longitude: result.longitude,
-                      accuracy: null,
-                      source: "manual-address",
-                      timestamp: Date.now(),
-                    }));
-                    localStorage.setItem("roofray_location", JSON.stringify({
-                      latitude: result.latitude,
-                      longitude: result.longitude,
-                      accuracy: null,
-                      source: "manual-address",
-                      timestamp: Date.now(),
-                    }));
-                    await loadLocationAnalysis(roofArea, undefined, {
-                      latitude: result.latitude,
-                      longitude: result.longitude,
-                      label,
-                    });
-                  } catch (error) {
-                    setLocationError(error instanceof Error ? error.message : "Could not use that address.");
-                  } finally {
-                    setManualLocationLoading(false);
-                  }
-                }}
-              >
-                <label htmlFor="roofray-manual-address" className="text-[11px] font-semibold text-slate-300">
-                  Or enter your full house address / paste Google Maps coordinates
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="roofray-manual-address"
-                    value={manualLocationAddress}
-                    onChange={(event) => setManualLocationAddress(event.target.value)}
-                    placeholder="House, street, area, city"
-                    className="min-w-0 flex-1 rounded-lg border border-blue-400/20 bg-slate-950/70 px-3 py-2 text-[12px] text-white outline-none placeholder:text-slate-600 focus:border-blue-400/60"
-                    autoComplete="street-address"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!manualLocationAddress.trim() || manualLocationLoading}
-                    className="shrink-0 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-[11px] font-semibold text-emerald-300 disabled:opacity-50"
-                  >
-                    {manualLocationLoading ? "Searching…" : "Use address"}
-                  </button>
-                </div>
-              </form>
+
             </div>
           )}
 
