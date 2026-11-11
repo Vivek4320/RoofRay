@@ -1004,6 +1004,9 @@ export default function RoofRayChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const generationControllerRef = useRef<AbortController | null>(null);
+  // State updates are asynchronous; this ref prevents Enter/click/quick-reply
+  // events from processing the same answer twice before React re-renders.
+  const sendInFlightRef = useRef(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationStatus, setLocationStatus] = useState<"idle" | "detecting" | "ready" | "warning" | "denied" | "unavailable">("idle");
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
@@ -1090,6 +1093,7 @@ export default function RoofRayChat() {
   function stopGeneration() {
     generationControllerRef.current?.abort();
     generationControllerRef.current = null;
+    sendInFlightRef.current = false;
     setLoading(false);
     setLocationLoading(false);
   }
@@ -1097,6 +1101,7 @@ export default function RoofRayChat() {
   function finishGeneration(controller: AbortController) {
     if (generationControllerRef.current !== controller) return;
     generationControllerRef.current = null;
+    sendInFlightRef.current = false;
     setLoading(false);
   }
 
@@ -1922,7 +1927,7 @@ export default function RoofRayChat() {
   async function sendMessage(text = input) {
     const content = text.trim();
     if (!content && attachments.length === 0) return;
-    if (loading) return;
+    if (loading || sendInFlightRef.current) return;
 
     // Let the user greet RoofRay first, then offer the language choices in chat.
     if (!chatLanguage) {
@@ -1946,6 +1951,9 @@ export default function RoofRayChat() {
       return;
     }
 
+    // Lock synchronously before any await so the same answer cannot be
+    // processed by both Enter and click/quick-reply handlers.
+    sendInFlightRef.current = true;
     const imageAttachment = attachments.find((att) => ALLOWED_IMAGES.includes(att.file.type));
     const userMessage: ChatMessage = {
       id: safeUUID(),
