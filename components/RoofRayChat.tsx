@@ -2525,7 +2525,7 @@ export default function RoofRayChat() {
             />
           </div>
 
-          {goal !== null && (locationStatus === "idle" || locationStatus === "detecting" || locationStatus === "denied" || locationStatus === "unavailable" || locationStatus === "warning") && !locationCoords && (
+          {goal !== null && name !== null && roofArea !== null && roofType !== null && monthlyBill !== null && applianceStep >= 6 && connectionType !== null && ownership !== null && (locationStatus === "idle" || locationStatus === "detecting" || locationStatus === "denied" || locationStatus === "unavailable" || locationStatus === "warning") && !locationCoords && (
             <div className="mx-auto flex w-full max-w-[900px] flex-col gap-2 border-t border-blue-400/10 bg-[#0A1020]/95 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6">
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-100"><LuMapPin className="h-3.5 w-3.5" aria-hidden="true" />I need your location permission</p>
