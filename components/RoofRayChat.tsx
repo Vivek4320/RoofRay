@@ -2501,11 +2501,13 @@ export default function RoofRayChat() {
                         <div className="mt-3 flex flex-wrap gap-3">
                           <button type="button" onClick={() => {
                             setChatLanguage("en");
-                            setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: "Great! Let’s start. What is your name?" }]);
+                            setReportFlow(true);
+                            setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: "What is your main goal for installing solar: reduce your electricity bill, maximize generation, understand cost/subsidy, or just check feasibility?" }]);
                           }} className="rounded-xl border border-blue-400/40 bg-blue-500/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500/20">English</button>
                           <button type="button" onClick={() => {
                             setChatLanguage("gu");
-                            setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: "સરસ! ચાલો શરૂ કરીએ. તમારું નામ શું છે?" }]);
+                            setReportFlow(true);
+                            setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: "સોલાર લગાવવાનો તમારો મુખ્ય હેતુ શું છે: વીજળીનું બિલ ઘટાડવું, વધુ વીજ ઉત્પાદન, ખર્ચ/સબસિડી કે માત્ર શક્યતા તપાસવી?" }]);
                           }} className="rounded-xl border border-blue-400/40 bg-blue-500/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500/20">ગુજરાતી (Gujarati)</button>
                         </div>
                       </div>
