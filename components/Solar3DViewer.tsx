@@ -186,7 +186,7 @@ function sunPoints(
     ? (sun.next12Hours as Array<Record<string, unknown>>)
     : [];
 
-  return samples
+  const points = samples
     .filter((sample) => Number.isFinite(Number(sample.azimuthDeg)))
     .slice(0, 12)
     .map((sample, index) => {
@@ -201,6 +201,15 @@ function sunPoints(
         index,
       };
     });
+
+  let lastLabelPoint: { x: number; y: number } | null = null;
+  return points.map((point) => {
+    const farEnough = !lastLabelPoint ||
+      Math.hypot(point.x - lastLabelPoint.x, point.y - lastLabelPoint.y) >= 76;
+    const showTime = farEnough && Boolean(point.time);
+    if (showTime) lastLabelPoint = point;
+    return { ...point, showTime };
+  });
 }
 
 export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProps) {
@@ -352,10 +361,24 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
   const slope = String(planning.recommendedSlopeDeg ?? "--");
 
   return (
-    <section className="relative min-h-[calc(100vh-64px)] w-full overflow-hidden bg-[#050912]">
+    <section className="w-full bg-[#050912] px-3 py-4 text-white sm:px-5 sm:py-6">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <header className="rounded-2xl border border-white/10 bg-[#07111c]/95 px-4 py-4 shadow-xl sm:px-6 sm:py-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
+            RoofRay Solar Site Analysis
+          </p>
+          <h1 className="mt-1 text-xl font-semibold sm:text-2xl">Your location, roof & sun path</h1>
+          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-300 sm:text-sm">
+            {satellite
+              ? "Real satellite imagery centered on your GPS location with deterministic RoofRay overlays. Green is your house, blue is nearby buildings and yellow is the calculated sun path."
+              : "Satellite imagery is unavailable right now, so RoofRay is showing a planning visualization. Green is your house, blue is nearby buildings and yellow is the calculated sun path."}
+          </p>
+        </header>
+
+        <div className="relative isolate h-[clamp(340px,62vh,680px)] min-h-[340px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#12202a] shadow-2xl">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="xMidYMid slice"
+        preserveAspectRatio="xMidYMid meet"
         className="absolute inset-0 h-full w-full"
         role="img"
         aria-label="RoofRay deterministic solar site visual"
@@ -451,16 +474,16 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
               points={sunPath}
               fill="none"
               stroke="#ffd21a"
-              strokeWidth="7"
-              strokeDasharray="18 13"
+              strokeWidth="9"
+              strokeDasharray="22 15"
               strokeLinecap="round"
               filter="url(#shadow)"
             />
             {sun.map((point) => (
               <g key={`sun-${point.index}`}>
-                <circle cx={point.x} cy={point.y} r="10" fill="#ffd21a" stroke="#fff3a3" strokeWidth="3" />
-                {point.time && (
-                  <text x={point.x + 15} y={point.y - 13} fill="#fff4a3" fontSize="20" fontWeight="700">
+                <circle cx={point.x} cy={point.y} r="13" fill="#ffd21a" stroke="#fff3a3" strokeWidth="4" />
+                {point.showTime && point.time && (
+                  <text x={point.x + 21} y={point.y - 16} fill="#fff4a3" fontSize="34" fontWeight="700">
                     {point.time}
                   </text>
                 )}
@@ -472,69 +495,55 @@ export default function Solar3DViewer({ latitude, longitude }: Solar3DViewerProp
         <circle cx={targetCenter.x} cy={targetCenter.y} r="7" fill="#ffffff" stroke="#20ff9a" strokeWidth="5" />
         <rect width={W} height={H} fill="url(#vignette)" pointerEvents="none" />
       </svg>
-
-      <div className="pointer-events-none absolute left-5 top-5 z-10 max-w-md rounded-2xl border border-white/10 bg-[#07111c]/90 px-5 py-4 text-white shadow-2xl backdrop-blur-xl">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
-          RoofRay Solar Site Analysis
-        </p>
-        <h1 className="mt-1 text-lg font-semibold">Your location, roof & sun path</h1>
-        <p className="mt-1 text-xs leading-relaxed text-slate-300">
-          {satellite
-            ? "Real satellite imagery centered on your GPS location with deterministic RoofRay overlays. Green is your house, blue is nearby buildings and yellow is the calculated sun path."
-            : "Satellite imagery is unavailable right now, so RoofRay is showing a planning visualization. Green is your house, blue is nearby buildings and yellow is the calculated sun path."}
-        </p>
-      </div>
-
-      <div className="pointer-events-none absolute right-5 top-5 z-10 w-72 rounded-2xl border border-white/10 bg-[#07111c]/90 p-4 text-white shadow-2xl backdrop-blur-xl">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-cyan-300">
-          Live Solar Data
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-          <div><span className="text-slate-400">Latitude</span><br />{location.latitude.toFixed(6)}</div>
-          <div><span className="text-slate-400">Longitude</span><br />{location.longitude.toFixed(6)}</div>
-          <div><span className="text-slate-400">Roof area</span><br />{Number.isFinite(roofAreaSqFt) ? `${roofAreaSqFt.toFixed(0)} sq ft` : "--"}</div>
-          <div><span className="text-slate-400">Panels</span><br />{Number.isFinite(panelCount) ? panelCount : "--"}</div>
-          <div><span className="text-slate-400">Direction</span><br />{direction}</div>
-          <div><span className="text-slate-400">Tilt</span><br />{slope}°</div>
-          <div><span className="text-slate-400">Sunrise</span><br />{sunrise}</div>
-          <div><span className="text-slate-400">Solar noon</span><br />{solarNoon}</div>
-          <div><span className="text-slate-400">Sunset</span><br />{sunset}</div>
-          <div><span className="text-slate-400">Mapped roof</span><br />{targetArea > 0 ? `${targetArea.toFixed(0)} m²` : "--"}</div>
-        </div>
-      </div>
-
-
-      <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#07111c]/95 px-5 py-3 text-center text-xs text-slate-200 shadow-2xl backdrop-blur-xl">
-        <div className={`flex items-center justify-center gap-2 font-semibold ${satellite ? "text-emerald-300" : "text-amber-300"}`}>
-          <span className={`h-2.5 w-2.5 rounded-full ${satellite ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" : "bg-amber-400"}`} />
-          {satellite ? "Real Satellite Reference" : "Planning Visualization"}
-        </div>
-        <div className="mt-1 text-[11px] text-slate-400">
-          {satellite
-            ? `Esri World Imagery • centered on your GPS • ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
-            : `No satellite image loaded • GPS center • ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`}
-        </div>
-        <div className="mt-1 text-[10px] text-slate-500">
-          Green target = mapped building footprint from OpenStreetMap
-        </div>
-      </div>
-
-      <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-xl border border-white/10 bg-[#07111c]/90 px-4 py-3 text-xs text-slate-200 shadow-xl backdrop-blur-xl">
-        <div className="font-semibold text-white">RoofRay visual</div>
-        <div className="mt-2 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-400" />Your House</div>
-        <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-400" />Nearby Buildings</div>
-        <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Sun Path</div>
-      </div>
-
-      <div className="absolute bottom-5 right-5 z-10 flex items-center gap-2">
-        {error && (
-          <div className="max-w-sm rounded-xl border border-amber-300/20 bg-[#07111c]/90 px-4 py-3 text-xs text-amber-100 shadow-xl backdrop-blur-xl">
-            {error}
+          <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl border border-white/10 bg-[#07111c]/95 px-3 py-2.5 text-[11px] text-slate-200 shadow-xl backdrop-blur-xl sm:bottom-4 sm:left-4 sm:px-4 sm:py-3 sm:text-xs">
+            <div className="font-semibold text-white">RoofRay visual</div>
+            <div className="mt-1.5 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-400" />Your House</div>
+            <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-400" />Nearby Buildings</div>
+            <div className="mt-1 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Sun Path</div>
           </div>
-        )}
-        <div className="rounded-xl border border-white/10 bg-[#07111c]/90 px-4 py-3 text-xs text-slate-300 shadow-xl backdrop-blur-xl">
-          {status}
+          <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-[#050912]/90 text-sm font-semibold text-white shadow-lg sm:bottom-4 sm:right-4 sm:h-10 sm:w-10">
+            N
+          </div>
         </div>
+
+        <section className="rounded-2xl border border-cyan-300/20 bg-[#07111c]/95 p-4 shadow-xl sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Live Solar Data</p>
+              <p className="mt-1 text-xs text-slate-500">Location-based planning values</p>
+            </div>
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${satellite ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-amber-400/30 bg-amber-400/10 text-amber-200"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${satellite ? "bg-emerald-400" : "bg-amber-400"}`} />
+              {satellite ? "Satellite reference" : "Planning data"}
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {[
+              ["Latitude", location.latitude.toFixed(6)],
+              ["Longitude", location.longitude.toFixed(6)],
+              ["Roof area", Number.isFinite(roofAreaSqFt) ? `${roofAreaSqFt.toFixed(0)} sq ft` : "--"],
+              ["Panels", Number.isFinite(panelCount) ? String(panelCount) : "--"],
+              ["Direction", direction],
+              ["Tilt", `${slope}°`],
+              ["Sunrise", sunrise],
+              ["Solar noon", solarNoon],
+              ["Sunset", sunset],
+              ["Mapped roof", targetArea > 0 ? `${targetArea.toFixed(0)} m²` : "--"],
+            ].map(([label, value]) => (
+              <div key={label} className="min-w-0 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-3">
+                <p className="text-[11px] text-slate-400">{label}</p>
+                <p className="mt-1 break-words text-sm font-semibold text-slate-100 sm:text-[15px]">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+            <p className="min-w-0 text-slate-400">{status}</p>
+            {error ? <p className="min-w-0 text-amber-200">{error}</p> : null}
+            <p className="shrink-0 text-slate-500">GPS: {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}</p>
+          </div>
+        </section>
       </div>
     </section>
   );
