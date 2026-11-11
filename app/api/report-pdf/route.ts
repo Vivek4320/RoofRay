@@ -254,7 +254,8 @@ function generationBarChartCommands(
   height: number,
 ): string[] {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const points = monthly
+  const points = [...monthly]
+    .sort((a, b) => (numberValue(a.month) ?? 0) - (numberValue(b.month) ?? 0))
     .map((item) => ({
       month: numberValue(item.month),
       monthly: numberValue(item.expectedKwh),
@@ -464,7 +465,7 @@ function buildPdf(data: SummaryData): Uint8Array {
     } else if (pageIndex === 1) {
       commands.push(...headerCommands("Solar Generation — Month & Day", "ROOFRAY | PVGIS-BACKED GENERATION PLANNING"));
       commands.push(
-        "BT /F1 8 Tf 0.35 0.43 0.52 rg 42 482 Td (Bars show modeled monthly units. The label below each month shows the month-average daily units.) Tj ET",
+        "BT /F1 8 Tf 0.35 0.43 0.52 rg 42 482 Td (Monthly bars use the location-specific PVGIS seasonal profile; daily labels are monthly averages.) Tj ET",
       );
       commands.push(...generationBarChartCommands(data.monthlyGenerationKwh, 24, 96, 794, 360));
       if (data.annualGenerationKwh !== null) {

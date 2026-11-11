@@ -107,7 +107,9 @@ export async function POST(request: Request) {
         : null;
 
     const systemSizeKw = panelPlacement?.estimate.systemSizeKw ?? null;
-    const monthlyGenerationKwh = pvgis.monthly.map((item) => {
+    const monthlyGenerationKwh = [...pvgis.monthly]
+      .sort((a, b) => a.month - b.month)
+      .map((item) => {
       // Use PVGIS E_m (monthly total) as the canonical value. Derive the
       // displayed daily average from that same total so the chart labels and
       // bars cannot diverge due to mismatched daily/monthly source fields.

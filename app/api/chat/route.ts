@@ -335,7 +335,17 @@ export async function POST(request: Request) {
           (affectedSamples / Math.max(1, samples.length)) * 15;
       }
       const shade = num(planning.estimatedShadingPercent) || shadeFromShadow;
-      const monthly = num(planning.averageMonthlyGenerationKwh) || (Number.isFinite(fallbackAnnual) ? Math.round(fallbackAnnual * (1 - (Number.isFinite(shade) ? shade / 100 : 0)) / 12) : NaN);
+      const monthlyValues = Array.isArray(planning.monthlyGenerationKwh)
+        ? (planning.monthlyGenerationKwh as Array<Record<string, unknown>>)
+            .map((item) => num(item.expectedKwh))
+            .filter((value) => Number.isFinite(value) && value >= 0)
+        : [];
+      const monthly = num(planning.averageMonthlyGenerationKwh) ||
+        (monthlyValues.length
+          ? Math.round(monthlyValues.reduce((sum, value) => sum + value, 0) / monthlyValues.length)
+          : Number.isFinite(fallbackAnnual)
+            ? Math.round(fallbackAnnual * (1 - (Number.isFinite(shade) ? shade / 100 : 0)) / 12)
+            : NaN);
       const annual = num(planning.annualGenerationAfterEstimatedShadingKwh ?? estimate.effectiveGenerationKwh) || (Number.isFinite(fallbackAnnual) ? Math.round(fallbackAnnual * (1 - (Number.isFinite(shade) ? shade / 100 : 0))) : NaN);
       const direction = typeof planning.recommendedDirection === "string"
         ? planning.recommendedDirection
@@ -352,7 +362,8 @@ export async function POST(request: Request) {
         "Jan", "Feb", "Mar", "Apr", "May", "Jun",
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
       ];
-      const monthlyGenerationLines = monthlyGeneration
+      const monthlyGenerationLines = [...monthlyGeneration]
+        .sort((a, b) => num(a.month) - num(b.month))
         .map((item) => {
           const month = num(item.month);
           const expectedKwh = num(item.expectedKwh);
@@ -415,6 +426,7 @@ export async function POST(request: Request) {
 
       const answer = [
         "☀️ ROOFRAY SOLAR FEASIBILITY REPORT",
+        "Monthly generation follows the location-specific PVGIS seasonal profile, including irradiation and temperature-related system performance. Summer is often stronger in clear pre-monsoon months, while monsoon cloud and panel heat can reduce output; no month is artificially boosted.",
         "",
         locationLine,
         "",

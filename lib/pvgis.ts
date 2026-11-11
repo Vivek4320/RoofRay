@@ -224,16 +224,53 @@ export async function getPVGISAnalysis({
       irradiationKwhM2: annualIrradiation,
       averageDailyEnergyKwh: asNumber(fixed?.e_d ?? fixed?.E_d),
     },
-    monthly: monthly.map((item) => ({
-      month: item.month ?? 0,
-      // PVGIS monthly E_m / H(i)_m values are the monthly totals.
-      // Prefer these canonical fields before any lowercase aliases so a
-      // daily-average field can never accidentally drive the monthly chart.
-      energyKwh: item.E_m ?? item.e_m ?? 0,
-      irradiationKwhM2: item["H(i)_m"] ?? item.h_i_m ?? 0,
-      averageDailyEnergyKwh: item.E_d ?? item.e_d ?? 0,
-      averageDailyIrradiationKwhM2: item["H(i)_d"] ?? item.h_i_d ?? 0,
-    })),
+    monthly: (() => {
+      const rows = monthly
+        .map((item) => {
+          const month = asNumber(item.month);
+          const energyKwh = asNumber(item.E_m ?? item.e_m);
+          const irradiationKwhM2 = asNumber(item["H(i)_m"] ?? item.h_i_m);
+          const daysInMonth = month !== null && Number.isInteger(month) && month >= 1 && month <= 12
+            ? new Date(2024, month, 0).getDate()
+            : 0;
+          return {
+            month,
+            energyKwh,
+            irradiationKwhM2,
+            averageDailyEnergyKwh: asNumber(item.E_d ?? item.e_d),
+            averageDailyIrradiationKwhM2: asNumber(item["H(i)_d"] ?? item.h_i_d),
+            daysInMonth,
+          };
+        })
+        .filter((item) => item.month !== null && Number.isInteger(item.month) && item.month >= 1 && item.month <= 12)
+        .sort((a, b) => (a.month ?? 0) - (b.month ?? 0));
+
+      const totalIrradiation = rows.reduce((sum, item) => sum + Math.max(0, item.irradiationKwhM2 ?? 0), 0);
+      return rows.map((item) => {
+        // E_m is the PVGIS monthly electricity output and remains authoritative.
+        // If a month is missing E_m, distribute annual output by that month's
+        // plane-of-array irradiation rather than using a flat annual/12 estimate.
+        const derivedEnergy = annualEnergy !== null && totalIrradiation > 0 && item.irradiationKwhM2 !== null
+          ? annualEnergy * Math.max(0, item.irradiationKwhM2) / totalIrradiation
+          : null;
+        const energyKwh = item.energyKwh !== null && item.energyKwh > 0
+          ? item.energyKwh
+          : derivedEnergy;
+        return {
+          month: item.month ?? 0,
+          energyKwh: energyKwh ?? 0,
+          irradiationKwhM2: item.irradiationKwhM2 ?? 0,
+          averageDailyEnergyKwh: item.averageDailyEnergyKwh !== null
+            ? item.averageDailyEnergyKwh
+            : energyKwh !== null && item.daysInMonth > 0 ? energyKwh / item.daysInMonth : 0,
+          averageDailyIrradiationKwhM2: item.averageDailyIrradiationKwhM2 !== null
+            ? item.averageDailyIrradiationKwhM2
+            : item.irradiationKwhM2 !== null && item.daysInMonth > 0
+              ? item.irradiationKwhM2 / item.daysInMonth
+              : 0,
+        };
+      });
+    })(),
     notes: [
       "PVGIS estimates solar-resource and PV-system performance from long-term radiation and meteorological data.",
       ...(specificYield !== null && specificYield > 2500

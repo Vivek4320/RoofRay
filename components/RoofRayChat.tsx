@@ -538,6 +538,10 @@ function AssistantMessage({
     pattern.test(message.content),
   );
   const needsLocationPermission = /i need your location permission/i.test(message.content);
+  const isWelcomeMessage =
+    /nice to meet you/i.test(message.content) &&
+    /rooftop solar/i.test(message.content);
+  const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
 
   return (
     <div className="rr-assistant-row rr-msg-in flex items-start">
@@ -585,6 +589,34 @@ function AssistantMessage({
             ) : (
               renderAssistantContent(message.content)
             )}
+
+            {isWelcomeMessage ? (
+              <div className="mt-4 w-full max-w-xl rounded-2xl border border-cyan-300/15 bg-[#071522]/80 p-3.5 sm:p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-100">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-300/10 text-cyan-300">✦</span>
+                  Questions (Step by Step)
+                </div>
+                <ol className="space-y-2">
+                  {[
+                    ["Goal & New Order", "What do you want to achieve?"],
+                    ["Your Name", "Tell us your name."],
+                    ["Roof / Area Details", "Enter your roof area and roof type."],
+                    ["Appliances & Usage", "Bulbs, fans, AC, refrigerator, TV and pump quantities."],
+                    ["Electricity Connection", "Residential, commercial or other."],
+                    ["Location Permission", "Requested only before the final analysis."],
+                    ["Report Generation", "RoofRay prepares your solar feasibility report."],
+                  ].map(([title, description], index) => (
+                    <li key={title} className="flex min-w-0 items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-300/10 text-xs font-semibold text-cyan-200">{index + 1}</span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-semibold text-slate-100 sm:text-sm">{title}</span>
+                        <span className="mt-0.5 block text-[11px] leading-snug text-slate-400 sm:text-xs">{description}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
 
             {message.content.startsWith("☀️ ROOFRAY SOLAR FEASIBILITY REPORT") ? (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -651,11 +683,14 @@ function AssistantMessage({
                         setCustomApplianceValue("");
                         return;
                       }
+                      setSelectedChoice(label);
                       onRetry(label);
                     }}
-                    className="rr-choice-button"
+                    aria-pressed={selectedChoice === label}
+                    className={`rr-choice-button inline-flex items-center justify-center gap-2 ${selectedChoice === label ? "border-cyan-300/70 bg-cyan-400/15 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]" : ""}`}
                   >
                     <span>{label}</span>
+                    {selectedChoice === label ? <LuCheck className="h-4 w-4 shrink-0 text-cyan-300" aria-hidden="true" /> : null}
                   </button>
                 ))}
               </div>
