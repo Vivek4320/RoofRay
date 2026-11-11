@@ -1972,24 +1972,34 @@ export default function RoofRayChat() {
     const normalized = content.toLowerCase();
     const isReportRequest = /\b(generate|create|make|prepare|need|want|give me|show me|estimate|calculate)\b.{0,50}\b(solar|rooftop|roof|feasibility|system|report|installation)\b|\b(solar|rooftop|roof)\b.{0,50}\b(report|estimate|feasibility|system size)\b/i.test(content)
       || /solar system.*(estimate|report)|feasibility report|solar report/i.test(content)
-      // A clear installation intent should start the structured intake immediately.
-      // Location is collected by browser geolocation after the intake, not by asking for a PIN code.
-      || /\b(for installing solar|install(?:ing)? solar|solar installation|want to install solar|planning to install solar|install solar panels)\b/i.test(content);
+      // Support English, Roman Gujarati, and Gujarati-script installation requests.
+      || /\b(for installing solar|install(?:ing)? solar|solar installation|want to install solar|planning to install solar|install solar panels|mare solar|solar lagav|solar lagadv|ghar par solar|chhat par solar|solar mukav)\b/i.test(content)
+      || /(સોલાર|સોલર).{0,30}(લગાવ|મૂકવ|ઇન્સ્ટોલ|શક્યતા|અંદાજ|રિપોર્ટ)|(લગાવ|મૂકવ).{0,30}(સોલાર|સોલર)/i.test(content);
     const nextReportFlow = reportFlow || isReportRequest;
 
-    const isGreeting = /^(hi+|hello+|hey+|good morning|good afternoon|good evening)[!.\s]*$/i.test(content.trim());
-
+    const isGreeting = /^(hi+|hello+|hey+|good morning|good afternoon|good evening)[!.\\s]*$/i.test(content.trim());
     const isLikelyName =
       content.length <= 40 &&
       !/[?؟]/.test(content) &&
-      !/\b(what|why|how|benefit|benefits|solar|can|does|do|tell|explain|estimate|calculate|hello|hi|hey)\b/i.test(content);
+      !/\\b(what|why|how|benefit|benefits|solar|can|does|do|tell|explain|estimate|calculate|hello|hi|hey)\\b/i.test(content);
 
-    if (name === null && !nextReportFlow) {
-      if (!isGreeting && isLikelyName) {
-        nextName = content.replace(/\s+/g, " ").trim().slice(0, 80);
-        if (nextName) setName(nextName);
-      }
-    } else if (roofArea === null && number !== null && number > 0 && !/[?؟]/.test(content)) {
+    // The structured intake starts with the user's goal, then name and roof details.
+    // Do not let the normal conversational model replace or skip these questions.
+    const goalAnswer = (() => {
+      if (/reduce|bill|ochhu|ghat|ઘટાડ|ઓછું|બિલ ઘટાડ/i.test(normalized)) return "Reduce electricity bill";
+      if (/maximum|generation|vadhu|વધુ ઉત્પાદન|વધારે વીજ/i.test(normalized)) return "Maximum generation";
+      if (/cost|subsidy|kharch|ખર્ચ|સબસિડી/i.test(normalized)) return "Cost/subsidy";
+      if (/feasibility|shakyata|શક્યતા|માત્ર તપાસ/i.test(normalized)) return "Just check feasibility";
+      return null;
+    })();
+
+    if (nextReportFlow && nextGoal === null && goalAnswer) {
+      nextGoal = goalAnswer;
+      setGoal(goalAnswer);
+    } else if (nextReportFlow && nextGoal !== null && nextName === null && isLikelyName && !isGreeting) {
+      nextName = content.replace(/\\s+/g, " ").trim().slice(0, 80);
+      setName(nextName);
+    } else if (nextReportFlow && nextGoal !== null && nextName !== null && nextRoofArea === null && number !== null && number > 0 && !/[?؟]/.test(content)) {
       nextRoofArea = number;
       setRoofArea(number);
       const refreshedAnalysis = await refreshAnalysisWithRoofArea(number, signal);
@@ -1998,51 +2008,51 @@ export default function RoofRayChat() {
         return;
       }
       if (refreshedAnalysis) currentSolarContext = refreshedAnalysis;
-    } else if (roofArea !== null && roofType === null) {
-      if (normalized.includes("rcc") || normalized.includes("concrete")) nextRoofType = "RCC/Concrete";
-      else if (normalized.includes("metal") || normalized.includes("sheet")) nextRoofType = "Metal Sheet";
-      else if (normalized.includes("tile")) nextRoofType = "Tile";
-      else if (normalized.includes("other")) nextRoofType = "Other";
+    } else if (nextReportFlow && nextRoofArea !== null && nextRoofType === null) {
+      if (normalized.includes("rcc") || normalized.includes("concrete") || content.includes("આરસીસી") || content.includes("કોંક્રિટ")) nextRoofType = "RCC/Concrete";
+      else if (normalized.includes("metal") || normalized.includes("sheet") || content.includes("પતરું")) nextRoofType = "Metal Sheet";
+      else if (normalized.includes("tile") || content.includes("ટાઇલ")) nextRoofType = "Tile";
+      else if (normalized.includes("other") || content.includes("અન્ય")) nextRoofType = "Other";
       if (nextRoofType) setRoofType(nextRoofType);
-    } else if (roofArea !== null && roofType !== null && monthlyBill === null && number !== null && number > 0) {
+    } else if (nextReportFlow && nextRoofType !== null && nextMonthlyBill === null && number !== null && number > 0) {
       nextMonthlyBill = number;
       setMonthlyBill(number);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceStep < 6) {
+    } else if (nextReportFlow && nextMonthlyBill !== null && nextApplianceStep < 6) {
       const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
-      const selectedAppliance = applianceNames[applianceStep];
+      const selectedAppliance = applianceNames[nextApplianceStep];
       const selectedQuantity = content.trim();
-      if (/^(0|1|2|3|4\+|none|\d+)$/i.test(selectedQuantity)) {
+      if (/^(0|1|2|3|4\\+|none|\\d+)$/i.test(selectedQuantity)) {
         const entry = `${selectedAppliance}: ${selectedQuantity.toLowerCase() === "none" ? "0" : selectedQuantity}`;
         nextApplianceDetails = [applianceDetails, entry].filter(Boolean).join(", ");
         nextApplianceStep = applianceStep + 1;
         setApplianceDetails(nextApplianceDetails);
         setApplianceStep(nextApplianceStep);
       }
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && applianceStep >= 6 && connectionType === null) {
+    } else if (nextReportFlow && nextApplianceStep >= 6 && nextConnectionType === null) {
       if (normalized.includes("residential") || normalized.includes("ghar") || normalized.includes("home") || content.includes("ઘર")) nextConnectionType = "Residential";
       else if (normalized.includes("commercial") || normalized.includes("dukan") || normalized.includes("business") || content.includes("દુકાન")) nextConnectionType = "Commercial";
       else if (normalized.includes("other") || content.includes("અન્ય")) nextConnectionType = "Other";
       if (nextConnectionType) setConnectionType(nextConnectionType);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership === null) {
-      if (normalized.includes("own") || normalized.includes("maru") || normalized.includes("mari") || content.includes("મારું") || content.includes("મારી")) nextOwnership = "Own";
-      else if (normalized.includes("permission") || normalized.includes("manjuri") || content.includes("મંજૂરી")) nextOwnership = "Permission";
-      else if (/\bno\b/.test(normalized) || normalized.includes("nathi") || content.includes("નથી")) nextOwnership = "No";
+    } else if (nextReportFlow && nextConnectionType !== null && nextOwnership === null) {
+      if (normalized.includes("own") || normalized.includes("maru") || normalized.includes("mari") || content.includes("મારું") || content.includes("મારી") || content.includes("પોતાની")) nextOwnership = "Own";
+      else if (normalized.includes("permission") || normalized.includes("manjuri") || content.includes("મંજૂરી") || content.includes("પરવાનગી")) nextOwnership = "Permission";
+      else if (/\\bno\\b/.test(normalized) || normalized.includes("nathi") || content.includes("નથી")) nextOwnership = "No";
       if (nextOwnership) setOwnership(nextOwnership);
-    } else if (roofArea !== null && roofType !== null && monthlyBill !== null && connectionType !== null && ownership !== null && goal === null && content.length <= 80 && !/[?؟]/.test(content)) {
-      if (normalized.includes("reduce") || normalized.includes("ochhu") || normalized.includes("ghat") || content.includes("ઘટાડ") || content.includes("ઓછું")) nextGoal = "Reduce electricity bill";
-      else if (normalized.includes("maximum") || normalized.includes("vadhu generation") || content.includes("વધુ ઉત્પાદન")) nextGoal = "Maximum generation";
-      else if (normalized.includes("cost") || normalized.includes("subsidy") || normalized.includes("kharch") || content.includes("ખર્ચ") || content.includes("સબસિડી")) nextGoal = "Cost/subsidy";
-      else if (normalized.includes("feasibility") || normalized.includes("shakyata") || content.includes("શક્યતા")) nextGoal = "Just check feasibility";
-      if (nextGoal) {
-        setGoal(nextGoal);
-        // Location analysis and report generation start immediately after the goal is selected.
-      }
     }
 
-    // The final goal answer now immediately starts live location analysis and PDF generation.
-    // A roof photo is no longer required: the report uses the detected building footprint
-    // and mapped 3D building data for the site model.
-    if (nextGoal !== null && goal === null) {
+    const intakeCompleteNow =
+      nextReportFlow &&
+      nextGoal !== null &&
+      nextName !== null &&
+      nextRoofArea !== null &&
+      nextRoofType !== null &&
+      nextMonthlyBill !== null &&
+      nextApplianceStep >= 6 &&
+      nextConnectionType !== null &&
+      nextOwnership !== null;
+
+    // Ask every intake question before requesting location and generating the report.
+    if (intakeCompleteNow) {
       setReportFlow(false);
       const liveAnalysis = await loadLocationAnalysis(nextRoofArea, signal);
       if (signal.aborted) {
@@ -2061,21 +2071,24 @@ export default function RoofRayChat() {
       setReportFlow(true);
       const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
       const gu = chatLanguage === "gu";
-      const nextQuestion = nextRoofArea === null
-        ? (gu ? "તમારી છતનું ક્ષેત્રફળ કેટલું છે? (ચોરસ ફૂટમાં)" : "To prepare your solar report, what is your roof area in square feet?")
-        : nextRoofType === null
-          ? (gu ? "તમારી છત કયા પ્રકારની છે? (RCC/કોંક્રિટ, મેટલ શીટ, ટાઇલ કે અન્ય)" : "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)")
-          : nextMonthlyBill === null
-            ? (gu ? "તમારું સરેરાશ માસિક વીજળી બિલ કેટલું આવે છે? (₹માં)" : "What is your average monthly electricity bill in ₹?")
-            : nextApplianceStep < applianceNames.length
-              ? (gu ? `તમારા ઘરે કેટલા ${({TV:"ટીવી",Fan:"પંખા",AC:"એસી",Refrigerator:"ફ્રિજ",Bulb:"બલ્બ/લાઇટ", "Water Pump":"પાણીના પંપ"})[applianceNames[nextApplianceStep] as "TV" | "Fan" | "AC" | "Refrigerator" | "Bulb" | "Water Pump"]} છે? ન હોય તો 0 લખો.` : `Approximately how many ${applianceNames[nextApplianceStep]}s do you have? Enter 0 if none.`)
-              : nextConnectionType === null
-                ? (gu ? "તમારું વીજળી કનેક્શન ઘરેલું છે કે વ્યાવસાયિક? (Residential/Commercial)" : "Is the electricity connection Residential or Commercial?")
-                : nextOwnership === null
-                  ? (gu ? "મિલકત તમારી પોતાની છે કે સોલાર લગાવવાની પરવાનગી છે?" : "Do you own the property, or do you have permission to install solar there?")
-                  : nextGoal === null
-                    ? (gu ? "સોલાર લગાવવાનો તમારો મુખ્ય હેતુ શું છે: બિલ ઘટાડવું, વધુ વીજ ઉત્પાદન, ખર્ચ/સબસિડી કે શક્યતા તપાસવી?" : "What is your main goal: reduce bill, maximum generation, cost/subsidy, or feasibility?")
-                    : "";
+      const nextQuestion =
+        nextGoal === null
+          ? (gu ? "સોલાર લગાવવાનો તમારો મુખ્ય હેતુ શું છે: વીજળીનું બિલ ઘટાડવું, વધુ વીજ ઉત્પાદન, ખર્ચ/સબસિડી કે માત્ર શક્યતા તપાસવી?" : "What is your main goal for installing solar: reduce your electricity bill, maximize generation, understand cost/subsidy, or just check feasibility?")
+          : nextName === null
+            ? (gu ? "તમારું નામ શું છે?" : "What is your name?")
+            : nextRoofArea === null
+              ? (gu ? "તમારી છતનું ક્ષેત્રફળ કેટલું છે? (ચોરસ ફૂટમાં)" : "What is the area of your roof in square feet?")
+              : nextRoofType === null
+                ? (gu ? "તમારી છત કયા પ્રકારની છે? (RCC/કોંક્રિટ, મેટલ શીટ, ટાઇલ કે અન્ય)" : "What type of roof do you have? (RCC/Concrete, Metal Sheet, Tile, or Other)")
+                : nextMonthlyBill === null
+                  ? (gu ? "તમારું સરેરાશ માસિક વીજળી બિલ કેટલું આવે છે? (₹માં)" : "What is your average monthly electricity bill in ₹?")
+                  : nextApplianceStep < applianceNames.length
+                    ? (gu ? `તમારા ઘરે કેટલા ${({TV:"ટીવી",Fan:"પંખા",AC:"એસી",Refrigerator:"ફ્રિજ",Bulb:"બલ્બ/લાઇટ", "Water Pump":"પાણીના પંપ"})[applianceNames[nextApplianceStep] as "TV" | "Fan" | "AC" | "Refrigerator" | "Bulb" | "Water Pump"]} છે? ન હોય તો 0 લખો.` : `Approximately how many ${applianceNames[nextApplianceStep]}s do you have? Enter 0 if none.`)
+                    : nextConnectionType === null
+                      ? (gu ? "તમારું વીજળી કનેક્શન ઘરેલું છે કે વ્યાવસાયિક? (Residential/Commercial)" : "Is the electricity connection Residential or Commercial?")
+                      : nextOwnership === null
+                        ? (gu ? "મિલકત તમારી પોતાની છે કે સોલાર લગાવવાની પરવાનગી છે?" : "Do you own the property, or do you have permission to install solar there?")
+                        : "";
       if (nextQuestion) {
         setMessages((current) => [...current, { id: safeUUID(), role: "assistant", content: nextQuestion }]);
         finishGeneration(controller);
