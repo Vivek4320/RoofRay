@@ -510,7 +510,7 @@ function AssistantMessage({
       options: ["RCC/Concrete", "Metal Sheet", "Tile", "Other"],
     },
     {
-      pattern: /what type of electricity connection do you have/i,
+      pattern: /(?:what type of electricity connection do you have|is the electricity connection residential or commercial)/i,
       options: ["Residential", "Commercial", "Other"],
     },
     {
@@ -2056,8 +2056,10 @@ export default function RoofRayChat() {
         setApplianceStep(nextApplianceStep);
       }
     } else if (nextReportFlow && nextApplianceStep >= 6 && nextConnectionType === null) {
-      if (normalized.includes("residential") || normalized.includes("ghar") || normalized.includes("home") || content.includes("ઘર")) nextConnectionType = "Residential";
-      else if (normalized.includes("commercial") || normalized.includes("dukan") || normalized.includes("business") || content.includes("દુકાન")) nextConnectionType = "Commercial";
+      // Accept common typing mistakes such as "resdential" as well as Gujarati/Roman Gujarati answers.
+      const connectionAnswer = normalized.replace(/[\\s_-]+/g, "");
+      if (/res(?:i)?dential/.test(connectionAnswer) || normalized.includes("ghar") || normalized.includes("home") || content.includes("ઘર") || content.includes("રહેણાંક")) nextConnectionType = "Residential";
+      else if (/com+ercial|comercial/.test(connectionAnswer) || normalized.includes("dukan") || normalized.includes("business") || content.includes("દુકાન") || content.includes("વ્યવસાયિક")) nextConnectionType = "Commercial";
       else if (normalized.includes("other") || content.includes("અન્ય")) nextConnectionType = "Other";
       if (nextConnectionType) setConnectionType(nextConnectionType);
     } else if (nextReportFlow && nextConnectionType !== null && nextOwnership === null) {
