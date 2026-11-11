@@ -1806,9 +1806,35 @@ export default function RoofRayChat() {
     link.remove();
   }
 
-  async function generateFinalReport(analysis: SolarAnalysis, roofPhotoOverride?: string | null, goalOverride?: string | null, signal?: AbortSignal, languageHint?: string) {
+  async function generateFinalReport(
+    analysis: SolarAnalysis,
+    roofPhotoOverride?: string | null,
+    goalOverride?: string | null,
+    signal?: AbortSignal,
+    languageHint?: string,
+    inputsOverride?: {
+      name: string | null;
+      roofAreaSqFt: number | null;
+      roofType: string | null;
+      monthlyBillInr: number | null;
+      applianceDetails: string | null;
+      connectionType: string | null;
+      ownership: string | null;
+      goal: string | null;
+    },
+  ) {
     const reportGoal = goalOverride ?? goal;
     if (reportGoal === null) return;
+    const reportInputs = inputsOverride ?? {
+      name,
+      roofAreaSqFt: roofArea,
+      roofType,
+      monthlyBillInr: monthlyBill,
+      applianceDetails,
+      connectionType,
+      ownership,
+      goal: reportGoal,
+    };
     const controller = signal ? null : new AbortController();
     const requestSignal = signal ?? controller!.signal;
     if (controller) generationControllerRef.current = controller;
@@ -1877,14 +1903,7 @@ export default function RoofRayChat() {
       const activeController = generationControllerRef.current;
       if (activeController?.signal === requestSignal) finishGeneration(activeController);
       await persistReportAndDownloadPdf(data.message, analysis, {
-        name,
-        roofAreaSqFt: roofArea,
-        roofType,
-        monthlyBillInr: monthlyBill,
-        applianceDetails,
-        connectionType,
-        ownership,
-        goal,
+        ...reportInputs,
         roofPhotoDataUrl: roofPhotoOverride || roofPhotoDataUrl || undefined,
       });
     } catch (error) {
@@ -2061,7 +2080,16 @@ export default function RoofRayChat() {
       }
       if (liveAnalysis) {
         currentSolarContext = liveAnalysis;
-        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl, nextGoal, signal, content);
+        await generateFinalReport(liveAnalysis, nextRoofPhotoDataUrl, nextGoal, signal, content, {
+          name: nextName,
+          roofAreaSqFt: nextRoofArea,
+          roofType: nextRoofType,
+          monthlyBillInr: nextMonthlyBill,
+          applianceDetails: nextApplianceDetails,
+          connectionType: nextConnectionType,
+          ownership: nextOwnership,
+          goal: nextGoal,
+        });
       }
       finishGeneration(controller);
       return;
