@@ -2004,11 +2004,11 @@ export default function RoofRayChat() {
       || /(સોલાર|સોલર).{0,30}(લગાવ|મૂકવ|ઇન્સ્ટોલ|શક્યતા|અંદાજ|રિપોર્ટ)|(લગાવ|મૂકવ).{0,30}(સોલાર|સોલર)/i.test(content);
     const nextReportFlow = reportFlow || isReportRequest;
 
-    const isGreeting = /^(hi+|hello+|hey+|good morning|good afternoon|good evening)[!.\\s]*$/i.test(content.trim());
+    const isGreeting = /^(hi+|hello+|hey+|good morning|good afternoon|good evening)[!.\s]*$/i.test(content.trim());
     const isLikelyName =
       content.length <= 40 &&
       !/[?؟]/.test(content) &&
-      !/\\b(what|why|how|benefit|benefits|solar|can|does|do|tell|explain|estimate|calculate|hello|hi|hey)\\b/i.test(content);
+      !/\b(what|why|how|benefit|benefits|solar|can|does|do|tell|explain|estimate|calculate|hello|hi|hey)\b/i.test(content);
 
     // The structured intake starts with the user's goal, then name and roof details.
     // Do not let the normal conversational model replace or skip these questions.
@@ -2024,7 +2024,7 @@ export default function RoofRayChat() {
       nextGoal = goalAnswer;
       setGoal(goalAnswer);
     } else if (nextReportFlow && nextGoal !== null && nextName === null && isLikelyName && !isGreeting) {
-      nextName = content.replace(/\\s+/g, " ").trim().slice(0, 80);
+      nextName = content.replace(/\s+/g, " ").trim().slice(0, 80);
       setName(nextName);
     } else if (nextReportFlow && nextGoal !== null && nextName !== null && nextRoofArea === null && number !== null && number > 0 && !/[?؟]/.test(content)) {
       nextRoofArea = number;
@@ -2048,7 +2048,7 @@ export default function RoofRayChat() {
       const applianceNames = ["TV", "Fan", "AC", "Refrigerator", "Bulb", "Water Pump"];
       const selectedAppliance = applianceNames[nextApplianceStep];
       const selectedQuantity = content.trim();
-      if (/^(0|1|2|3|4\\+|none|\\d+)$/i.test(selectedQuantity)) {
+      if (/^(0|1|2|3|4\+|none|\d+)$/i.test(selectedQuantity)) {
         const entry = `${selectedAppliance}: ${selectedQuantity.toLowerCase() === "none" ? "0" : selectedQuantity}`;
         nextApplianceDetails = [applianceDetails, entry].filter(Boolean).join(", ");
         nextApplianceStep = applianceStep + 1;
@@ -2063,7 +2063,7 @@ export default function RoofRayChat() {
     } else if (nextReportFlow && nextConnectionType !== null && nextOwnership === null) {
       if (normalized.includes("own") || normalized.includes("maru") || normalized.includes("mari") || content.includes("મારું") || content.includes("મારી") || content.includes("પોતાની")) nextOwnership = "Own";
       else if (normalized.includes("permission") || normalized.includes("manjuri") || content.includes("મંજૂરી") || content.includes("પરવાનગી")) nextOwnership = "Permission";
-      else if (/\\bno\\b/.test(normalized) || normalized.includes("nathi") || content.includes("નથી")) nextOwnership = "No";
+      else if (/\bno\b/.test(normalized) || normalized.includes("nathi") || content.includes("નથી")) nextOwnership = "No";
       if (nextOwnership) setOwnership(nextOwnership);
     }
 
